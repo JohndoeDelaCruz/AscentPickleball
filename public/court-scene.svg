@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1100" fill="none">
+<defs>
+ <linearGradient id="ground" x1="0" y1="0" x2="1000" y2="1100"><stop stop-color="#66856a"/><stop offset="1" stop-color="#254535"/></linearGradient>
+ <linearGradient id="court" x1="200" y1="200" x2="850" y2="900"><stop stop-color="#bfcc86"/><stop offset="1" stop-color="#8eaa6d"/></linearGradient>
+ <linearGradient id="ball" x1="650" y1="730" x2="810" y2="930"><stop stop-color="#f1ff80"/><stop offset=".5" stop-color="#d0ee40"/><stop offset="1" stop-color="#94ae23"/></linearGradient>
+ <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope=".08"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter>
+ <filter id="shadow"><feGaussianBlur stdDeviation="15"/></filter>
+ <pattern id="net" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 0H12V12" stroke="#dce8c6" stroke-opacity=".55" stroke-width="1.2"/></pattern>
+ <clipPath id="clip"><path d="M-120 0H1100V1200H-120Z"/></clipPath>
+</defs>
+<g clip-path="url(#clip)">
+<path fill="url(#ground)" d="M0 0h1000v1100H0z"/>
+<g transform="translate(505 530) rotate(-23) translate(-505 -530)">
+<path fill="#183d30" d="M160-100h690v1350H160z"/>
+<path fill="url(#court)" d="M215 80h580v1030H215z"/>
+<path fill="#64835d" d="M215 436h580v316H215z"/>
+<g stroke="#f8f6d9" stroke-width="7" stroke-linecap="square">
+<path d="M215 80h580v1030H215zM215 436h580M215 752h580M505 80v356M505 752v358"/>
+</g>
+<path d="M181 600h650l54 52H215Z" fill="#102b20" opacity=".3"/>
+<path d="M184 535h643v68H184z" fill="#183629"/>
+<path d="M184 535h643v68H184z" fill="url(#net)"/>
+<path d="M183 533h647" stroke="#faf8dc" stroke-width="7"/>
+<path d="M178 528v91M832 528v91" stroke="#132d20" stroke-width="11"/>
+<path d="M70-50V1150M940-50V1150" stroke="#d8dfb4" stroke-opacity=".12" stroke-width="2"/>
+<path d="M850 160l250 70M850 180l250 70M850 200l250 70M850 220l250 70M850 240l250 70M850 260l250 70M850 280l250 70" stroke="#102c21" stroke-opacity=".18" stroke-width="12"/>
+</g>
+<path d="M0 0h1000v1100H0z" filter="url(#noise)" opacity=".8"/>
+<ellipse cx="789" cy="918" rx="121" ry="39" fill="#0d261b" opacity=".45" filter="url(#shadow)"/>
+<circle cx="756" cy="826" r="112" fill="url(#ball)"/>
+<g fill="#718728">
+<ellipse cx="715" cy="757" rx="14" ry="11" transform="rotate(-30 715 757)"/>
+<ellipse cx="769" cy="744" rx="14" ry="9" transform="rotate(10 769 744)"/>
+<ellipse cx="818" cy="780" rx="12" ry="15" transform="rotate(-35 818 780)"/>
+<circle cx="756" cy="805" r="17"/>
+<ellipse cx="697" cy="824" rx="14" ry="18" transform="rotate(-15 697 824)"/>
+<ellipse cx="807" cy="848" rx="16" ry="19" transform="rotate(25 807 848)"/>
+<ellipse cx="748" cy="875" rx="18" ry="15"/>
+<ellipse cx="685" cy="877" rx="8" ry="13" transform="rotate(-40 685 877)"/>
+<ellipse cx="853" cy="822" rx="6" ry="15"/>
+<ellipse cx="789" cy="920" rx="13" ry="6" transform="rotate(-25 789 920)"/>
+</g>
+<path d="M688 754a100 100 0 0 1 100-28" stroke="#f8ffa3" stroke-width="4" opacity=".65" stroke-linecap="round"/>
+</g>
+</svg>

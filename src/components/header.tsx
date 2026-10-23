@@ -1,0 +1,103 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { ArrowUpRight, Menu, X, LogOut } from "lucide-react";
+import { Brand } from "./brand";
+import { createClient } from "@/lib/supabase/client";
+
+export function Header({
+  signedIn,
+  staff,
+}: {
+  signedIn: boolean;
+  staff: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const path = usePathname();
+  const router = useRouter();
+  async function signOut() {
+    await createClient().auth.signOut();
+    setOpen(false);
+    router.push("/");
+    router.refresh();
+  }
+  const links = [
+    { href: "/#courts", label: "The courts" },
+    { href: "/#how-it-works", label: "How it works" },
+    { href: "/#visit", label: "Find us" },
+  ];
+  return (
+    <header className="site-header">
+      <div className="container nav-shell">
+        <Brand />
+        <nav className="desktop-nav" aria-label="Main navigation">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href}>
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="nav-actions">
+          <Link
+            href={staff ? "/admin" : signedIn ? "/my-bookings" : "/login"}
+            className="nav-account"
+          >
+            {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
+          </Link>
+          <Link href="/book" className="button button-dark button-small">
+            Book a court <ArrowUpRight size={16} />
+          </Link>
+          {signedIn && (
+            <button
+              className="icon-button sign-out"
+              onClick={signOut}
+              aria-label="Sign out"
+            >
+              <LogOut size={17} />
+            </button>
+          )}
+        </div>
+        <button
+          className="icon-button mobile-menu"
+          onClick={() => setOpen(!open)}
+          aria-label={open ? "Close navigation" : "Open navigation"}
+          aria-expanded={open}
+        >
+          {open ? <X /> : <Menu />}
+        </button>
+      </div>
+      {open && (
+        <nav className="mobile-nav" aria-label="Mobile navigation">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setOpen(false)}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <Link href="/my-bookings" onClick={() => setOpen(false)}>
+            My bookings
+          </Link>
+          <Link
+            href={staff ? "/admin" : "/login"}
+            onClick={() => setOpen(false)}
+          >
+            {staff ? "Dashboard" : signedIn ? "Account" : "Log in / Sign up"}
+          </Link>
+          {signedIn && <button onClick={signOut}>Sign out</button>}
+          <Link
+            href="/book"
+            className="button button-dark"
+            onClick={() => setOpen(false)}
+          >
+            Book a court <ArrowUpRight size={16} />
+          </Link>
+        </nav>
+      )}
+    </header>
+  );
+}
