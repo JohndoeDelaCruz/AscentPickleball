@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import {
+  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   Check,
@@ -11,7 +12,6 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
-import { Starburst } from "@/components/starburst";
 import { canBook, formatHour, money, getRatePeriods } from "@/lib/booking";
 
 export default async function Home() {
@@ -41,8 +41,37 @@ export default async function Home() {
   ];
   return (
     <main id="main">
-      <section className="container hero" aria-label="Ascent Pickleball courts">
-        <h1 className="sr-only">Ascent Pickleball</h1>
+      <section className="container hero">
+        <div className="hero-copy">
+          <h1>
+            PLAY HIGHER.
+            <br />
+            <span className="hero-ascent">
+              PLAY <span className="text-outline">ASCENT.</span>
+              <svg viewBox="0 0 410 20" aria-hidden="true">
+                <path
+                  d="M3 13Q190-3 405 9M35 19Q220 4 380 13"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          </h1>
+          <p className="hero-description">
+            A place to play, a reason to connect. Get your crew together and
+            make your next game an Ascent game.
+          </p>
+          <div className="hero-buttons">
+            <Link href="/book" className="button button-dark">
+              Find your court <ArrowUpRight size={19} />
+            </Link>
+            <a href="#courts" className="text-link">
+              Meet Ascent <ArrowDown size={16} />
+            </a>
+          </div>
+        </div>
         <div className="hero-visual">
           <Image
             src="/ascent-courts-panorama.jpg"
@@ -88,9 +117,8 @@ export default async function Home() {
             <div className="marquee-group" key={copy}>
               {[0, 1].map((repeat) => (
                 <div className="marquee-phrase" key={repeat}>
-                  PLAY MORE <Starburst className="marquee-star" /> CONNECT MORE{" "}
-                  <Starburst className="marquee-star" /> RISE TOGETHER{" "}
-                  <Starburst className="marquee-star" />
+                  PLAY MORE <span>✳</span> CONNECT MORE <span>✳</span> RISE
+                  TOGETHER <span>✳</span>
                 </div>
               ))}
             </div>
@@ -334,7 +362,7 @@ export default async function Home() {
               <span />
               <span />
             </div>
-            <Starburst className="visit-ball" />
+            <span className="visit-ball">✳</span>
             <span className="visit-word">
               MEET YOU
               <br />
@@ -374,7 +402,7 @@ export default async function Home() {
           <h2>
             THE NEXT RALLY
             <br />
-            STARTS WITH YOU
+            STARTS WITH YOU<span>↗</span>
           </h2>
           <Link href="/book" className="button button-dark">
             Let’s get playing <ArrowRight size={18} />

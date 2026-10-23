@@ -32,9 +32,6 @@ export default async function MyBookings() {
           Reservations, payment updates, and everything you need for your next
           game.
         </p>
-        <Link href="/account" className="text-link account-link">
-          Account settings / Change password <ArrowUpRight size={17} />
-        </Link>
       </div>
       {error ? (
         <div className="error-message">
@@ -74,7 +71,7 @@ export default async function MyBookings() {
                     : `Court ${b.court_id}`}{" "}
                   <span
                     style={{
-                      fontSize: 14,
+                      fontSize: 10,
                       color: "var(--muted)",
                       fontWeight: 400,
                       marginLeft: 7,
@@ -106,7 +103,7 @@ export default async function MyBookings() {
                 <span className={`status-badge status-${b.status}`}>
                   {statusLabels[b.status]}
                 </span>
-                <span className="text-link" style={{ fontSize: 14 }}>
+                <span className="text-link" style={{ fontSize: 10 }}>
                   View booking <ArrowUpRight size={15} />
                 </span>
               </div>

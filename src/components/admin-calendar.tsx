@@ -150,7 +150,7 @@ export function AdminCalendar({
                         justifyContent: "center",
                         minHeight: 34,
                         borderRadius: 4,
-                        fontSize: 14,
+                        fontSize: 9,
                       }}
                     >
                       {b.status === "blocked"
@@ -164,7 +164,7 @@ export function AdminCalendar({
                         justifyContent: "center",
                         alignItems: "center",
                         height: 34,
-                        fontSize: 14,
+                        fontSize: 9,
                         color: "var(--muted)",
                       }}
                     >
@@ -319,7 +319,7 @@ export function AdminCalendar({
           }
           onClose={() => !pending && setAction(null)}
         >
-          <p style={{ fontSize: 14, lineHeight: 1.8 }}>
+          <p style={{ fontSize: 12, lineHeight: 1.8 }}>
             <strong>
               {action.booking.reference} · {action.booking.customer_name}
             </strong>

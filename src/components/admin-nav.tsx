@@ -10,14 +10,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
-  KeyRound,
 } from "lucide-react";
 
 const items = [
   { href: "/admin", label: "Court calendar", icon: CalendarDays },
   { href: "/admin/finance", label: "Finance", icon: ChartNoAxesCombined },
   { href: "/admin/settings", label: "Venue settings", icon: Settings2 },
-  { href: "/account", label: "Change password", icon: KeyRound },
 ];
 
 export function AdminNav() {

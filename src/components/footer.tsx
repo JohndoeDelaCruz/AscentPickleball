@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Brand } from "./brand";
-import { Starburst } from "./starburst";
 export function Footer() {
   return (
     <footer className="site-footer">
@@ -34,7 +33,7 @@ export function Footer() {
       <div className="container footer-bottom">
         <span>© {new Date().getFullYear()} Ascent Pickleball</span>
         <span>
-          Made for the love of the game. <Starburst className="tiny-ball" />
+          Made for the love of the game. <span className="tiny-ball">✳</span>
         </span>
         <Link href="/privacy">Privacy policy</Link>
       </div>
