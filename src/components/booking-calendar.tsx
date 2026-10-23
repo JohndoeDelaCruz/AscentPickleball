@@ -539,7 +539,7 @@ export function BookingCalendar({
                   style={{
                     display: "flex",
                     gap: 9,
-                    fontSize: 10,
+                    fontSize: 14,
                     lineHeight: 1.8,
                   }}
                 >
@@ -584,7 +584,7 @@ export function BookingCalendar({
           </>
         )}
         <details style={{ marginTop: 23 }} id="booking-policy">
-          <summary style={{ fontSize: 10, color: "var(--muted)" }}>
+          <summary style={{ fontSize: 14, color: "var(--muted)" }}>
             Booking & cancellation policy
           </summary>
           <p className="small-print">{venue.cancellation_policy}</p>

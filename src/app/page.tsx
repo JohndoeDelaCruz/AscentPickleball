@@ -7,11 +7,11 @@ import {
   Check,
   Clock3,
   MapPin,
-  MoveUpRight,
   QrCode,
   CalendarDays,
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
+import { Starburst } from "@/components/starburst";
 import { canBook, formatHour, money, getRatePeriods } from "@/lib/booking";
 
 export default async function Home() {
@@ -41,7 +41,7 @@ export default async function Home() {
   ];
   return (
     <main id="main">
-      <section className="container hero">
+      <section className="container hero" aria-label="Ascent Pickleball courts">
         <div className="hero-copy">
           <h1>
             PLAY HIGHER.
@@ -92,9 +92,6 @@ export default async function Home() {
           </div>
           <div className="vertical-word">LET’S PLAY.</div>
           <div className="hero-image-caption">
-            <span className="caption-circle">
-              <MoveUpRight size={30} />
-            </span>
             <div>
               <strong>
                 Find your people.
@@ -117,8 +114,9 @@ export default async function Home() {
             <div className="marquee-group" key={copy}>
               {[0, 1].map((repeat) => (
                 <div className="marquee-phrase" key={repeat}>
-                  PLAY MORE <span>✳</span> CONNECT MORE <span>✳</span> RISE
-                  TOGETHER <span>✳</span>
+                  PLAY MORE <Starburst className="marquee-star" /> CONNECT MORE{" "}
+                  <Starburst className="marquee-star" /> RISE TOGETHER{" "}
+                  <Starburst className="marquee-star" />
                 </div>
               ))}
             </div>
@@ -362,7 +360,7 @@ export default async function Home() {
               <span />
               <span />
             </div>
-            <span className="visit-ball">✳</span>
+            <Starburst className="visit-ball" />
             <span className="visit-word">
               MEET YOU
               <br />
@@ -402,7 +400,7 @@ export default async function Home() {
           <h2>
             THE NEXT RALLY
             <br />
-            STARTS WITH YOU<span>↗</span>
+            STARTS WITH YOU
           </h2>
           <Link href="/book" className="button button-dark">
             Let’s get playing <ArrowRight size={18} />

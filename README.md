@@ -40,6 +40,7 @@ Rates, hours, address, city, contact details, introduction, GCash details, unpai
 | `/`               | Responsive venue website, both courts, FAQs, directions when configured             |
 | `/book`           | Public availability and reservation flow                                            |
 | `/login`          | Sign up, log in, password recovery                                                  |
+| `/account`        | Signed-in customers and staff: change password after verifying the current password |
 | `/my-bookings`    | Your reservations and statuses                                                      |
 | `/booking/[id]`   | Booking details, GCash QR, payment reference, unpaid cancellation                   |
 | `/admin`          | Staff calendar, GCash reviews, confirmed walk-ins, maintenance blocks               |
@@ -82,6 +83,6 @@ The database suite runs the **actual migrations** in an isolated PGlite Postgres
 
 ## Design and launch notes
 
-The homepage uses a wide venue photo hero with the headline and booking links over the image.
+The homepage uses a wide venue photo hero with its headline, description, booking links, and venue caption. The caption's circled arrow is removed. Decorative starbursts use SVGs so they render consistently across desktop and mobile platforms.
 
 The green and lime palette, wordmark, and original SVG court illustrations are starter branding and artwork. Replace the illustrations with venue photography when available. The privacy notice describes implemented behavior; update venue contact details and business policies before opening reservations. Hosting and a domain have not been provisioned; the app can be deployed to any compatible Next.js Node host with the two public environment variables configured.

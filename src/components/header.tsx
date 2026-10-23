@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { ArrowUpRight, Menu, X, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight, Menu, X, LogOut, UserRound } from "lucide-react";
 import { Brand } from "./brand";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,7 +15,6 @@ export function Header({
   staff: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const path = usePathname();
   const router = useRouter();
   async function signOut() {
     await createClient().auth.signOut();
@@ -46,9 +45,26 @@ export function Header({
           >
             {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
           </Link>
-          <Link href="/book" className="button button-dark button-small">
+          <Link href="/book" className="button button-dark button-small nav-book-button">
             Book a court <ArrowUpRight size={16} />
           </Link>
+          <Link
+            href={signedIn ? (staff ? "/admin" : "/my-bookings") : "/login"}
+            className="button button-dark button-small nav-mobile-primary"
+            onClick={() => setOpen(false)}
+          >
+            {signedIn ? (staff ? "Dashboard" : "My bookings") : "Log in / Sign up"}
+          </Link>
+          {signedIn && (
+            <Link
+              href="/account"
+              className="icon-button account-settings"
+              aria-label="Account settings"
+              title="Account settings"
+            >
+              <UserRound size={18} />
+            </Link>
+          )}
           {signedIn && (
             <button
               className="icon-button sign-out"
@@ -82,11 +98,9 @@ export function Header({
           <Link href="/my-bookings" onClick={() => setOpen(false)}>
             My bookings
           </Link>
-          <Link
-            href={staff ? "/admin" : "/login"}
-            onClick={() => setOpen(false)}
-          >
-            {staff ? "Dashboard" : signedIn ? "Account" : "Log in / Sign up"}
+          {staff && <Link href="/admin" onClick={() => setOpen(false)}>Dashboard</Link>}
+          <Link href={signedIn ? "/account" : "/login"} onClick={() => setOpen(false)}>
+            {signedIn ? "Account settings / Change password" : "Log in / Sign up"}
           </Link>
           {signedIn && <button onClick={signOut}>Sign out</button>}
           <Link
