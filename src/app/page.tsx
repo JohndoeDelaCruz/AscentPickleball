@@ -25,7 +25,7 @@ export default async function Home() {
     ],
     [
       "How do GCash payments work?",
-      "Pay the exact booking amount using our GCash QR, then submit your payment reference before your hold expires. Your booking stays under review until staff verifies the incoming payment.",
+      "Choose a 50% reservation fee or full payment, then pay the amount shown using our GCash QR and submit your reference before your hold expires. Staff verifies the payment before confirming your booking. If you choose the reservation fee, settle the remaining balance at the venue before you play.",
     ],
     ["Can I cancel my reservation?", venue.cancellation_policy],
     [

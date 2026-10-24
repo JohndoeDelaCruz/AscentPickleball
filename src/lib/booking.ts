@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Availability, VenueSettings } from "./types";
+import { paymentOptionSchema } from "./payment";
 
 export const TIME_ZONE = "Asia/Manila";
 export function isValidDate(value: string | undefined): value is string {
@@ -161,6 +162,7 @@ export function canBook(venue: VenueSettings) {
   );
 }
 export const bookingSchema = z.object({
+  payment_option: paymentOptionSchema.default("full"),
   equipment_rental: z.boolean().default(false),
   court_id: z.coerce.number().int().min(1).max(2),
   booking_date: z.iso.date(),
@@ -185,6 +187,7 @@ export const openPlaySchema = bookingSchema
     customer_name: true,
     customer_phone: true,
     equipment_rental: true,
+    payment_option: true,
   })
   .extend({ participant_count: z.coerce.number().int().min(1).max(20) });
 export function calculateReservationTotal(

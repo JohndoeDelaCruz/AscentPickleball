@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { ArrowUpRight, CalendarDays, Info } from "lucide-react";
 import { getSession, getVenue } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatHour } from "@/lib/booking";
+import { formatDate, formatHour, money } from "@/lib/booking";
+import { bookingPayments } from "@/lib/payment";
 import { statusLabels, type Booking } from "@/lib/types";
 export const metadata: Metadata = { title: "My bookings" };
 export default async function MyBookings() {
@@ -106,6 +107,13 @@ export default async function MyBookings() {
                 <span className={`status-badge status-${b.status}`}>
                   {statusLabels[b.status]}
                 </span>
+                {b.status === "confirmed" && (
+                  <small>
+                    {bookingPayments(b).balance > 0
+                      ? `${money(bookingPayments(b).balance)} balance at venue`
+                      : "Fully paid"}
+                  </small>
+                )}
                 <span className="text-link" style={{ fontSize: 14 }}>
                   View booking <ArrowUpRight size={15} />
                 </span>

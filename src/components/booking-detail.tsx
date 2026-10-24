@@ -16,6 +16,7 @@ import {
   money,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
+import { bookingPayments } from "@/lib/payment";
 
 export function BookingDetail({
   booking: b,
@@ -95,6 +96,7 @@ export function BookingDetail({
   }
   const awaitingPayment = b.status === "awaiting_payment" && remaining !== 0;
   const openPlay = b.booking_type === "open_play";
+  const payments = bookingPayments(b);
   return (
     <div className="detail-layout">
       <div>
@@ -180,13 +182,62 @@ export function BookingDetail({
             <span>Booking total</span>
             <strong>{money(b.total_amount)}</strong>
           </div>
+          <dl className="summary-rows payment-cost-rows">
+            <div>
+              <dt>Payment option</dt>
+              <dd>
+                {b.payment_option === "reservation_fee"
+                  ? "Reservation fee · 50%"
+                  : "Full payment"}
+              </dd>
+            </div>
+            <div>
+              <dt>Verified payment</dt>
+              <dd>{money(payments.paid)}</dd>
+            </div>
+            {b.status === "confirmed" ? (
+              <div>
+                <dt>Balance at venue</dt>
+                <dd>
+                  <strong>{money(payments.balance)}</strong>
+                </dd>
+              </div>
+            ) : ["awaiting_payment", "awaiting_verification"].includes(
+                b.status,
+              ) ? (
+              <>
+                <div>
+                  <dt>
+                    {b.status === "awaiting_verification"
+                      ? "Payment under review"
+                      : "Pay now"}
+                  </dt>
+                  <dd>{money(payments.initial)}</dd>
+                </div>
+                <div>
+                  <dt>Balance after verification</dt>
+                  <dd>{money(payments.later)}</dd>
+                </div>
+              </>
+            ) : null}
+            {b.balance_payment_reference && (
+              <div>
+                <dt>Balance payment reference</dt>
+                <dd>{b.balance_payment_reference}</dd>
+              </div>
+            )}
+          </dl>
           {b.status === "confirmed" && (
             <div
               className="success-message"
               style={{ display: "flex", gap: 10 }}
             >
               <Check size={19} />
-              <span>You’re confirmed. We’ll see you on court!</span>
+              <span>
+                {payments.balance > 0
+                  ? `Your reservation fee is verified and your booking is confirmed. Please settle ${money(payments.balance)} at the venue before you play.`
+                  : "You’re confirmed and fully paid. We’ll see you on court!"}
+              </span>
             </div>
           )}
           {b.status === "awaiting_verification" && (
@@ -306,9 +357,15 @@ export function BookingDetail({
           </span>
           <h3>Pay with GCash</h3>
           <p>
-            Pay exactly <strong>{money(b.total_amount)}</strong> and send your
+            Pay exactly <strong>{money(payments.initial)}</strong> and send your
             reference before the hold expires.
           </p>
+          {payments.later > 0 && (
+            <p className="small-print">
+              This is your 50% reservation fee. The remaining{" "}
+              {money(payments.later)} is due at the venue before you play.
+            </p>
+          )}
           {remaining !== null && (
             <div className="countdown" aria-label="Time remaining">
               {String(Math.floor(remaining / 60)).padStart(2, "0")}:

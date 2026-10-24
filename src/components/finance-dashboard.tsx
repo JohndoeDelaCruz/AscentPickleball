@@ -25,6 +25,8 @@ import { financePageSize } from "@/lib/finance";
 import { statusLabels } from "@/lib/types";
 import { saveBookingFinance, saveFinanceDay } from "@/app/actions";
 import { Modal } from "./modal";
+import { bookingPayments } from "@/lib/payment";
+import { BalancePaymentModal } from "./balance-payment-modal";
 
 type Period = { month: string; date: string; start: string; end: string };
 export function FinanceDashboard({
@@ -46,6 +48,9 @@ export function FinanceDashboard({
   const totals = sumFinance(days);
   const daily = days.find((d) => d.report_date === period.date)!;
   const [editing, setEditing] = useState<FinanceBooking | null>(null);
+  const [balanceBooking, setBalanceBooking] = useState<FinanceBooking | null>(
+    null,
+  );
   const [worker, setWorker] = useState(notes.worker_on_duty);
   const [managerNotes, setManagerNotes] = useState(notes.manager_notes);
   const [error, setError] = useState("");
@@ -114,9 +119,12 @@ export function FinanceDashboard({
       </div>
       <div className="finance-stats">
         <div className="panel stat-card">
-          <span>Confirmed sales</span>
+          <span>Collected payments</span>
           <strong>{money(totals.total_sales)}</strong>
-          <small>{totals.confirmed_bookings} reservations</small>
+          <small>
+            {totals.confirmed_bookings} confirmed{" "}
+            {totals.confirmed_bookings === 1 ? "reservation" : "reservations"}
+          </small>
         </div>
         <div className="panel stat-card">
           <span>Private court hours</span>
@@ -131,17 +139,27 @@ export function FinanceDashboard({
           <small>{totals.open_play_players} players</small>
         </div>
         <div className="panel stat-card">
+          <span>Confirmed booking value</span>
+          <strong>{money(totals.booking_value)}</strong>
+          <small>Includes unpaid balances</small>
+        </div>
+        <div className="panel stat-card">
+          <span>Balance to collect</span>
+          <strong>{money(totals.balance_due)}</strong>
+          <small>Due at the venue before play</small>
+        </div>
+        <div className="panel stat-card">
           <span>Pending value</span>
           <strong>{money(totals.pending_value)}</strong>
-          <small>Excluded from confirmed sales</small>
+          <small>Not yet verified</small>
         </div>
       </div>
       <p className="small-print finance-report-note">
-        Amounts use the Philippine play date and each reservation’s saved total.
-        Future confirmed bookings are included. Cancelled, expired, and pending
-        bookings do not count toward sales. Selected equipment rental is
-        included in confirmed totals and reported separately below. Refunds are
-        outside this report.
+        Collections include verified payments for confirmed reservations,
+        assigned to the Philippine play date. Reservation fees count only as the
+        amount collected. Unpaid balances are separate. Court/pass and equipment
+        collections are allocated proportionally. Cancelled, expired, and
+        pending reservations are excluded. Refunds are outside this report.
       </p>
       <section className="panel finance-month-panel">
         <div className="table-scroll">
@@ -156,7 +174,8 @@ export function FinanceDashboard({
                 <th scope="col">Court 2 sales</th>
                 <th scope="col">Open play</th>
                 <th scope="col">Equipment</th>
-                <th scope="col">Total sales</th>
+                <th scope="col">Collected</th>
+                <th scope="col">Balance due</th>
                 <th scope="col">Court 1 hours</th>
                 <th scope="col">Court 2 hours</th>
                 <th scope="col">Open-play players</th>
@@ -191,6 +210,7 @@ export function FinanceDashboard({
                   <td>
                     <strong>{money(d.total_sales)}</strong>
                   </td>
+                  <td>{money(d.balance_due)}</td>
                   <td>{d.court_1_hours}</td>
                   <td>{d.court_2_hours}</td>
                   <td>{d.open_play_players}</td>
@@ -205,6 +225,7 @@ export function FinanceDashboard({
                 <td>{money(totals.open_play_sales)}</td>
                 <td>{money(totals.equipment_sales)}</td>
                 <td>{money(totals.total_sales)}</td>
+                <td>{money(totals.balance_due)}</td>
                 <td>{totals.court_1_hours}</td>
                 <td>{totals.court_2_hours}</td>
                 <td>{totals.open_play_players}</td>
@@ -258,7 +279,7 @@ export function FinanceDashboard({
             <small>{daily.open_play_players} players</small>
           </div>
           <div>
-            <span>Day’s confirmed sales</span>
+            <span>Day’s collections</span>
             <strong>{money(daily.total_sales)}</strong>
             <small>{daily.confirmed_bookings} reservations</small>
           </div>
@@ -266,7 +287,7 @@ export function FinanceDashboard({
         <p className="small-print">
           Equipment rental sales:{" "}
           <strong>{money(daily.equipment_sales)}</strong>. Included in the day’s
-          confirmed total; court and open-play amounts above exclude rental.
+          collections; court and open-play amounts above exclude rental.
         </p>
         <div className="finance-payment-totals">
           {(
@@ -390,6 +411,17 @@ export function FinanceDashboard({
                       </td>
                       <td>
                         {money(b.total_amount)}
+                        <small>
+                          {b.payment_option === "reservation_fee"
+                            ? "50% reservation fee"
+                            : "Full payment"}
+                        </small>
+                        <small>Paid: {money(bookingPayments(b).paid)}</small>
+                        {b.status === "confirmed" && (
+                          <small>
+                            Balance: {money(bookingPayments(b).balance)}
+                          </small>
+                        )}
                         {b.equipment_rental && (
                           <small>
                             Includes {money(b.equipment_amount)} · 1 paddle + 2
@@ -402,6 +434,14 @@ export function FinanceDashboard({
                         {b.payment_reference && (
                           <small>{b.payment_reference}</small>
                         )}
+                        {b.balance_payment_method && (
+                          <small>
+                            Balance: {paymentMethods[b.balance_payment_method]}
+                            {b.balance_payment_reference
+                              ? ` · ${b.balance_payment_reference}`
+                              : ""}
+                          </small>
+                        )}
                       </td>
                       <td>
                         <span className={`status-badge status-${b.status}`}>
@@ -412,6 +452,15 @@ export function FinanceDashboard({
                         {b.booking_finance?.notes || "—"}
                       </td>
                       <td>
+                        {b.status === "confirmed" &&
+                          bookingPayments(b).balance > 0 && (
+                            <button
+                              className="text-link"
+                              onClick={() => setBalanceBooking(b)}
+                            >
+                              Record balance
+                            </button>
+                          )}
                         <button
                           className="text-link"
                           onClick={() => setEditing(b)}
@@ -436,7 +485,7 @@ export function FinanceDashboard({
           <div className="finance-log-footer">
             <span>
               {count} {count === 1 ? "reservation" : "reservations"} · Day’s
-              confirmed sales: <strong>{money(daily.total_sales)}</strong>
+              collections: <strong>{money(daily.total_sales)}</strong>
             </span>
             {count > financePageSize && (
               <div className="finance-actions">
@@ -458,6 +507,12 @@ export function FinanceDashboard({
         <FinanceBookingEditor
           booking={editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {balanceBooking && (
+        <BalancePaymentModal
+          booking={balanceBooking}
+          onClose={() => setBalanceBooking(null)}
         />
       )}
     </>

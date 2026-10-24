@@ -21,11 +21,12 @@ import {
   courtScheduleLabel,
   hasOpenPlay,
 } from "@/lib/booking";
-import type { Availability, VenueSettings } from "@/lib/types";
+import type { Availability, PaymentOption, VenueSettings } from "@/lib/types";
 import { reserveCourt } from "@/app/actions";
 import { DateSlider } from "@/components/date-slider";
 import { OpenPlayBooking } from "@/components/open-play-booking";
 import { EquipmentRental } from "@/components/equipment-rental";
+import { PaymentOptions } from "@/components/payment-options";
 
 export function BookingCalendar({
   venue,
@@ -69,6 +70,7 @@ export function BookingCalendar({
   const [name, setName] = useState(userName);
   const [phone, setPhone] = useState("");
   const [equipmentRental, setEquipmentRental] = useState(false);
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(() => new Date());
@@ -159,6 +161,7 @@ export function BookingCalendar({
         customer_name: name,
         customer_phone: phone,
         equipment_rental: equipmentRental,
+        payment_option: paymentOption,
       });
       if (result.error) {
         setError(result.error);
@@ -491,6 +494,16 @@ export function BookingCalendar({
                   : "To be announced"}
               </strong>
             </div>
+            <PaymentOptions
+              total={calculateReservationTotal(
+                calculateCourtTotal(venue, selection.hour, duration) ?? 0,
+                venue.equipment_rental_price,
+                equipmentRental,
+              )}
+              value={paymentOption}
+              onChange={setPaymentOption}
+              disabled={pending}
+            />
             {!open ? (
               <div className="notice">
                 <Info size={16} />

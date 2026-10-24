@@ -8,6 +8,7 @@ import {
   bookingBaseAmount,
 } from "./booking";
 import type { Booking } from "./types";
+import { bookingPayments } from "./payment";
 
 export const paymentMethods = {
   cash: "Cash",
@@ -56,6 +57,8 @@ export const financeMetrics = [
   "pending_value",
   "confirmed_bookings",
   "equipment_sales",
+  "booking_value",
+  "balance_due",
 ] as const;
 export type FinanceSummary = Record<(typeof financeMetrics)[number], number>;
 export type FinanceDay = FinanceSummary & { report_date: string };
@@ -125,7 +128,7 @@ export function monthCsv(days: FinanceDay[]) {
     "Court 1 sales (PHP)",
     "Court 2 sales (PHP)",
     "Open-play sales (PHP)",
-    "Total confirmed sales (PHP)",
+    "Verified collections (PHP)",
     "Court 1 hours",
     "Court 2 hours",
     "Open-play players",
@@ -138,6 +141,8 @@ export function monthCsv(days: FinanceDay[]) {
     "Pending value (PHP)",
     "Confirmed reservations",
     "Equipment rental sales (PHP)",
+    "Confirmed booking value (PHP)",
+    "Unpaid balance (PHP)",
   ];
   const fields = financeMetrics;
   const totals = sumFinance(days);
@@ -153,7 +158,7 @@ export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
     ["Worker on duty", notes.worker_on_duty],
     ["Manager notes", notes.manager_notes],
     [
-      "Amounts are assigned to play date. Confirmed sales include selected equipment rental. Refunds are not tracked here.",
+      "Amounts are assigned to play date. Collections include verified payments only; unpaid balances are separate. Equipment collections are allocated proportionally. Refunds are not tracked here.",
     ],
     [],
     [
@@ -170,11 +175,16 @@ export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
       "Equipment sets",
       "Equipment charge (PHP)",
       "Booking value (PHP)",
-      "Confirmed sales (PHP)",
+      "Verified collections (PHP)",
       "Payment method",
       "Status",
       "GCash reference",
       "Staff notes",
+      "Payment option",
+      "Initial payment due (PHP)",
+      "Unpaid balance (PHP)",
+      "Balance payment method",
+      "Balance payment reference",
     ],
     ...bookings.map((b) => [
       b.reference,
@@ -192,11 +202,18 @@ export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
       b.equipment_rental ? 1 : 0,
       Number(b.equipment_amount || 0),
       Number(b.total_amount),
-      b.status === "confirmed" ? Number(b.total_amount) : 0,
+      b.status === "confirmed" ? bookingPayments(b).paid : 0,
       paymentMethods[bookingPaymentMethod(b)],
       b.status,
       b.payment_reference || "",
       b.booking_finance?.notes || "",
+      b.payment_option === "reservation_fee"
+        ? "50% reservation fee"
+        : "Full payment",
+      bookingPayments(b).initial,
+      b.status === "confirmed" ? bookingPayments(b).balance : 0,
+      b.balance_payment_method ? paymentMethods[b.balance_payment_method] : "",
+      b.balance_payment_reference || "",
     ]),
   ]);
 }

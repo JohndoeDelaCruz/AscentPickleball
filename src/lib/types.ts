@@ -64,6 +64,7 @@ export type BookingStatus =
   | "cancelled"
   | "expired"
   | "blocked";
+export type PaymentOption = "full" | "reservation_fee";
 export type Booking = {
   id: string;
   reference: string;
@@ -75,6 +76,13 @@ export type Booking = {
   start_hour: number;
   duration: number;
   total_amount: number;
+  payment_option: PaymentOption;
+  initial_payment_amount: number;
+  paid_amount: number;
+  balance_payment_method:
+    "cash" | "gcash" | "bank_transfer" | "card" | "other" | null;
+  balance_payment_reference: string | null;
+  balance_paid_at: string | null;
   equipment_rental: boolean;
   equipment_amount: number;
   status: BookingStatus;

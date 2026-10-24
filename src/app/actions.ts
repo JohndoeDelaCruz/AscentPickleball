@@ -6,6 +6,7 @@ import { bookingSchema, openPlaySchema, settingsSchema } from "@/lib/booking";
 import { getVenue } from "@/lib/data";
 import { financeBookingSchema, financeDaySchema } from "@/lib/finance";
 import { z } from "zod";
+import { balancePaymentSchema } from "@/lib/payment";
 
 export async function reserveCourt(input: unknown) {
   const parsed = bookingSchema.safeParse(input);
@@ -18,7 +19,8 @@ export async function reserveCourt(input: unknown) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please sign in before reserving a court." };
   const p = parsed.data;
-  const { data, error } = await supabase.rpc("reserve_with_equipment", {
+  const { data, error } = await supabase.rpc("reserve_with_payment", {
+    p_payment_option: p.payment_option,
     p_kind: "court",
     p_rental: p.equipment_rental,
     p_court: p.court_id,
@@ -52,7 +54,8 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
     if (finance && !finance.success)
       return { error: finance.error.issues[0].message };
     const { data, error } = walkIn
-      ? await supabase.rpc("reserve_with_equipment", {
+      ? await supabase.rpc("reserve_with_payment", {
+          p_payment_option: p.payment_option,
           p_kind: "open_play",
           p_walk_in: true,
           p_rental: p.equipment_rental,
@@ -63,7 +66,8 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
           p_method: finance!.data!.payment_method,
           p_notes: finance!.data!.finance_notes,
         })
-      : await supabase.rpc("reserve_with_equipment", {
+      : await supabase.rpc("reserve_with_payment", {
+          p_payment_option: p.payment_option,
           p_kind: "open_play",
           p_rental: p.equipment_rental,
           p_date: p.booking_date,
@@ -191,7 +195,8 @@ export async function staffCreateBooking(input: unknown, blocked: boolean) {
   try {
     const supabase = await staffClient();
     const p = parsed.data;
-    const { error } = await supabase.rpc("reserve_with_equipment", {
+    const { error } = await supabase.rpc("reserve_with_payment", {
+      p_payment_option: blocked ? "full" : p.payment_option,
       p_kind: "court",
       p_walk_in: true,
       p_rental: p.equipment_rental,
@@ -209,6 +214,28 @@ export async function staffCreateBooking(input: unknown, blocked: boolean) {
     revalidatePath("/admin");
     revalidatePath("/book");
     revalidatePath("/admin/finance");
+    return { success: true };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
+export async function staffRecordBalance(input: unknown) {
+  const parsed = balancePaymentSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  try {
+    const supabase = await staffClient();
+    const p = parsed.data;
+    const { error } = await supabase.rpc("staff_record_balance", {
+      p_booking: p.booking_id,
+      p_method: p.payment_method,
+      p_reference: p.reference,
+    });
+    if (error) return { error: bookingError(error) };
+    revalidatePath("/admin");
+    revalidatePath("/admin/finance");
+    revalidatePath("/my-bookings");
+    revalidatePath(`/booking/${p.booking_id}`);
     return { success: true };
   } catch (error) {
     return { error: (error as Error).message };

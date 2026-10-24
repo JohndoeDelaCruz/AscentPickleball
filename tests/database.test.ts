@@ -69,6 +69,44 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         "utf8",
       ),
     );
+    await db.exec(
+      "insert into public.bookings(reference,court_id,booking_date,start_hour,duration,total_amount,status,customer_name,customer_phone) values ('AP-OLD-PAID',1,current_date+1,6,1,175.25,'confirmed','Legacy Paid Player','09171234567')",
+    );
+    // Supabase projects may explicitly grant new functions to anon by default.
+    await db.exec(
+      "alter default privileges grant execute on functions to anon,authenticated",
+    );
+    await db.exec(
+      await readFile(
+        resolve("supabase/migrations/202610240007_payment_options.sql"),
+        "utf8",
+      ),
+    );
+    for (const fn of [
+      "public.staff_record_balance(uuid,text,text)",
+      "public.get_finance_month(date)",
+      "public.reserve_with_payment(text,date,text,text,int,int,int,int,boolean,boolean,boolean,text,text,text)",
+    ]) {
+      assert.equal(
+        (
+          await db.query<{ allowed: boolean }>(
+            "select has_function_privilege('anon',$1,'execute') as allowed",
+            [fn],
+          )
+        ).rows[0].allowed,
+        false,
+      );
+    }
+    const legacyPaid = (
+      await db.query<{
+        payment_option: string;
+        initial_payment_amount: string;
+        paid_amount: string;
+      }>("select * from public.bookings where reference='AP-OLD-PAID'")
+    ).rows[0];
+    assert.equal(legacyPaid.payment_option, "full");
+    assert.equal(Number(legacyPaid.initial_payment_amount), 175.25);
+    assert.equal(Number(legacyPaid.paid_amount), 175.25);
 
     async function asUser<T>(
       id: string,
@@ -1416,6 +1454,288 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         assert.equal(Number(day.total_sales), 130);
         assert.equal(Number(day.equipment_sales), 30);
         assert.equal(Number(day.court_1_sales), 0);
+      },
+    );
+    async function paymentBooking(
+      user: string,
+      option: string,
+      {
+        kind = "court",
+        court = 1,
+        start = 8,
+        rental = true,
+        people = 1,
+        walkIn = false,
+      } = {},
+    ) {
+      return asUser(
+        user,
+        async () =>
+          (
+            await db.query<{ id: string }>(
+              "select public.reserve_with_payment($1,$2,'Payment Player','09171234567',$3,$4,1,$5,$6,$7,false,'cash','',$8) as id",
+              [kind, weekend, court, start, people, rental, walkIn, option],
+            )
+          ).rows[0].id,
+      );
+    }
+    async function paymentRow(id: string) {
+      return (
+        await db.query<{
+          status: string;
+          payment_option: string;
+          total_amount: string;
+          initial_payment_amount: string;
+          paid_amount: string;
+          balance_payment_method: string | null;
+          balance_payment_reference: string | null;
+        }>("select * from public.bookings where id=$1", [id])
+      ).rows[0];
+    }
+    async function verifyPayment(id: string, user: string, reference: string) {
+      await asUser(user, () =>
+        db.query("select public.submit_payment_reference($1,$2)", [
+          id,
+          reference,
+        ]),
+      );
+      await asUser(staff, () =>
+        db.query("select public.staff_update_booking($1,'confirmed')", [id]),
+      );
+    }
+    await t.test(
+      "payment options snapshot 50% of the entire court/pass and equipment total, including centavos",
+      async () => {
+        await startOpenPlay();
+        const fee = await paymentBooking(alice, "reservation_fee");
+        const full = await paymentBooking(bob, "full", { court: 2 });
+        const passes = await paymentBooking(alice, "reservation_fee", {
+          kind: "open_play",
+          people: 3,
+        });
+        await db.exec(
+          "update public.venue_settings set equipment_rental_price=30.01",
+        );
+        const walkin = await paymentBooking(staff, "reservation_fee", {
+          start: 7,
+          walkIn: true,
+        });
+        for (const [id, total, initial, paid] of [
+          [fee, 130, 65, 0],
+          [full, 130, 130, 0],
+          [passes, 180, 90, 0],
+          [walkin, 130.01, 65.01, 65.01],
+        ] as const) {
+          const b = await paymentRow(id);
+          assert.equal(Number(b.total_amount), total);
+          assert.equal(Number(b.initial_payment_amount), initial);
+          assert.equal(Number(b.paid_amount), paid);
+        }
+        await db.exec(
+          "update public.venue_settings set hourly_rate=900,equipment_rental_price=99",
+        );
+        assert.equal(
+          Number((await paymentRow(fee)).initial_payment_amount),
+          65,
+        );
+        await assert.rejects(
+          () => paymentBooking(bob, "fake"),
+          /Choose reservation fee/,
+        );
+      },
+    );
+    await t.test(
+      "a fee remains unpaid during reference review and becomes a partial verified payment only on staff confirmation",
+      async () => {
+        await startOpenPlay();
+        const id = await paymentBooking(alice, "reservation_fee");
+        await asUser(alice, () =>
+          db.query("select public.submit_payment_reference($1,'FEE-123456')", [
+            id,
+          ]),
+        );
+        assert.equal((await paymentRow(id)).status, "awaiting_verification");
+        assert.equal(Number((await paymentRow(id)).paid_amount), 0);
+        await asUser(staff, () =>
+          db.query("select public.staff_update_booking($1,'confirmed')", [id]),
+        );
+        assert.equal((await paymentRow(id)).status, "confirmed");
+        assert.equal(Number((await paymentRow(id)).paid_amount), 65);
+        await assert.rejects(
+          () =>
+            asUser(alice, () =>
+              db.query(
+                "update public.bookings set paid_amount=130,payment_option='full' where id=$1",
+                [id],
+              ),
+            ),
+          /permission denied/,
+        );
+        await assert.rejects(
+          () => paymentBooking(bob, "full"),
+          /conflicting key/,
+        );
+      },
+    );
+    await t.test(
+      "only staff can record an exact remaining balance once, preserving the deposit and confirmed reservation",
+      async () => {
+        await startOpenPlay();
+        const id = await paymentBooking(alice, "reservation_fee");
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query("select public.staff_record_balance($1,'cash')", [id]),
+            ),
+          /Only a confirmed/,
+        );
+        await verifyPayment(id, alice, "BALANCE-INITIAL");
+        await assert.rejects(
+          () =>
+            asUser(alice, () =>
+              db.query("select public.staff_record_balance($1,'cash')", [id]),
+            ),
+          /Staff access/,
+        );
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query("select public.staff_record_balance($1,'unspecified')", [
+                id,
+              ]),
+            ),
+          /payment method/,
+        );
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query("select public.staff_record_balance($1,'gcash')", [id]),
+            ),
+          /valid payment reference/,
+        );
+        await asUser(staff, () =>
+          db.query("select public.staff_record_balance($1,'cash')", [id]),
+        );
+        const b = await paymentRow(id);
+        assert.equal(Number(b.paid_amount), 130);
+        assert.equal(Number(b.initial_payment_amount), 65);
+        assert.equal(b.balance_payment_method, "cash");
+        assert.equal(b.status, "confirmed");
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query("select public.staff_record_balance($1,'cash')", [id]),
+            ),
+          /Only a confirmed/,
+        );
+        const full = await paymentBooking(staff, "full", {
+          court: 2,
+          walkIn: true,
+        });
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query("select public.staff_record_balance($1,'cash')", [full]),
+            ),
+          /Only a confirmed/,
+        );
+      },
+    );
+    await t.test(
+      "finance separates confirmed value, verified fee, and outstanding balance, then reconciles mixed GCash/cash settlement",
+      async () => {
+        await startOpenPlay();
+        const id = await paymentBooking(alice, "reservation_fee");
+        await verifyPayment(id, alice, "FINANCE-FEE");
+        async function finance() {
+          return (
+            await asUser(staff, () =>
+              db.query<Record<string, string | number>>(
+                "select *,report_date::text as day from public.get_finance_month($1)",
+                [weekend.slice(0, 7) + "-01"],
+              ),
+            )
+          ).rows.find((r) => r.day === weekend)!;
+        }
+        let day = await finance();
+        for (const [key, value] of Object.entries({
+          total_sales: 65,
+          booking_value: 130,
+          balance_due: 65,
+          court_1_sales: 50,
+          equipment_sales: 15,
+          gcash_sales: 65,
+          cash_sales: 0,
+          court_1_hours: 1,
+        }))
+          assert.equal(Number(day[key]), value, key);
+        await asUser(staff, () =>
+          db.query("select public.staff_record_balance($1,'cash')", [id]),
+        );
+        day = await finance();
+        for (const [key, value] of Object.entries({
+          total_sales: 130,
+          booking_value: 130,
+          balance_due: 0,
+          court_1_sales: 100,
+          equipment_sales: 30,
+          gcash_sales: 65,
+          cash_sales: 65,
+          court_1_hours: 1,
+        }))
+          assert.equal(Number(day[key]), value, key);
+      },
+    );
+    await t.test(
+      "initial and balance references share duplicate protection, including normalized references on other bookings",
+      async () => {
+        await startOpenPlay();
+        const first = await paymentBooking(alice, "reservation_fee");
+        const second = await paymentBooking(bob, "reservation_fee", {
+          court: 2,
+        });
+        await verifyPayment(first, alice, "ORIGINAL-FIRST");
+        await verifyPayment(second, bob, "ORIGINAL-SECOND");
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query(
+                "select public.staff_record_balance($1,'gcash','original second')",
+                [first],
+              ),
+            ),
+          /already been submitted/,
+        );
+        await asUser(staff, () =>
+          db.query(
+            "select public.staff_record_balance($1,'gcash','SETTLED-REFERENCE')",
+            [first],
+          ),
+        );
+        await assert.rejects(
+          () =>
+            asUser(staff, () =>
+              db.query(
+                "select public.staff_record_balance($1,'gcash','settled reference')",
+                [second],
+              ),
+            ),
+          /already been submitted/,
+        );
+        const third = await paymentBooking(alice, "reservation_fee", {
+          kind: "open_play",
+        });
+        await assert.rejects(
+          () =>
+            asUser(alice, () =>
+              db.query(
+                "select public.submit_payment_reference($1,'settled reference')",
+                [third],
+              ),
+            ),
+          /already been submitted/,
+        );
+        assert.equal(Number((await paymentRow(third)).paid_amount), 0);
       },
     );
     await t.test("QR uploads are restricted to staff", async () => {

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, Plus, X } from "lucide-react";
+import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
 import {
   addDays,
   formatDate,
@@ -20,6 +20,8 @@ import {
 import { Modal } from "./modal";
 import { paymentMethods } from "@/lib/finance";
 import { EquipmentRental } from "./equipment-rental";
+import { bookingPayments } from "@/lib/payment";
+import { BalancePaymentModal } from "./balance-payment-modal";
 
 export function AdminCalendar({
   bookings,
@@ -31,6 +33,7 @@ export function AdminCalendar({
   venue: VenueSettings;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
+  const [balanceBooking, setBalanceBooking] = useState<Booking | null>(null);
   const [action, setAction] = useState<{
     booking: Booking;
     status: "confirmed" | "cancelled";
@@ -258,7 +261,35 @@ export function AdminCalendar({
                         </small>
                       )}
                     </td>
-                    <td>{money(b.total_amount)}</td>
+                    <td>
+                      {money(b.total_amount)}
+                      {b.status !== "blocked" && (
+                        <>
+                          <small>
+                            {b.payment_option === "reservation_fee"
+                              ? "50% reservation fee"
+                              : "Full payment"}
+                          </small>
+                          <small>Paid: {money(bookingPayments(b).paid)}</small>
+                          {b.status === "confirmed" ? (
+                            <small>
+                              {bookingPayments(b).balance > 0
+                                ? `Balance: ${money(bookingPayments(b).balance)}`
+                                : "Fully paid"}
+                            </small>
+                          ) : (
+                            [
+                              "awaiting_payment",
+                              "awaiting_verification",
+                            ].includes(b.status) && (
+                              <small>
+                                Due now: {money(bookingPayments(b).initial)}
+                              </small>
+                            )
+                          )}
+                        </>
+                      )}
+                    </td>
                     <td>{b.payment_reference || "—"}</td>
                     <td>
                       <span className={`status-badge status-${b.status}`}>
@@ -267,6 +298,16 @@ export function AdminCalendar({
                     </td>
                     <td>
                       <div className="table-actions">
+                        {b.status === "confirmed" &&
+                          bookingPayments(b).balance > 0 && (
+                            <button
+                              aria-label={`Record balance for ${b.reference}`}
+                              title="Record balance payment"
+                              onClick={() => setBalanceBooking(b)}
+                            >
+                              <Wallet size={16} />
+                            </button>
+                          )}
                         {["awaiting_payment", "awaiting_verification"].includes(
                           b.status,
                         ) && (
@@ -310,6 +351,12 @@ export function AdminCalendar({
           onClose={() => setCreateOpen(false)}
         />
       )}
+      {balanceBooking && (
+        <BalancePaymentModal
+          booking={balanceBooking}
+          onClose={() => setBalanceBooking(null)}
+        />
+      )}
       {action && (
         <Modal
           title={
@@ -330,6 +377,16 @@ export function AdminCalendar({
             · {formatHour(action.booking.start_hour)} ·{" "}
             {money(action.booking.total_amount)}
           </p>
+          {action.status === "confirmed" && (
+            <p>
+              <strong>
+                Verify {money(bookingPayments(action.booking).initial)}
+              </strong>
+              {action.booking.payment_option === "reservation_fee"
+                ? ` reservation fee. Balance at venue: ${money(bookingPayments(action.booking).later)}.`
+                : " full payment."}
+            </p>
+          )}
           <div className="notice notice-warning">
             <span>
               {action.status === "confirmed"
@@ -528,6 +585,17 @@ function CreateBookingModal({
               onChange={setEquipmentRental}
               disabled={pending}
             />
+            <label className="field">
+              <span>Payment collected</span>
+              <select name="payment_option" defaultValue="full">
+                <option value="full">Full payment</option>
+                <option value="reservation_fee">50% reservation fee</option>
+              </select>
+              <small>
+                Choose the amount already collected. Any remaining balance is
+                due before play.
+              </small>
+            </label>
             <label className="field">
               <span>Payment received via</span>
               <select name="payment_method" defaultValue="cash">

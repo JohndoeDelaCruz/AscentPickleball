@@ -15,8 +15,13 @@ import {
   canBook,
   calculateReservationTotal,
 } from "@/lib/booking";
-import type { OpenPlayAvailability, VenueSettings } from "@/lib/types";
+import type {
+  OpenPlayAvailability,
+  PaymentOption,
+  VenueSettings,
+} from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
+import { PaymentOptions } from "./payment-options";
 
 export function OpenPlayBooking({
   venue,
@@ -35,6 +40,7 @@ export function OpenPlayBooking({
   const [name, setName] = useState(userName);
   const [phone, setPhone] = useState("");
   const [equipmentRental, setEquipmentRental] = useState(false);
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
   const [availability, setAvailability] = useState<OpenPlayAvailability | null>(
     null,
@@ -107,6 +113,7 @@ export function OpenPlayBooking({
         customer_name: name,
         customer_phone: phone,
         equipment_rental: equipmentRental,
+        payment_option: paymentOption,
       });
       if (result.error) {
         setError(result.error);
@@ -269,6 +276,16 @@ export function OpenPlayBooking({
                   )}
                 </strong>
               </div>
+              <PaymentOptions
+                total={calculateReservationTotal(
+                  (people || 0) * venue.open_play_price,
+                  venue.equipment_rental_price,
+                  equipmentRental,
+                )}
+                value={paymentOption}
+                onChange={setPaymentOption}
+                disabled={pending}
+              />
               {tooMany && (
                 <div className="notice notice-warning">
                   There are not enough places for this group. Choose fewer

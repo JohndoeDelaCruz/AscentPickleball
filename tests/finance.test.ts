@@ -9,6 +9,8 @@ import {
   monthCsv,
   financeMetrics,
   type FinanceDay,
+  dayCsv,
+  type FinanceBooking,
 } from "../src/lib/finance";
 
 test("finance periods handle leap months, year boundaries, invalid dates, and selected play dates", () => {
@@ -69,4 +71,39 @@ test("finance CSV preserves centavos, reconciles columns, escapes quoted notes, 
   assert.ok(text.includes('"\'@command"'));
   assert.ok(text.includes('"A, B\n""note"""'));
   assert.ok(text.endsWith('"100.25"'));
+});
+test("daily CSV separates a verified reservation fee from booking value and the unpaid balance", () => {
+  const b = {
+    reference: "AP-FEE",
+    booking_date: "2026-10-25",
+    booking_type: "court",
+    court_id: 1,
+    customer_name: "Fee Player",
+    start_hour: 8,
+    duration: 1,
+    participant_count: 1,
+    total_amount: 130,
+    equipment_rental: true,
+    equipment_amount: 30,
+    status: "confirmed",
+    payment_option: "reservation_fee",
+    initial_payment_amount: 65,
+    paid_amount: 65,
+    payment_reference: "FEE-REFERENCE",
+    booking_finance: { payment_method: "gcash", notes: "" },
+    balance_payment_method: null,
+    balance_payment_reference: null,
+  } as FinanceBooking;
+  const csv = dayCsv([b], {
+    report_date: "2026-10-25",
+    worker_on_duty: "",
+    manager_notes: "",
+  });
+  assert.ok(csv.includes('"130","65","GCash","confirmed"'));
+  assert.ok(csv.includes('"50% reservation fee","65","65"'));
+  const settled = dayCsv(
+    [{ ...b, paid_amount: 130, balance_payment_method: "cash" }],
+    { report_date: "2026-10-25", worker_on_duty: "", manager_notes: "" },
+  );
+  assert.ok(settled.includes('"50% reservation fee","65","0","Cash"'));
 });
