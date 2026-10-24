@@ -1,12 +1,19 @@
 "use client";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Save, Upload } from "lucide-react";
-import { saveOpenPlayCapacity, saveSettings } from "@/app/actions";
+import { saveVenueSetting, saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import { canBook, openPlayCapacityLabel } from "@/lib/booking";
 import type { VenueSettings } from "@/lib/types";
 import { TypedSettingField } from "./typed-setting-field";
+import type { IndividualSettingKey } from "@/lib/venue-setting";
+
+type SettingFieldOptions = Pick<
+  ComponentProps<typeof TypedSettingField>,
+  "label" | "kind" | "min" | "max" | "optional" | "hint" | "placeholder"
+>;
+type FieldFeedback = { error?: string; message?: string };
 
 export function SettingsForm({ initial }: { initial: VenueSettings }) {
   const [venue, setVenue] = useState(initial);
@@ -14,10 +21,15 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [capacityPending, startCapacityTransition] = useTransition();
-  const [capacityError, setCapacityError] = useState("");
-  const [capacityMessage, setCapacityMessage] = useState("");
-  const capacityInput = useRef<HTMLInputElement>(null);
+  const [fieldPending, startFieldTransition] = useTransition();
+  const [applyingField, setApplyingField] =
+    useState<IndividualSettingKey | null>(null);
+  const [fieldFeedback, setFieldFeedback] = useState<
+    Partial<Record<IndividualSettingKey, FieldFeedback>>
+  >({});
+  const fieldInputs = useRef<
+    Partial<Record<IndividualSettingKey, HTMLInputElement | null>>
+  >({});
   const router = useRouter();
   function update<K extends keyof VenueSettings>(
     key: K,
@@ -65,43 +77,115 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
   }
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (capacityPending) return;
+    if (fieldPending) return;
     setError("");
     setMessage("");
     startTransition(async () => {
       const result = await saveSettings(venue);
       if (result.error) setError(result.error);
       else {
+        setFieldFeedback({});
         setMessage("Settings saved. Your website is up to date.");
         router.refresh();
       }
     });
   }
-  function applyCapacity() {
+  function applyField(key: IndividualSettingKey) {
     if (
       pending ||
-      capacityPending ||
+      fieldPending ||
       uploading ||
-      !capacityInput.current?.reportValidity()
+      !fieldInputs.current[key]?.reportValidity()
     )
       return;
-    const capacity = venue.open_play_capacity;
-    setCapacityError("");
-    setCapacityMessage("");
-    startCapacityTransition(async () => {
+    const value = venue[key];
+    setApplyingField(key);
+    setFieldFeedback((old) => ({ ...old, [key]: {} }));
+    startFieldTransition(async () => {
       try {
-        const result = await saveOpenPlayCapacity(capacity);
-        if (result.error) setCapacityError(result.error);
+        const result = await saveVenueSetting(key, value);
+        if (result.error)
+          setFieldFeedback((old) => ({
+            ...old,
+            [key]: { error: result.error },
+          }));
         else
-          setCapacityMessage(
-            `Player limit applied. ${openPlayCapacityLabel(capacity)}.`,
-          );
+          setFieldFeedback((old) => ({
+            ...old,
+            [key]: {
+              message:
+                key === "open_play_capacity"
+                  ? `Player limit applied. ${openPlayCapacityLabel(value)}.`
+                  : "Applied.",
+            },
+          }));
       } catch {
-        setCapacityError(
-          "The player limit could not be applied. Please try again.",
-        );
+        setFieldFeedback((old) => ({
+          ...old,
+          [key]: {
+            error: "This setting could not be applied. Please try again.",
+          },
+        }));
+      } finally {
+        setApplyingField(null);
       }
     });
+  }
+  function numericField(
+    key: IndividualSettingKey,
+    options: SettingFieldOptions,
+  ) {
+    const feedback = fieldFeedback[key];
+    return (
+      <div
+        key={key}
+        className="applicable-setting"
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            applyField(key);
+          }
+        }}
+      >
+        <TypedSettingField
+          {...options}
+          value={venue[key]}
+          inputRef={(input) => {
+            fieldInputs.current[key] = input;
+          }}
+          disabled={pending || fieldPending}
+          onDraftChange={() =>
+            setFieldFeedback((old) => ({ ...old, [key]: {} }))
+          }
+          onChange={(value) => update(key, value)}
+          action={
+            <button
+              type="button"
+              className="button button-dark button-small"
+              aria-label={
+                key === "open_play_capacity"
+                  ? "Apply player limit"
+                  : `Apply ${options.label}`
+              }
+              disabled={pending || fieldPending || uploading}
+              onClick={() => applyField(key)}
+            >
+              {fieldPending && applyingField === key ? "Applying…" : "Apply"}
+            </button>
+          }
+        />
+        {feedback?.error && (
+          <div className="error-message" role="alert">
+            {feedback.error}
+          </div>
+        )}
+        {feedback?.message && (
+          <div className="success-message" role="status">
+            {feedback.message}
+          </div>
+        )}
+      </div>
+    );
   }
   const textField = (
     key:
@@ -171,78 +255,58 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
           total when selected, separately from the court rate.
         </p>
         <p className="small-print">
-          Type times such as 6:00 AM or 18:00. Use whole hours only.
+          Type times such as 6:00 AM or 18:00. Use whole hours only. Apply saves
+          one field. Use Save venue settings for changes that need to be saved
+          together.
         </p>
         <div className="field-grid">
-          <TypedSettingField
-            label="Daytime court rate (PHP / hour)"
-            value={venue.hourly_rate}
-            min={1}
-            max={100000}
-            optional
-            placeholder="Not set yet"
-            onChange={(value) => update("hourly_rate", value)}
-          />
-          <TypedSettingField
-            label="Evening court rate (PHP / hour)"
-            value={venue.evening_hourly_rate}
-            min={0.01}
-            max={100000}
-            onChange={(value) => {
-              if (value !== null) update("evening_hourly_rate", value);
-            }}
-          />
-          <TypedSettingField
-            label="Evening rate starts at"
-            value={venue.evening_start_hour}
-            kind="hour"
-            min={1}
-            max={23}
-            onChange={(value) => {
-              if (value !== null) update("evening_start_hour", value);
-            }}
-          />
-          <TypedSettingField
-            label="Equipment rental package (PHP)"
-            value={venue.equipment_rental_price}
-            min={0}
-            max={100000}
-            hint="1 paddle + 2 balls. Added once per reservation when selected."
-            onChange={(value) => {
-              if (value !== null) update("equipment_rental_price", value);
-            }}
-          />
-          <TypedSettingField
-            label="Unpaid hold duration (minutes)"
-            value={venue.hold_minutes}
-            kind="integer"
-            min={15}
-            max={120}
-            hint="Enter 15–120 minutes."
-            onChange={(value) => {
-              if (value !== null) update("hold_minutes", value);
-            }}
-          />
-          <TypedSettingField
-            label="Opening time"
-            value={venue.opening_hour}
-            kind="hour"
-            min={0}
-            max={23}
-            optional
-            placeholder="Not set yet"
-            onChange={(value) => update("opening_hour", value)}
-          />
-          <TypedSettingField
-            label="Closing time"
-            value={venue.closing_hour}
-            kind="hour"
-            min={1}
-            max={24}
-            optional
-            placeholder="Not set yet"
-            onChange={(value) => update("closing_hour", value)}
-          />
+          {numericField("hourly_rate", {
+            label: "Daytime court rate (PHP / hour)",
+            min: 1,
+            max: 100000,
+            optional: true,
+            placeholder: "Not set yet",
+          })}
+          {numericField("evening_hourly_rate", {
+            label: "Evening court rate (PHP / hour)",
+            min: 0.01,
+            max: 100000,
+          })}
+          {numericField("evening_start_hour", {
+            label: "Evening rate starts at",
+            kind: "hour",
+            min: 1,
+            max: 23,
+          })}
+          {numericField("equipment_rental_price", {
+            label: "Equipment rental package (PHP)",
+            min: 0,
+            max: 100000,
+            hint: "1 paddle + 2 balls. Added once per reservation when selected.",
+          })}
+          {numericField("hold_minutes", {
+            label: "Unpaid hold duration (minutes)",
+            kind: "integer",
+            min: 15,
+            max: 120,
+            hint: "Enter 15–120 minutes.",
+          })}
+          {numericField("opening_hour", {
+            label: "Opening time",
+            kind: "hour",
+            min: 0,
+            max: 23,
+            optional: true,
+            placeholder: "Not set yet",
+          })}
+          {numericField("closing_hour", {
+            label: "Closing time",
+            kind: "hour",
+            min: 1,
+            max: 24,
+            optional: true,
+            placeholder: "Not set yet",
+          })}
         </div>
         <hr className="form-divider" />
         <h3 className="form-section-title">Weekend open play</h3>
@@ -267,76 +331,28 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               ["open_play_start_hour", "Open play starts"],
               ["open_play_end_hour", "Open play ends"],
             ] as const
-          ).map(([key, label]) => (
-            <TypedSettingField
-              key={key}
-              label={label}
-              value={venue[key]}
-              kind="hour"
-              min={key === "open_play_end_hour" ? 1 : 0}
-              max={key === "open_play_end_hour" ? 24 : 23}
-              onChange={(value) => {
-                if (value !== null) update(key, value);
-              }}
-            />
-          ))}
-          <TypedSettingField
-            label="Open-play pass (PHP / person)"
-            value={venue.open_play_price}
-            min={0.01}
-            max={100000}
-            onChange={(value) => {
-              if (value !== null) update("open_play_price", value);
-            }}
-          />
-          <div
-            className="capacity-setting"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                applyCapacity();
-              }
-            }}
-          >
-            <TypedSettingField
-              label="Total player limit per weekend day (optional)"
-              value={venue.open_play_capacity}
-              inputRef={capacityInput}
-              disabled={pending || capacityPending}
-              kind="integer"
-              min={1}
-              max={100000}
-              optional
-              placeholder="No limit"
-              hint={`${openPlayCapacityLabel(venue.open_play_capacity)}. Leave blank for no player limit.`}
-              onDraftChange={() => {
-                setCapacityError("");
-                setCapacityMessage("");
-              }}
-              onChange={(value) => update("open_play_capacity", value)}
-              action={
-                <button
-                  type="button"
-                  className="button button-dark button-small"
-                  aria-label="Apply player limit"
-                  disabled={pending || capacityPending || uploading}
-                  onClick={applyCapacity}
-                >
-                  {capacityPending ? "Applying…" : "Apply"}
-                </button>
-              }
-            />
-            {capacityError && (
-              <div className="error-message" role="alert">
-                {capacityError}
-              </div>
-            )}
-            {capacityMessage && (
-              <div className="success-message" role="status">
-                {capacityMessage}
-              </div>
-            )}
-          </div>
+          ).map(([key, label]) =>
+            numericField(key, {
+              label,
+              kind: "hour",
+              min: key === "open_play_end_hour" ? 1 : 0,
+              max: key === "open_play_end_hour" ? 24 : 23,
+            }),
+          )}
+          {numericField("open_play_price", {
+            label: "Open-play pass (PHP / person)",
+            min: 0.01,
+            max: 100000,
+          })}
+          {numericField("open_play_capacity", {
+            label: "Total player limit per weekend day (optional)",
+            kind: "integer",
+            min: 1,
+            max: 100000,
+            optional: true,
+            placeholder: "No limit",
+            hint: `${openPlayCapacityLabel(venue.open_play_capacity)}. Leave blank for no player limit.`,
+          })}
         </div>
         <p className="small-print">
           A pass covers the whole session with player rotation. Selected
@@ -460,7 +476,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
         <div className="settings-save">
           <button
             className="button button-dark"
-            disabled={pending || capacityPending || uploading}
+            disabled={pending || fieldPending || uploading}
           >
             <Save size={16} />
             {pending ? "Saving…" : "Save venue settings"}

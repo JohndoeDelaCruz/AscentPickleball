@@ -970,7 +970,7 @@ img {
 .field-control-row .button {
   flex-shrink: 0;
 }
-.capacity-setting {
+.applicable-setting {
   display: flex;
   flex-direction: column;
   gap: 10px;

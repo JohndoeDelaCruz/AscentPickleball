@@ -7,6 +7,7 @@ import { getVenue } from "@/lib/data";
 import { financeBookingSchema, financeDaySchema } from "@/lib/finance";
 import { z } from "zod";
 import { balancePaymentSchema } from "@/lib/payment";
+import { venueSettingPatch } from "@/lib/venue-setting";
 
 export async function reserveCourt(input: unknown) {
   const parsed = bookingSchema.safeParse(input);
@@ -157,26 +158,31 @@ export async function saveSettings(input: unknown) {
   }
 }
 
-export async function saveOpenPlayCapacity(input: unknown) {
-  const parsed = settingsSchema.shape.open_play_capacity.safeParse(input);
-  if (!parsed.success)
-    return {
-      error:
-        "Enter a whole-number player limit from 1 to 100000, or leave it blank for no limit.",
-    };
+export async function saveVenueSetting(key: unknown, value: unknown) {
   try {
     const supabase = await staffClient();
+    const { data: current, error: readError } = await supabase
+      .from("venue_settings")
+      .select("*")
+      .eq("id", true)
+      .single();
+    if (readError || !current)
+      return {
+        error: "Your saved settings could not be loaded. Please try again.",
+      };
+    const parsed = venueSettingPatch(current, key, value);
+    if (!parsed.data) return { error: parsed.error };
     const { error } = await supabase
       .from("venue_settings")
-      .update({ open_play_capacity: parsed.data })
+      .update(parsed.data)
       .eq("id", true)
-      .select("open_play_capacity")
+      .select("id")
       .single();
     if (error)
       return {
         error: error.message.includes("Booking:")
           ? bookingError(error)
-          : "The player limit could not be applied. Please try again.",
+          : "This setting could not be applied. Please try again.",
       };
     revalidatePath("/", "layout");
     return { success: true };
