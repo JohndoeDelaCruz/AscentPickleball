@@ -356,11 +356,13 @@ export default async function Home() {
             )}
           </div>
           <div className="visit-art" aria-hidden="true">
-            <div className="visit-court">
-              <span />
-              <span />
-            </div>
-            <Starburst className="visit-ball" />
+            <Image
+              src="/pickleball-equipment.jpg"
+              alt=""
+              fill
+              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) 45vw, 560px"
+              className="visit-photo"
+            />
             <span className="visit-word">
               MEET YOU
               <br />

@@ -711,59 +711,32 @@ img {
   height: 340px;
   border: 1px solid #d0d6bd;
   border-radius: 10px;
-  background: #dfe5cb;
+  background: var(--ink);
   position: relative;
   overflow: hidden;
 }
-.visit-court {
-  width: 270px;
-  height: 440px;
-  border: 3px solid #a5b58c;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) rotate(26deg);
-}
-.visit-court:before {
+.visit-art:after {
   content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 36%;
-  height: 28%;
-  border-block: 3px solid #a5b58c;
-}
-.visit-court:after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  height: 100%;
-  width: 3px;
-  background: #a5b58c;
-}
-.visit-court > span:first-child {
   position: absolute;
   inset: 0;
-  background: #c0cf9c50;
+  background: linear-gradient(180deg, #07130dd9 0%, #07130d59 48%, transparent 78%);
+  pointer-events: none;
 }
-.visit-ball {
-  position: absolute;
-  width: 160px;
-  height: 160px;
-  right: -6px;
-  bottom: 1px;
-  color: #b4c97e;
+.visit-photo {
+  object-fit: cover;
+  object-position: 50% 60%;
 }
 .visit-word {
   position: absolute;
+  z-index: 1;
   top: 38px;
   left: 35px;
   font-family: var(--font-display), Impact, sans-serif;
   font-size: 65px;
   font-weight: 600;
   line-height: 0.95;
-  color: #355239;
+  color: var(--cream);
+  text-shadow: 0 2px 16px #00000066;
 }
 .faq-section {
   display: grid;
