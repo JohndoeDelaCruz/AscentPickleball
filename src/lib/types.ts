@@ -49,7 +49,7 @@ export const defaultVenue: VenueSettings = {
   open_play_end_hour: 16,
   weekend_court_end_hour: 9,
   open_play_price: 50,
-  open_play_capacity: null,
+  open_play_capacity: 24,
   gcash_name: "",
   gcash_number: "",
   gcash_qr_url: "",

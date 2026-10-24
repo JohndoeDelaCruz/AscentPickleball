@@ -117,6 +117,13 @@ export function isWeekend(date: string) {
 export function hasOpenPlay(venue: VenueSettings, date: string) {
   return venue.open_play_enabled && isWeekend(date);
 }
+export function openPlayCapacityLabel(capacity: number | null) {
+  if (capacity === null) return "No player limit across both courts";
+  const total = `${capacity} ${capacity === 1 ? "player" : "players"} total`;
+  if (capacity % 2 !== 0) return `${total} across both courts`;
+  const perCourt = capacity / 2;
+  return `${perCourt} ${perCourt === 1 ? "player" : "players"} per court · ${total}`;
+}
 export function courtScheduleLabel(
   venue: VenueSettings,
   date: string,

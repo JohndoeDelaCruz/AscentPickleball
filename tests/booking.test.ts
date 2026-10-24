@@ -88,10 +88,15 @@ test("weekend sessions use Philippine dates and leave private bookings before 9 
   );
 });
 
-test("open-play settings permit unlimited players and validate session boundaries and pass groups", () => {
+test("open-play settings default to 24 players, allow an optional limit, and validate sessions and pass groups", () => {
   assert.equal(defaultVenue.open_play_price, 50);
-  assert.equal(defaultVenue.open_play_capacity, null);
+  assert.equal(defaultVenue.open_play_capacity, 24);
   assert.equal(settingsSchema.safeParse(defaultVenue).success, true);
+  assert.equal(
+    settingsSchema.safeParse({ ...defaultVenue, open_play_capacity: null })
+      .success,
+    true,
+  );
   for (const patch of [
     { open_play_end_hour: 9 },
     { weekend_court_end_hour: 10 },

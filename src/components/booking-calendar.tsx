@@ -21,6 +21,7 @@ import {
   money,
   courtScheduleLabel,
   hasOpenPlay,
+  openPlayCapacityLabel,
 } from "@/lib/booking";
 import type { Availability, PaymentOption, VenueSettings } from "@/lib/types";
 import { reserveCourt } from "@/app/actions";
@@ -409,11 +410,7 @@ export function BookingCalendar({
               One pass covers the session. Share both courts and rotate between
               games.
             </p>
-            <p>
-              {venue.open_play_capacity === null
-                ? "No player limit."
-                : `Up to ${venue.open_play_capacity} players per session.`}
-            </p>
+            <p>{openPlayCapacityLabel(venue.open_play_capacity)}.</p>
           </div>
         ) : !selection ? (
           <div className="summary-placeholder">

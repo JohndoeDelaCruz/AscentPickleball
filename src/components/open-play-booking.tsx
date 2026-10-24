@@ -14,6 +14,7 @@ import {
   money,
   canBook,
   calculateReservationTotal,
+  openPlayCapacityLabel,
 } from "@/lib/booking";
 import type {
   OpenPlayAvailability,
@@ -137,10 +138,13 @@ export function OpenPlayBooking({
         </strong>
       </div>
       <p>
-        Come for a few rallies or stay for the session. Players share both
-        courts and rotate. Your pass covers{" "}
+        Come for a few rallies or stay for the session. Your pass covers{" "}
         {formatHour(venue.open_play_start_hour)}–
         {formatHour(venue.open_play_end_hour)}.
+      </p>
+      <p>
+        <strong>{openPlayCapacityLabel(venue.open_play_capacity)}.</strong>{" "}
+        Players share both courts and rotate between games.
       </p>
       <div className="open-play-meta">
         <span>

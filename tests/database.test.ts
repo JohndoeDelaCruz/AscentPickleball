@@ -82,6 +82,12 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        resolve("supabase/migrations/202610240008_open_play_capacity.sql"),
+        "utf8",
+      ),
+    );
     for (const fn of [
       "public.staff_record_balance(uuid,text,text)",
       "public.get_finance_month(date)",
@@ -596,6 +602,34 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
           ).rows[0].id,
       );
     }
+    await t.test(
+      "open play allows 24 participants across both courts and rejects a 25th pass",
+      async () => {
+        await reset();
+        await db.exec(
+          "update public.venue_settings set open_play_enabled=true",
+        );
+        await db.exec(
+          await readFile(
+            resolve("supabase/migrations/202610240008_open_play_capacity.sql"),
+            "utf8",
+          ),
+        );
+        assert.equal((await openAvailability()).capacity, 24);
+        await openPass(alice, 20);
+        assert.equal((await openAvailability()).remaining, 4);
+        await openPass(bob, 4);
+        assert.equal((await openAvailability()).remaining, 0);
+        await assert.rejects(
+          () => openPass(alice),
+          /not enough open-play places/,
+        );
+        await assert.rejects(
+          () => openPass(staff, 1, weekend, true),
+          /not enough open-play places/,
+        );
+      },
+    );
     await t.test(
       "weekends reserve both courts for open play while morning and evening bookings remain available",
       async () => {

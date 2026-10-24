@@ -10,6 +10,7 @@ import {
   money,
   courtScheduleLabel,
   hasOpenPlay,
+  openPlayCapacityLabel,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import {
@@ -192,10 +193,7 @@ export function AdminCalendar({
               .filter((b) => b.booking_type === "open_play")
               .reduce((sum, b) => sum + b.participant_count, 0)}{" "}
             players held or confirmed · {money(venue.open_play_price)} per
-            person ·{" "}
-            {venue.open_play_capacity === null
-              ? "No player limit"
-              : `${venue.open_play_capacity} player limit`}
+            person · {openPlayCapacityLabel(venue.open_play_capacity)}
           </span>
         </div>
       )}

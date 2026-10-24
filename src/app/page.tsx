@@ -12,7 +12,13 @@ import {
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
 import { Starburst } from "@/components/starburst";
-import { canBook, formatHour, money, getRatePeriods } from "@/lib/booking";
+import {
+  canBook,
+  formatHour,
+  money,
+  getRatePeriods,
+  openPlayCapacityLabel,
+} from "@/lib/booking";
 
 export default async function Home() {
   const { venue } = await getVenue();
@@ -189,10 +195,8 @@ export default async function Home() {
                 {formatHour(venue.open_play_start_hour)}–
                 {formatHour(venue.open_play_end_hour)} ·{" "}
                 {money(venue.open_play_price)} per person ·{" "}
-                {venue.open_play_capacity === null
-                  ? "No player limit"
-                  : `${venue.open_play_capacity} players per day`}
-                . Share both courts and rotate throughout the session.
+                {openPlayCapacityLabel(venue.open_play_capacity)}. Share both
+                courts and rotate throughout the session.
               </p>
               <p className="small-print">
                 Weekend private court bookings:{" "}

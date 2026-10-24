@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Check, Save, Upload } from "lucide-react";
 import { saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
-import { canBook } from "@/lib/booking";
+import { canBook, openPlayCapacityLabel } from "@/lib/booking";
 import type { VenueSettings } from "@/lib/types";
 import { TypedSettingField } from "./typed-setting-field";
 
@@ -259,14 +259,14 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             }}
           />
           <TypedSettingField
-            label="Player limit per weekend day (optional)"
+            label="Total player limit per weekend day (optional)"
             value={venue.open_play_capacity}
             kind="integer"
             min={1}
             max={100000}
             optional
             placeholder="No limit"
-            hint="Leave blank for no player limit across both courts."
+            hint={`${openPlayCapacityLabel(venue.open_play_capacity)}. Leave blank for no player limit.`}
             onChange={(value) => update("open_play_capacity", value)}
           />
         </div>
