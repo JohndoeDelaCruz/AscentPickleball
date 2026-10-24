@@ -34,7 +34,6 @@ export default async function BookPage({
         initialOpenPlay={params.play === "open"}
         signedIn={Boolean(user)}
         userName={user?.user_metadata?.full_name || ""}
-        initialCourt={params.court === "2" ? 2 : 1}
         initialDate={params.date}
       />
     </main>

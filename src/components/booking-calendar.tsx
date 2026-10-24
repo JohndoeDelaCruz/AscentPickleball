@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarDays, Check, Info, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -33,7 +34,6 @@ export function BookingCalendar({
   ready,
   signedIn,
   userName,
-  initialCourt,
   initialDate,
   openPlayReady,
   initialOpenPlay = false,
@@ -42,7 +42,6 @@ export function BookingCalendar({
   ready: boolean;
   signedIn: boolean;
   userName: string;
-  initialCourt: number;
   initialDate?: string;
   openPlayReady: boolean;
   initialOpenPlay?: boolean;
@@ -313,16 +312,21 @@ export function BookingCalendar({
               {loading && <span>Updating…</span>}
             </div>
             <div className="availability-grid" aria-busy={loading}>
-              <div className="availability-header">
+              <div className="availability-header booking-court-header">
                 <div>PHT / UTC+8</div>
-                <div>
-                  Court 1{" "}
-                  {initialCourt === 1 && <span aria-hidden="true">↗</span>}
-                </div>
-                <div>
-                  Court 2{" "}
-                  {initialCourt === 2 && <span aria-hidden="true">↗</span>}
-                </div>
+                {[1, 2].map((court) => (
+                  <div className="court-column-heading" key={court}>
+                    <div className="court-column-photo">
+                      <Image
+                        src={`/court-${court}.jpg`}
+                        alt={`Ascent Pickleball Court ${court}`}
+                        fill
+                        sizes="(max-width: 650px) 35vw, (max-width: 850px) 40vw, 30vw"
+                      />
+                    </div>
+                    <span>Court {court}</span>
+                  </div>
+                ))}
               </div>
               {hours.map((hour) => (
                 <div className="availability-row" key={hour}>

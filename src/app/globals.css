@@ -1303,6 +1303,29 @@ img {
 .availability-header > div + div {
   border-left: 1px solid var(--line);
 }
+.booking-court-header > div:first-child {
+  display: flex;
+  align-items: flex-end;
+}
+.court-column-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.court-column-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  max-height: 160px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--line);
+}
+.court-column-photo img {
+  object-fit: cover;
+  object-position: center;
+}
 .availability-row + .availability-row {
   border-top: 1px solid #e8ebdf;
 }
