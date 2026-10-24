@@ -958,6 +958,24 @@ img {
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
+.field-control-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.field-control-row input {
+  flex: 1;
+  width: 0;
+}
+.field-control-row .button {
+  flex-shrink: 0;
+}
+.capacity-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
 .form-stack {
   display: flex;
   flex-direction: column;

@@ -157,6 +157,34 @@ export async function saveSettings(input: unknown) {
   }
 }
 
+export async function saveOpenPlayCapacity(input: unknown) {
+  const parsed = settingsSchema.shape.open_play_capacity.safeParse(input);
+  if (!parsed.success)
+    return {
+      error:
+        "Enter a whole-number player limit from 1 to 100000, or leave it blank for no limit.",
+    };
+  try {
+    const supabase = await staffClient();
+    const { error } = await supabase
+      .from("venue_settings")
+      .update({ open_play_capacity: parsed.data })
+      .eq("id", true)
+      .select("open_play_capacity")
+      .single();
+    if (error)
+      return {
+        error: error.message.includes("Booking:")
+          ? bookingError(error)
+          : "The player limit could not be applied. Please try again.",
+      };
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
 export async function staffSetStatus(
   id: string,
   status: "confirmed" | "cancelled",

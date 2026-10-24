@@ -51,7 +51,7 @@ Rates, hours, address, city, contact details, introduction, GCash details, unpai
 ## Reservation behavior
 
 - A database exclusion constraint prevents overlapping court reservations even when requests arrive together. Adjacent bookings and bookings on the other court remain valid.
-- Weekend open-play passes cover the full shared session, with 1–20 players per reservation. The daily player limit is optional; leaving it blank allows unlimited players. A database lock protects optional capacity and prevents private bookings or maintenance blocks from conflicting with active passes.
+- Weekend open-play passes cover the full shared session, with 1–20 players per reservation. The daily player limit is optional; leaving it blank allows unlimited players. Staff can use **Apply** beside the player-limit field to save that limit without saving other form edits. A database lock protects optional capacity and prevents private bookings or maintenance blocks from conflicting with active passes.
 - Passes use the same GCash reference, hold, confirmation, cancellation, and account pages as court bookings. Staff can record paid walk-in passes in the calendar. Prices and session times are saved on each reservation, preserving past totals when settings change.
 - Existing court reservations are preserved when open play is enabled. If one overlaps a weekend session, pass sales for that date stay unavailable until staff resolves the conflict. Schedule changes are prevented while future active passes depend on the existing hours.
 - Database functions calculate prices from saved venue settings, enforce Philippine Time, validate future dates/opening hours, and limit each player to two pending reservations.

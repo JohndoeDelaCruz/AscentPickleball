@@ -1,8 +1,8 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Save, Upload } from "lucide-react";
-import { saveSettings } from "@/app/actions";
+import { saveOpenPlayCapacity, saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import { canBook, openPlayCapacityLabel } from "@/lib/booking";
 import type { VenueSettings } from "@/lib/types";
@@ -14,6 +14,10 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [capacityPending, startCapacityTransition] = useTransition();
+  const [capacityError, setCapacityError] = useState("");
+  const [capacityMessage, setCapacityMessage] = useState("");
+  const capacityInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
   function update<K extends keyof VenueSettings>(
     key: K,
@@ -61,6 +65,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
   }
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (capacityPending) return;
     setError("");
     setMessage("");
     startTransition(async () => {
@@ -69,6 +74,32 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
       else {
         setMessage("Settings saved. Your website is up to date.");
         router.refresh();
+      }
+    });
+  }
+  function applyCapacity() {
+    if (
+      pending ||
+      capacityPending ||
+      uploading ||
+      !capacityInput.current?.reportValidity()
+    )
+      return;
+    const capacity = venue.open_play_capacity;
+    setCapacityError("");
+    setCapacityMessage("");
+    startCapacityTransition(async () => {
+      try {
+        const result = await saveOpenPlayCapacity(capacity);
+        if (result.error) setCapacityError(result.error);
+        else
+          setCapacityMessage(
+            `Player limit applied. ${openPlayCapacityLabel(capacity)}.`,
+          );
+      } catch {
+        setCapacityError(
+          "The player limit could not be applied. Please try again.",
+        );
       }
     });
   }
@@ -258,17 +289,54 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               if (value !== null) update("open_play_price", value);
             }}
           />
-          <TypedSettingField
-            label="Total player limit per weekend day (optional)"
-            value={venue.open_play_capacity}
-            kind="integer"
-            min={1}
-            max={100000}
-            optional
-            placeholder="No limit"
-            hint={`${openPlayCapacityLabel(venue.open_play_capacity)}. Leave blank for no player limit.`}
-            onChange={(value) => update("open_play_capacity", value)}
-          />
+          <div
+            className="capacity-setting"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applyCapacity();
+              }
+            }}
+          >
+            <TypedSettingField
+              label="Total player limit per weekend day (optional)"
+              value={venue.open_play_capacity}
+              inputRef={capacityInput}
+              disabled={pending || capacityPending}
+              kind="integer"
+              min={1}
+              max={100000}
+              optional
+              placeholder="No limit"
+              hint={`${openPlayCapacityLabel(venue.open_play_capacity)}. Leave blank for no player limit.`}
+              onDraftChange={() => {
+                setCapacityError("");
+                setCapacityMessage("");
+              }}
+              onChange={(value) => update("open_play_capacity", value)}
+              action={
+                <button
+                  type="button"
+                  className="button button-dark button-small"
+                  aria-label="Apply player limit"
+                  disabled={pending || capacityPending || uploading}
+                  onClick={applyCapacity}
+                >
+                  {capacityPending ? "Applying…" : "Apply"}
+                </button>
+              }
+            />
+            {capacityError && (
+              <div className="error-message" role="alert">
+                {capacityError}
+              </div>
+            )}
+            {capacityMessage && (
+              <div className="success-message" role="status">
+                {capacityMessage}
+              </div>
+            )}
+          </div>
         </div>
         <p className="small-print">
           A pass covers the whole session with player rotation. Selected
@@ -392,7 +460,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
         <div className="settings-save">
           <button
             className="button button-dark"
-            disabled={pending || uploading}
+            disabled={pending || capacityPending || uploading}
           >
             <Save size={16} />
             {pending ? "Saving…" : "Save venue settings"}
