@@ -323,8 +323,8 @@ export function BookingCalendar({
                         fill
                         sizes="(max-width: 650px) 35vw, (max-width: 850px) 40vw, 30vw"
                       />
+                      <span className="court-column-label">Court {court}</span>
                     </div>
-                    <span>Court {court}</span>
                   </div>
                 ))}
               </div>
