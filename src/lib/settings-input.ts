@@ -3,6 +3,10 @@ export type SettingInputResult =
 
 type InputRange = { min: number; max: number; optional?: boolean };
 
+export function formatSettingTime(hour: number | null) {
+  return hour === null ? "" : `${String(hour % 24).padStart(2, "0")}:00`;
+}
+
 export function parseSettingNumber(
   text: string,
   {

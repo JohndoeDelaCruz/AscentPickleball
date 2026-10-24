@@ -1,8 +1,11 @@
 "use client";
 
 import { useId, useState, type ReactNode, type Ref } from "react";
-import { formatHour } from "@/lib/booking";
-import { parseSettingHour, parseSettingNumber } from "@/lib/settings-input";
+import {
+  formatSettingTime,
+  parseSettingHour,
+  parseSettingNumber,
+} from "@/lib/settings-input";
 
 export function TypedSettingField({
   label,
@@ -34,7 +37,11 @@ export function TypedSettingField({
   onChange: (value: number | null) => void;
 }) {
   const [draft, setDraft] = useState(() =>
-    value === null ? "" : kind === "hour" ? formatHour(value) : String(value),
+    kind === "hour"
+      ? formatSettingTime(value)
+      : value === null
+        ? ""
+        : String(value),
   );
   const inputId = useId();
   const hintId = `${inputId}-hint`;
@@ -52,17 +59,16 @@ export function TypedSettingField({
     <input
       id={inputId}
       ref={inputRef}
-      type="text"
+      type={kind === "hour" ? "time" : "text"}
+      step={kind === "hour" ? 3600 : undefined}
       inputMode={
-        kind === "hour" ? "text" : kind === "integer" ? "numeric" : "decimal"
+        kind === "hour" ? undefined : kind === "integer" ? "numeric" : "decimal"
       }
       value={draft}
       disabled={disabled}
       required={!optional}
-      maxLength={kind === "hour" ? 12 : 14}
-      placeholder={
-        placeholder ?? (kind === "hour" ? "e.g. 4:00 PM or 16:00" : undefined)
-      }
+      maxLength={kind === "hour" ? undefined : 14}
+      placeholder={kind === "hour" ? undefined : placeholder}
       aria-describedby={hint ? hintId : undefined}
       autoComplete="off"
       onChange={(event) => {

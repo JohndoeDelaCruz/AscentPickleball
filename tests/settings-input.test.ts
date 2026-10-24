@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseSettingHour,
   parseSettingNumber,
+  formatSettingTime,
 } from "../src/lib/settings-input";
 import { settingsSchema } from "../src/lib/booking";
 import { defaultVenue } from "../src/lib/types";
@@ -50,6 +51,17 @@ test("typed times accept AM/PM and 24-hour formats while keeping bookings on who
     assert.ok(parseSettingHour(value, range).error, value);
 });
 test("closing midnight remains hour 24 and converted drafts retain server schedule validation", () => {
+  assert.equal(formatSettingTime(null), "");
+  assert.equal(formatSettingTime(6), "06:00");
+  assert.equal(formatSettingTime(22), "22:00");
+  assert.equal(
+    parseSettingHour(formatSettingTime(24), { min: 1, max: 24 }).value,
+    24,
+  );
+  assert.equal(
+    parseSettingHour(formatSettingTime(0), { min: 0, max: 23 }).value,
+    0,
+  );
   for (const value of ["12:00 AM", "00:00", "24:00"])
     assert.deepEqual(parseSettingHour(value, { min: 1, max: 24 }), {
       value: 24,

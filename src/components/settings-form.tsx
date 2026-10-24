@@ -135,6 +135,16 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
     key: IndividualSettingKey,
     options: SettingFieldOptions,
   ) {
+    if (options.kind === "hour")
+      return (
+        <TypedSettingField
+          key={key}
+          {...options}
+          value={venue[key]}
+          disabled={pending || fieldPending}
+          onChange={(value) => update(key, value)}
+        />
+      );
     const feedback = fieldFeedback[key];
     return (
       <div
@@ -255,9 +265,9 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
           total when selected, separately from the court rate.
         </p>
         <p className="small-print">
-          Type times such as 6:00 AM or 18:00. Use whole hours only. Apply saves
-          one field. Use Save venue settings for changes that need to be saved
-          together.
+          Choose whole-hour times with the clock picker, then use Save venue
+          settings to save time changes. Numeric fields can be saved
+          individually with Apply.
         </p>
         <div className="field-grid">
           {numericField("hourly_rate", {
