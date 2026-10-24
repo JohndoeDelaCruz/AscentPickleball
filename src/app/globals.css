@@ -12,14 +12,14 @@
   --lime: #d9ec98;
   --line: #dde2d5;
   --white: #fff;
-  --header-height: 89px;
+  --header-height: 113px;
 }
 * {
   box-sizing: border-box;
 }
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 100px;
+  scroll-padding-top: calc(var(--header-height) + 12px);
   scrollbar-gutter: stable;
 }
 @supports not (scrollbar-gutter: stable) {
@@ -215,7 +215,7 @@ img {
   backdrop-filter: blur(18px);
 }
 .nav-shell {
-  min-height: 88px;
+  min-height: 112px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -224,27 +224,14 @@ img {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 180px;
+  width: 96px;
   flex-shrink: 0;
 }
-.brand > span {
-  display: flex;
-  flex-direction: column;
-}
-.brand strong {
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: 31px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 2px;
-  position: relative;
-}
-.brand small {
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 4.5px;
-  margin-top: 4px;
+.brand-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 .desktop-nav {
   display: flex;
@@ -799,8 +786,8 @@ img {
   color: #dce3d1;
   padding-top: 53px;
 }
-.brand-light {
-  color: #e6efdb;
+.brand.brand-light {
+  width: 144px;
 }
 .footer-top {
   display: grid;
@@ -2149,9 +2136,6 @@ img {
   .nav-actions {
     gap: 17px;
   }
-  .brand {
-    width: 155px;
-  }
   .callout-inner {
     gap: 60px;
   }
@@ -2238,7 +2222,7 @@ img {
 }
 @media (max-width: 650px) {
   :root {
-    --header-height: 75px;
+    --header-height: 89px;
   }
   .weekend-home-callout {
     flex-direction: column;
@@ -2268,22 +2252,10 @@ img {
     width: calc(100% - 40px);
   }
   .nav-shell {
-    min-height: 74px;
+    min-height: 88px;
   }
   .brand {
-    width: 160px;
-    gap: 8px;
-  }
-  .brand svg {
-    width: 31px;
-    height: 31px;
-  }
-  .brand strong {
-    font-size: 27px;
-  }
-  .brand small {
-    font-size: 6px;
-    letter-spacing: 4px;
+    width: 72px;
   }
   .nav-actions {
     margin-left: auto;
@@ -3072,6 +3044,9 @@ img {
   }
 }
 @media (max-width: 850px) {
+  :root {
+    --header-height: 89px;
+  }
   .nav-account,
   .nav-book-button,
   .account-settings,
@@ -3085,9 +3060,10 @@ img {
     font-size: 14px;
   }
   .site-header .brand {
-    width: auto;
+    width: 72px;
   }
   .nav-shell {
+    min-height: 88px;
     gap: 12px;
   }
   .nav-actions {
@@ -3116,19 +3092,6 @@ img {
   }
 }
 @media (max-width: 380px) {
-  .site-header .brand {
-    gap: 6px;
-  }
-  .site-header .brand svg {
-    width: 25px;
-    height: 25px;
-  }
-  .site-header .brand strong {
-    font-size: 23px;
-  }
-  .site-header .brand small {
-    letter-spacing: 3px;
-  }
   .nav-shell {
     gap: 6px;
   }

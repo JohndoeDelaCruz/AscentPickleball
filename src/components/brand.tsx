@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Brand({ light = false }: { light?: boolean }) {
   return (
@@ -7,24 +8,15 @@ export function Brand({ light = false }: { light?: boolean }) {
       className={`brand ${light ? "brand-light" : ""}`}
       aria-label="Ascent Pickleball home"
     >
-      <svg
-        width="38"
-        height="38"
-        viewBox="0 0 64 64"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path d="m5 51 23-39h8l23 39H43L32 32 21 51Z" fill="currentColor" />
-        <path
-          d="m36 12 23 39H43L32 32 40 19"
-          fill="currentColor"
-          opacity=".45"
-        />
-      </svg>
-      <span>
-        <strong>ASCENT</strong>
-        <small>PICKLEBALL</small>
-      </span>
+      <Image
+        src="/ascent-logo.png"
+        width={144}
+        height={144}
+        alt="Ascent Pickleball Courts"
+        sizes={light ? "144px" : "(max-width: 850px) 72px, 96px"}
+        loading={light ? "lazy" : "eager"}
+        className="brand-image"
+      />
     </Link>
   );
 }
