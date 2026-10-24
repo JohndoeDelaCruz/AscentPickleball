@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { Check, Save, Upload } from "lucide-react";
 import { saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
-import { formatHour, canBook } from "@/lib/booking";
+import { canBook } from "@/lib/booking";
 import type { VenueSettings } from "@/lib/types";
+import { TypedSettingField } from "./typed-setting-field";
 
 export function SettingsForm({ initial }: { initial: VenueSettings }) {
   const [venue, setVenue] = useState(initial);
@@ -138,122 +139,79 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
           start time. Optional equipment rental is added once to the booking
           total when selected, separately from the court rate.
         </p>
+        <p className="small-print">
+          Type times such as 6:00 AM or 18:00. Use whole hours only.
+        </p>
         <div className="field-grid">
-          <label className="field">
-            <span>Daytime court rate (PHP / hour)</span>
-            <input
-              type="number"
-              min="1"
-              max="100000"
-              step="0.01"
-              value={venue.hourly_rate ?? ""}
-              placeholder="Not set yet"
-              onChange={(e) =>
-                update(
-                  "hourly_rate",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            />
-          </label>
-          <label className="field">
-            <span>Evening court rate (PHP / hour)</span>
-            <input
-              type="number"
-              min="0.01"
-              max="100000"
-              step="0.01"
-              value={venue.evening_hourly_rate}
-              onChange={(e) =>
-                update("evening_hourly_rate", Number(e.target.value))
-              }
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Evening rate starts at</span>
-            <select
-              value={venue.evening_start_hour}
-              onChange={(e) =>
-                update("evening_start_hour", Number(e.target.value))
-              }
-            >
-              {Array.from({ length: 23 }, (_, i) => (
-                <option value={i + 1} key={i + 1}>
-                  {formatHour(i + 1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Equipment rental package (PHP)</span>
-            <input
-              type="number"
-              min="0"
-              max="100000"
-              step="0.01"
-              value={venue.equipment_rental_price}
-              onChange={(e) =>
-                update("equipment_rental_price", Number(e.target.value))
-              }
-              required
-            />
-            <small>
-              1 paddle + 2 balls. Added once per reservation when selected.
-            </small>
-          </label>
-          <label className="field">
-            <span>Unpaid hold duration</span>
-            <select
-              value={venue.hold_minutes}
-              onChange={(e) => update("hold_minutes", Number(e.target.value))}
-            >
-              {[15, 30, 45, 60, 90, 120].map((v) => (
-                <option key={v} value={v}>
-                  {v} minutes
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Opening time</span>
-            <select
-              value={venue.opening_hour ?? ""}
-              onChange={(e) =>
-                update(
-                  "opening_hour",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            >
-              <option value="">Not set yet</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option value={i} key={i}>
-                  {formatHour(i)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Closing time</span>
-            <select
-              value={venue.closing_hour ?? ""}
-              onChange={(e) =>
-                update(
-                  "closing_hour",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            >
-              <option value="">Not set yet</option>
-              {Array.from({ length: 24 }, (_, i) => (
-                <option value={i + 1} key={i + 1}>
-                  {formatHour(i + 1)}
-                  {i === 23 ? " (midnight)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <TypedSettingField
+            label="Daytime court rate (PHP / hour)"
+            value={venue.hourly_rate}
+            min={1}
+            max={100000}
+            optional
+            placeholder="Not set yet"
+            onChange={(value) => update("hourly_rate", value)}
+          />
+          <TypedSettingField
+            label="Evening court rate (PHP / hour)"
+            value={venue.evening_hourly_rate}
+            min={0.01}
+            max={100000}
+            onChange={(value) => {
+              if (value !== null) update("evening_hourly_rate", value);
+            }}
+          />
+          <TypedSettingField
+            label="Evening rate starts at"
+            value={venue.evening_start_hour}
+            kind="hour"
+            min={1}
+            max={23}
+            onChange={(value) => {
+              if (value !== null) update("evening_start_hour", value);
+            }}
+          />
+          <TypedSettingField
+            label="Equipment rental package (PHP)"
+            value={venue.equipment_rental_price}
+            min={0}
+            max={100000}
+            hint="1 paddle + 2 balls. Added once per reservation when selected."
+            onChange={(value) => {
+              if (value !== null) update("equipment_rental_price", value);
+            }}
+          />
+          <TypedSettingField
+            label="Unpaid hold duration (minutes)"
+            value={venue.hold_minutes}
+            kind="integer"
+            min={15}
+            max={120}
+            hint="Enter 15–120 minutes."
+            onChange={(value) => {
+              if (value !== null) update("hold_minutes", value);
+            }}
+          />
+          <TypedSettingField
+            label="Opening time"
+            value={venue.opening_hour}
+            kind="hour"
+            min={0}
+            max={23}
+            optional
+            placeholder="Not set yet"
+            onChange={(value) => update("opening_hour", value)}
+          />
+          <TypedSettingField
+            label="Closing time"
+            value={venue.closing_hour}
+            kind="hour"
+            min={1}
+            max={24}
+            optional
+            placeholder="Not set yet"
+            onChange={(value) => update("closing_hour", value)}
+          />
         </div>
         <hr className="form-divider" />
         <h3 className="form-section-title">Weekend open play</h3>
@@ -279,53 +237,38 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               ["open_play_end_hour", "Open play ends"],
             ] as const
           ).map(([key, label]) => (
-            <label className="field" key={key}>
-              <span>{label}</span>
-              <select
-                value={venue[key]}
-                onChange={(e) => update(key, Number(e.target.value))}
-              >
-                {Array.from({ length: 24 }, (_, i) =>
-                  key === "open_play_end_hour" ? i + 1 : i,
-                ).map((hour) => (
-                  <option value={hour} key={hour}>
-                    {formatHour(hour)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <TypedSettingField
+              key={key}
+              label={label}
+              value={venue[key]}
+              kind="hour"
+              min={key === "open_play_end_hour" ? 1 : 0}
+              max={key === "open_play_end_hour" ? 24 : 23}
+              onChange={(value) => {
+                if (value !== null) update(key, value);
+              }}
+            />
           ))}
-          <label className="field">
-            <span>Open-play pass (PHP / person)</span>
-            <input
-              type="number"
-              value={venue.open_play_price}
-              min="0.01"
-              max="100000"
-              step="0.01"
-              onChange={(e) =>
-                update("open_play_price", Number(e.target.value))
-              }
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Player limit per weekend day (optional)</span>
-            <input
-              type="number"
-              value={venue.open_play_capacity ?? ""}
-              min="1"
-              max="100000"
-              placeholder="No limit"
-              onChange={(e) =>
-                update(
-                  "open_play_capacity",
-                  e.target.value === "" ? null : Number(e.target.value),
-                )
-              }
-            />
-            <small>Leave blank for no player limit across both courts.</small>
-          </label>
+          <TypedSettingField
+            label="Open-play pass (PHP / person)"
+            value={venue.open_play_price}
+            min={0.01}
+            max={100000}
+            onChange={(value) => {
+              if (value !== null) update("open_play_price", value);
+            }}
+          />
+          <TypedSettingField
+            label="Player limit per weekend day (optional)"
+            value={venue.open_play_capacity}
+            kind="integer"
+            min={1}
+            max={100000}
+            optional
+            placeholder="No limit"
+            hint="Leave blank for no player limit across both courts."
+            onChange={(value) => update("open_play_capacity", value)}
+          />
         </div>
         <p className="small-print">
           A pass covers the whole session with player rotation. Selected
