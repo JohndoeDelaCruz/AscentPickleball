@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
 import { Starburst } from "@/components/starburst";
+import { LandingMotion } from "@/components/landing-motion";
 import {
   canBook,
   formatHour,
@@ -47,10 +48,10 @@ export default async function Home() {
     ],
   ];
   return (
-    <main id="main">
+    <LandingMotion>
       <section className="container hero" aria-label="Ascent Pickleball courts">
         <div className="hero-copy">
-          <h1>
+          <h1 data-hero="">
             PLAY HIGHER.
             <br />
             <span className="hero-ascent">
@@ -66,11 +67,11 @@ export default async function Home() {
               </svg>
             </span>
           </h1>
-          <p className="hero-description">
+          <p className="hero-description" data-hero="">
             A place to play, a reason to connect. Get your crew together and
             make your next game an Ascent game.
           </p>
-          <div className="hero-buttons">
+          <div className="hero-buttons" data-hero="">
             <Link href="/book" className="button button-dark">
               Find your court <ArrowUpRight size={19} />
             </Link>
@@ -98,7 +99,7 @@ export default async function Home() {
             </span>
           </div>
           <div className="vertical-word">LET’S PLAY.</div>
-          <div className="hero-image-caption">
+          <div className="hero-image-caption" data-hero="">
             <div>
               <strong>
                 Find your people.
@@ -131,7 +132,7 @@ export default async function Home() {
         </div>
       </div>
       <section className="container section courts-section" id="courts">
-        <div className="section-heading">
+        <div className="section-heading" data-reveal="">
           <div>
             <span className="eyebrow">YOUR SPACE TO PLAY</span>
             <h2>
@@ -146,6 +147,7 @@ export default async function Home() {
             <Link
               href={`/book?court=${court}`}
               className="court-card"
+              data-reveal=""
               key={court}
             >
               <div className={`court-card-art court-art-${court}`}>
@@ -190,7 +192,7 @@ export default async function Home() {
           ))}
         </div>
         {venue.open_play_enabled && (
-          <div className="weekend-home-callout">
+          <div className="weekend-home-callout" data-reveal="">
             <div>
               <span className="eyebrow">SATURDAY & SUNDAY</span>
               <h3>More rallies. One open-play pass.</h3>
@@ -218,6 +220,7 @@ export default async function Home() {
       <section
         className="container membership-home"
         aria-labelledby="membership-home-title"
+        data-reveal=""
       >
         <div>
           <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
@@ -233,7 +236,7 @@ export default async function Home() {
       </section>
       <section className="booking-callout">
         <div className="container callout-inner">
-          <div>
+          <div data-reveal="">
             <span className="eyebrow">LESS PLANNING. MORE PLAYING.</span>
             <h2>
               YOUR COURT TIME
@@ -250,7 +253,7 @@ export default async function Home() {
               <ArrowUpRight size={18} />
             </Link>
           </div>
-          <div className="callout-details">
+          <div className="callout-details" data-reveal="">
             <div>
               <CalendarDays />
               <span>
@@ -286,7 +289,7 @@ export default async function Home() {
         </div>
       </section>
       <section className="container section" id="how-it-works">
-        <div className="section-heading">
+        <div className="section-heading" data-reveal="">
           <div>
             <span className="eyebrow">FROM LET’S PLAY TO GAME ON</span>
             <h2>
@@ -300,7 +303,7 @@ export default async function Home() {
           </Link>
         </div>
         <div className="steps">
-          <article>
+          <article data-reveal="">
             <span className="step-number">
               01 <CalendarDays size={23} />
             </span>
@@ -310,7 +313,7 @@ export default async function Home() {
               crew.
             </p>
           </article>
-          <article>
+          <article data-reveal="">
             <span className="step-number">
               02 <QrCode size={23} />
             </span>
@@ -320,7 +323,7 @@ export default async function Home() {
               reference number.
             </p>
           </article>
-          <article>
+          <article data-reveal="">
             <span className="step-number">
               03 <Check size={25} />
             </span>
@@ -334,7 +337,7 @@ export default async function Home() {
       </section>
       <section className="visit-section" id="visit">
         <div className="container visit-grid">
-          <div>
+          <div data-reveal="">
             <span className="eyebrow">A NEW PLACE TO CONNECT</span>
             <h2>
               SEE YOU
@@ -378,7 +381,7 @@ export default async function Home() {
               </a>
             )}
           </div>
-          <div className="visit-art" aria-hidden="true">
+          <div className="visit-art" aria-hidden="true" data-reveal="">
             <Image
               src="/pickleball-equipment.jpg"
               alt=""
@@ -395,7 +398,7 @@ export default async function Home() {
         </div>
       </section>
       <section className="container section faq-section" id="faq">
-        <div>
+        <div data-reveal="">
           <span className="eyebrow">A FEW THINGS TO KNOW</span>
           <h2>
             GOOD QUESTIONS.
@@ -408,7 +411,7 @@ export default async function Home() {
             </a>
           )}
         </div>
-        <div className="faq-list">
+        <div className="faq-list" data-reveal="">
           {faqs.map(([q, a]) => (
             <details key={q}>
               <summary>
@@ -421,7 +424,7 @@ export default async function Home() {
         </div>
       </section>
       <section className="last-call">
-        <div className="container">
+        <div className="container" data-reveal="">
           <h2>
             THE NEXT RALLY
             <br />
@@ -432,6 +435,6 @@ export default async function Home() {
           </Link>
         </div>
       </section>
-    </main>
+    </LandingMotion>
   );
 }
