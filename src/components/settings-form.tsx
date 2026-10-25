@@ -303,14 +303,12 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             kind: "integer",
             min: 1,
             max: 20,
-            hint: "Each rental set includes 1 paddle and this number of balls. New reservations use the updated count.",
           })}
           {numericField("private_court_capacity", {
             label: "Private-booking players per court",
             kind: "integer",
             min: 1,
             max: 100,
-            hint: "Maximum players sharing one privately booked court. Open-play capacity is set separately below.",
           })}
           {numericField("hold_minutes", {
             label: "Unpaid hold duration (minutes)",
