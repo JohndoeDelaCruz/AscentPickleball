@@ -1,7 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export function Brand({ light = false }: { light?: boolean }) {
+export function Brand({
+  light = false,
+  compact = false,
+}: {
+  light?: boolean;
+  compact?: boolean;
+}) {
   return (
     <Link
       href="/"
@@ -13,7 +19,7 @@ export function Brand({ light = false }: { light?: boolean }) {
         width={144}
         height={144}
         alt="Ascent Pickleball Courts"
-        sizes={light ? "144px" : "(max-width: 850px) 72px, 96px"}
+        sizes={light ? "144px" : compact ? "48px" : "(max-width: 850px) 72px, 96px"}
         loading={light ? "lazy" : "eager"}
         className="brand-image"
       />

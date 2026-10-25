@@ -133,3 +133,15 @@
     animation: none;
   }
 }
+
+@media (max-width: 420px) {
+  .content :global(.admin-stats) .stat {
+    min-height: 60px;
+  }
+
+  .content :global(.admin-stats) .value {
+    width: 40px;
+    height: 28px;
+    margin: 0;
+  }
+}

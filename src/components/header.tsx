@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowUpRight, Menu, X, LogOut, UserRound } from "lucide-react";
 import { Brand } from "./brand";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +16,8 @@ export function Header({
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   async function signOut() {
     await createClient().auth.signOut();
     setOpen(false);
@@ -29,33 +31,54 @@ export function Header({
     { href: "/#visit", label: "Find us" },
   ];
   return (
-    <header className="site-header">
+    <header className={`site-header${isAdmin ? " site-header--admin" : ""}`}>
       <div className="container nav-shell">
-        <Brand />
-        <nav className="desktop-nav" aria-label="Main navigation">
-          {links.map((link) => (
-            <Link key={link.href} href={link.href}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <Brand compact={isAdmin} />
+        {!isAdmin && (
+          <nav className="desktop-nav" aria-label="Main navigation">
+            {links.map((link) => (
+              <Link key={link.href} href={link.href}>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
         <div className="nav-actions">
-          <Link
-            href={staff ? "/admin" : signedIn ? "/my-bookings" : "/login"}
-            className="nav-account"
-          >
-            {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
-          </Link>
-          <Link href="/book" className="button button-dark button-small nav-book-button">
-            Book a court <ArrowUpRight size={16} />
-          </Link>
-          <Link
-            href={signedIn ? (staff ? "/admin" : "/my-bookings") : "/login"}
-            className="button button-dark button-small nav-mobile-primary"
-            onClick={() => setOpen(false)}
-          >
-            {signedIn ? (staff ? "Dashboard" : "My bookings") : "Log in / Sign up"}
-          </Link>
+          {isAdmin ? (
+            <Link
+              href="/"
+              className="button button-dark button-small admin-site-link"
+              onClick={() => setOpen(false)}
+            >
+              View website <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                href={staff ? "/admin" : signedIn ? "/my-bookings" : "/login"}
+                className="nav-account"
+              >
+                {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
+              </Link>
+              <Link
+                href="/book"
+                className="button button-dark button-small nav-book-button"
+              >
+                Book a court <ArrowUpRight size={16} />
+              </Link>
+              <Link
+                href={signedIn ? (staff ? "/admin" : "/my-bookings") : "/login"}
+                className="button button-dark button-small nav-mobile-primary"
+                onClick={() => setOpen(false)}
+              >
+                {signedIn
+                  ? staff
+                    ? "Dashboard"
+                    : "My bookings"
+                  : "Log in / Sign up"}
+              </Link>
+            </>
+          )}
           {signedIn && (
             <Link
               href="/account"
@@ -87,20 +110,31 @@ export function Header({
       </div>
       {open && (
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <Link href="/my-bookings" onClick={() => setOpen(false)}>
-            My bookings
-          </Link>
-          {staff && <Link href="/admin" onClick={() => setOpen(false)}>Dashboard</Link>}
-          <Link href={signedIn ? "/account" : "/login"} onClick={() => setOpen(false)}>
+          {!isAdmin && (
+            <>
+              {links.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/my-bookings" onClick={() => setOpen(false)}>
+                My bookings
+              </Link>
+              {staff && (
+                <Link href="/admin" onClick={() => setOpen(false)}>
+                  Dashboard
+                </Link>
+              )}
+            </>
+          )}
+          <Link
+            href={signedIn ? "/account" : "/login"}
+            onClick={() => setOpen(false)}
+          >
             {signedIn ? "Account settings / Change password" : "Log in / Sign up"}
           </Link>
           {signedIn && <button onClick={signOut}>Sign out</button>}
