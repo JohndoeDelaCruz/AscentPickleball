@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import { getVenue } from "@/lib/data";
 import { localDate, addDays, isValidDate } from "@/lib/booking";
 import { createClient } from "@/lib/supabase/server";
 import { AdminCalendar } from "@/components/admin-calendar";
+import { AdminCalendarSkeleton } from "@/components/admin-skeleton";
 import type { Booking } from "@/lib/types";
 export default async function AdminPage({
   searchParams,
@@ -16,6 +18,14 @@ export default async function AdminPage({
     params.date <= addDays(today, 30)
       ? params.date
       : today;
+  return (
+    <Suspense key={date} fallback={<AdminCalendarSkeleton />}>
+      <CalendarData date={date} />
+    </Suspense>
+  );
+}
+
+async function CalendarData({ date }: { date: string }) {
   const supabase = await createClient();
   await supabase.rpc("expire_unpaid_holds");
   const [{ data, error }, { venue }] = await Promise.all([

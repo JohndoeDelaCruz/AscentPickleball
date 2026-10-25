@@ -1,0 +1,135 @@
+.content {
+  min-width: 0;
+}
+
+.block {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 14px;
+  border-radius: 5px;
+  background: #e5e9dd;
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+.title {
+  width: 180px;
+  height: 27px;
+}
+
+.action {
+  width: 180px;
+  height: 44px;
+  border-radius: 7px;
+}
+
+.stat {
+  min-width: 0;
+  min-height: 130px;
+}
+
+.label {
+  width: 130px;
+}
+
+.value {
+  width: 65px;
+  height: 38px;
+  margin-block: 17px 8px;
+}
+
+.toolbar {
+  min-height: 82px;
+}
+
+.date {
+  width: 225px;
+  height: 22px;
+}
+
+.dateField {
+  display: grid;
+  gap: 12px;
+  width: 180px;
+  max-width: 45%;
+}
+
+.input {
+  width: 180px;
+  height: 49px;
+  border-radius: 6px;
+}
+
+.calendar {
+  margin-bottom: 28px;
+}
+
+.slot {
+  height: 34px;
+}
+
+.review,
+.settings {
+  display: grid;
+  gap: 24px;
+}
+
+.line {
+  width: 85%;
+}
+
+.reportNote {
+  margin-block: 22px 30px;
+}
+
+.report {
+  padding: 0;
+  overflow: hidden;
+}
+
+.reportRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  padding: 22px 24px;
+}
+
+.reportRow + .reportRow {
+  border-top: 1px solid var(--line);
+}
+
+.settingField {
+  display: grid;
+  gap: 12px;
+}
+
+.settingField .input {
+  width: 100%;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 650px) {
+  .dateField {
+    width: 145px;
+  }
+
+  .date {
+    width: 45%;
+  }
+
+  .reportRow {
+    gap: 16px;
+    padding-inline: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    animation: none;
+  }
+}
