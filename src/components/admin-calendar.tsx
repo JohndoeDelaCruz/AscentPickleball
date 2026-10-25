@@ -11,6 +11,7 @@ import {
   courtScheduleLabel,
   hasOpenPlay,
   openPlayCapacityLabel,
+  equipmentPackageLabel,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import {
@@ -254,7 +255,8 @@ export function AdminCalendar({
                       </small>
                       {b.equipment_rental && (
                         <small>
-                          Equipment: 1 paddle + 2 balls ·{" "}
+                          Equipment:{" "}
+                          {equipmentPackageLabel(b.equipment_ball_count ?? 2)} ·{" "}
                           {money(b.equipment_amount)}
                         </small>
                       )}
@@ -579,6 +581,7 @@ function CreateBookingModal({
           <>
             <EquipmentRental
               price={venue.equipment_rental_price}
+              ballCount={venue.equipment_ball_count}
               checked={equipmentRental}
               onChange={setEquipmentRental}
               disabled={pending}

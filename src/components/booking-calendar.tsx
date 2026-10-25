@@ -22,6 +22,7 @@ import {
   courtScheduleLabel,
   hasOpenPlay,
   openPlayCapacityLabel,
+  equipmentPackageLabel,
 } from "@/lib/booking";
 import type { Availability, PaymentOption, VenueSettings } from "@/lib/types";
 import { reserveCourt } from "@/app/actions";
@@ -244,6 +245,26 @@ export function BookingCalendar({
           />
         ) : (
           <>
+            <div className="notice booking-court-rules">
+              <Info size={17} aria-hidden="true" />
+              <span>
+                Private bookings allow up to{" "}
+                <strong>
+                  {venue.private_court_capacity} players per court
+                </strong>
+                . Optional rental: {money(venue.equipment_rental_price)} per
+                session for {equipmentPackageLabel(venue.equipment_ball_count)}.{" "}
+                <Link
+                  href="/court-rules"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="policy-link"
+                >
+                  Read court rules
+                </Link>
+                .
+              </span>
+            </div>
             {hasOpenPlay(venue, date) && (
               <div className="notice weekend-schedule-note">
                 <Info size={17} />
@@ -461,6 +482,7 @@ export function BookingCalendar({
             </dl>
             <EquipmentRental
               price={venue.equipment_rental_price}
+              ballCount={venue.equipment_ball_count}
               checked={equipmentRental}
               onChange={setEquipmentRental}
               disabled={pending}
@@ -570,7 +592,16 @@ export function BookingCalendar({
                       style={{ textDecoration: "underline" }}
                     >
                       booking and cancellation policy
-                    </a>
+                    </a>{" "}
+                    and the{" "}
+                    <Link
+                      href="/court-rules"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="policy-link"
+                    >
+                      court rules
+                    </Link>
                     .
                   </span>
                 </label>
@@ -602,6 +633,14 @@ export function BookingCalendar({
             Booking & cancellation policy
           </summary>
           <p className="small-print">{venue.cancellation_policy}</p>
+          <Link
+            href="/court-rules"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-link policy-link"
+          >
+            Read the full court rules
+          </Link>
           <p className="small-print">
             Unpaid holds expire after {venue.hold_minutes} minutes. Submitted
             payments stay pending for staff verification. Contact the venue if

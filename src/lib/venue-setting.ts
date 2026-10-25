@@ -7,6 +7,8 @@ export const individualSettingKey = z.enum([
   "evening_hourly_rate",
   "evening_start_hour",
   "equipment_rental_price",
+  "equipment_ball_count",
+  "private_court_capacity",
   "hold_minutes",
   "opening_hour",
   "closing_hour",

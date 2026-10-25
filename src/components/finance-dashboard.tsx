@@ -9,6 +9,7 @@ import {
   formatDate,
   formatHour,
   money,
+  equipmentPackageLabel,
 } from "@/lib/booking";
 import {
   bookingFinanceDescription,
@@ -424,8 +425,8 @@ export function FinanceDashboard({
                         )}
                         {b.equipment_rental && (
                           <small>
-                            Includes {money(b.equipment_amount)} · 1 paddle + 2
-                            balls
+                            Includes {money(b.equipment_amount)} ·{" "}
+                            {equipmentPackageLabel(b.equipment_ball_count ?? 2)}
                           </small>
                         )}
                       </td>

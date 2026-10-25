@@ -1,14 +1,16 @@
 "use client";
 
-import { money } from "@/lib/booking";
+import { equipmentPackageLabel, money } from "@/lib/booking";
 
 export function EquipmentRental({
   price,
+  ballCount,
   checked,
   onChange,
   disabled = false,
 }: {
   price: number;
+  ballCount: number;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
@@ -28,7 +30,7 @@ export function EquipmentRental({
         <strong>
           Rent equipment <span>{money(price)}</span>
         </strong>
-        <small>1 paddle + 2 balls · one set per booking</small>
+        <small>{equipmentPackageLabel(ballCount)} · one set per booking</small>
         <small>Charged once, added to your booking total.</small>
       </span>
     </label>

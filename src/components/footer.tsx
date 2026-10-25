@@ -19,6 +19,8 @@ export function Footer() {
             Book a court <ArrowUpRight size={15} />
           </Link>
           <Link href="/my-bookings">My bookings</Link>
+          <Link href="/membership">Membership</Link>
+          <Link href="/court-rules">Court rules</Link>
           <Link href="/#faq">Questions & answers</Link>
           <Link href="/admin">Staff access</Link>
         </div>

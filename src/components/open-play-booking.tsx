@@ -249,6 +249,7 @@ export function OpenPlayBooking({
               </label>
               <EquipmentRental
                 price={venue.equipment_rental_price}
+                ballCount={venue.equipment_ball_count}
                 checked={equipmentRental}
                 onChange={setEquipmentRental}
                 disabled={pending}
@@ -304,8 +305,17 @@ export function OpenPlayBooking({
                   required
                 />
                 <span>
-                  I agree to the booking policy and understand that open play
-                  uses shared courts with player rotation.
+                  I agree to the booking policy and{" "}
+                  <Link
+                    href="/court-rules"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="policy-link"
+                  >
+                    court rules
+                  </Link>
+                  , and understand that open play uses shared courts with player
+                  rotation.
                 </span>
               </label>
               <button

@@ -88,7 +88,17 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         "utf8",
       ),
     );
+    await db.exec(
+      "update public.bookings set equipment_rental=true,equipment_amount=30 where reference='AP-OLD-PAID'",
+    );
+    await db.exec(
+      await readFile(
+        resolve("supabase/migrations/202610260009_venue_rules.sql"),
+        "utf8",
+      ),
+    );
     for (const fn of [
+      "public.snapshot_equipment_inclusions()",
       "public.staff_record_balance(uuid,text,text)",
       "public.get_finance_month(date)",
       "public.reserve_with_payment(text,date,text,text,int,int,int,int,boolean,boolean,boolean,text,text,text)",
@@ -108,11 +118,13 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         payment_option: string;
         initial_payment_amount: string;
         paid_amount: string;
+        equipment_ball_count: number;
       }>("select * from public.bookings where reference='AP-OLD-PAID'")
     ).rows[0];
     assert.equal(legacyPaid.payment_option, "full");
     assert.equal(Number(legacyPaid.initial_payment_amount), 175.25);
     assert.equal(Number(legacyPaid.paid_amount), 175.25);
+    assert.equal(legacyPaid.equipment_ball_count, 2);
 
     async function asUser<T>(
       id: string,
@@ -131,7 +143,7 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
     }
     async function reset() {
       await db.exec(
-        "truncate public.bookings,public.booking_finance,public.finance_day_notes; update public.venue_settings set open_play_enabled=false,open_play_start_hour=9,open_play_end_hour=16,weekend_court_end_hour=9,open_play_price=50,open_play_capacity=null,hourly_rate=100,evening_hourly_rate=200,evening_start_hour=16,equipment_rental_price=30,opening_hour=6,closing_hour=22,gcash_name='Ascent',gcash_qr_url='https://example.com/qr.png',booking_enabled=true;",
+        "truncate public.bookings,public.booking_finance,public.finance_day_notes; update public.venue_settings set open_play_enabled=false,open_play_start_hour=9,open_play_end_hour=16,weekend_court_end_hour=9,open_play_price=50,open_play_capacity=null,hourly_rate=100,evening_hourly_rate=200,evening_start_hour=16,equipment_rental_price=30,equipment_ball_count=1,private_court_capacity=8,opening_hour=6,closing_hour=22,gcash_name='Ascent',gcash_qr_url='https://example.com/qr.png',booking_enabled=true;",
       );
     }
     async function reserve(user: string, court = 1, start = 10, duration = 1) {
@@ -1255,6 +1267,76 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
           ).rows[0].id,
       );
     }
+    await t.test(
+      "rental inclusions are saved with each booking, remain historical after settings edits, and are staff-only",
+      async () => {
+        await startOpenPlay();
+        await asUser(staff, () =>
+          db.exec(
+            "update public.venue_settings set equipment_ball_count=3,private_court_capacity=10",
+          ),
+        );
+        const original = await equipmentBooking(alice);
+        await asUser(staff, () =>
+          db.exec("update public.venue_settings set equipment_ball_count=1"),
+        );
+        const next = await equipmentBooking(bob, { court: 2 });
+        const without = await equipmentBooking(staff, {
+          start: 7,
+          rental: false,
+          walkIn: true,
+        });
+        for (const [id, count] of [
+          [original, 3],
+          [next, 1],
+          [without, 0],
+        ] as const) {
+          const saved = (
+            await db.query<{
+              equipment_ball_count: number;
+              total_amount: string;
+            }>(
+              "select equipment_ball_count,total_amount from public.bookings where id=$1",
+              [id],
+            )
+          ).rows[0];
+          assert.equal(saved.equipment_ball_count, count);
+          assert.equal(Number(saved.total_amount), count ? 130 : 100);
+        }
+        assert.equal(
+          (
+            await asUser(alice, () =>
+              db.query(
+                "update public.venue_settings set equipment_ball_count=20,private_court_capacity=100 returning id",
+              ),
+            )
+          ).rows.length,
+          0,
+        );
+        const settings = (
+          await db.query<{
+            equipment_ball_count: number;
+            private_court_capacity: number;
+          }>(
+            "select equipment_ball_count,private_court_capacity from public.venue_settings",
+          )
+        ).rows[0];
+        assert.deepEqual(settings, {
+          equipment_ball_count: 1,
+          private_court_capacity: 10,
+        });
+        for (const change of [
+          "equipment_ball_count=0",
+          "equipment_ball_count=21",
+          "private_court_capacity=0",
+          "private_court_capacity=101",
+        ])
+          await assert.rejects(
+            () => db.exec(`update public.venue_settings set ${change}`),
+            /check constraint/,
+          );
+      },
+    );
     await t.test(
       "equipment is optional and charged once per reservation, including multi-hour court bookings and shared open play",
       async () => {

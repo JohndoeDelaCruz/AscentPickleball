@@ -18,6 +18,7 @@ import {
   money,
   getRatePeriods,
   openPlayCapacityLabel,
+  equipmentPackageLabel,
 } from "@/lib/booking";
 
 export default async function Home() {
@@ -173,10 +174,14 @@ export default async function Home() {
                     ))}
                   </dl>
                   <p className="court-rental">
-                    Optional rental: {money(venue.equipment_rental_price)} · 1
-                    paddle + 2 balls
+                    Optional rental: {money(venue.equipment_rental_price)} ·{" "}
+                    {equipmentPackageLabel(venue.equipment_ball_count)}
                     <br />
-                    <span>Not included in the court rate.</span>
+                    <span>Per session, separate from the court rate.</span>
+                  </p>
+                  <p className="small-print">
+                    Up to {venue.private_court_capacity} players per private
+                    court.
                   </p>
                 </div>
                 <span className="circle-arrow">
@@ -211,6 +216,22 @@ export default async function Home() {
             </Link>
           </div>
         )}
+      </section>
+      <section
+        className="container membership-home"
+        aria-labelledby="membership-home-title"
+      >
+        <div>
+          <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
+          <h2 id="membership-home-title">Annual Membership — ₱300/year</h2>
+          <p>
+            Free use of paddles and balls, member rates, social play, and a
+            birthday perk. Enjoy a full year of Ascent benefits.
+          </p>
+        </div>
+        <Link href="/membership" className="button button-lime">
+          View membership benefits <ArrowUpRight size={18} />
+        </Link>
       </section>
       <section className="booking-callout">
         <div className="container callout-inner">

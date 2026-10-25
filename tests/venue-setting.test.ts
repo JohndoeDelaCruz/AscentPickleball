@@ -56,6 +56,14 @@ test("individual time changes validate against saved session and opening hours",
 
 test("individual numeric fields keep nullable limits, zero-price rental, integer holds, and booking prerequisites", () => {
   assert.deepEqual(
+    venueSettingPatch(defaultVenue, "private_court_capacity", 10).data,
+    { private_court_capacity: 10 },
+  );
+  assert.deepEqual(
+    venueSettingPatch(defaultVenue, "equipment_ball_count", 2).data,
+    { equipment_ball_count: 2 },
+  );
+  assert.deepEqual(
     venueSettingPatch(defaultVenue, "open_play_capacity", null).data,
     { open_play_capacity: null },
   );
@@ -69,6 +77,11 @@ test("individual numeric fields keep nullable limits, zero-price rental, integer
     ["open_play_capacity", 0],
     ["open_play_price", 0],
     ["equipment_rental_price", -1],
+    ["equipment_ball_count", 0],
+    ["equipment_ball_count", 21],
+    ["equipment_ball_count", 1.5],
+    ["private_court_capacity", 0],
+    ["private_court_capacity", 101],
   ])
     assert.ok(
       venueSettingPatch(defaultVenue, key, value).error,

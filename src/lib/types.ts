@@ -11,6 +11,8 @@ export type VenueSettings = {
   evening_hourly_rate: number;
   evening_start_hour: number;
   equipment_rental_price: number;
+  equipment_ball_count: number;
+  private_court_capacity: number;
   opening_hour: number | null;
   closing_hour: number | null;
   hold_minutes: number;
@@ -40,6 +42,8 @@ export const defaultVenue: VenueSettings = {
   evening_hourly_rate: 200,
   evening_start_hour: 16,
   equipment_rental_price: 30,
+  equipment_ball_count: 1,
+  private_court_capacity: 8,
   opening_hour: 6,
   closing_hour: 22,
   hold_minutes: 30,
@@ -85,6 +89,7 @@ export type Booking = {
   balance_paid_at: string | null;
   equipment_rental: boolean;
   equipment_amount: number;
+  equipment_ball_count: number;
   status: BookingStatus;
   hold_expires_at: string | null;
   payment_reference: string | null;

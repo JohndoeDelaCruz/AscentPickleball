@@ -14,6 +14,7 @@ import {
   formatDate,
   formatHour,
   money,
+  equipmentPackageLabel,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import { bookingPayments } from "@/lib/payment";
@@ -171,7 +172,8 @@ export function BookingDetail({
                 <dt>
                   Equipment rental
                   <small className="equipment-description">
-                    1 paddle + 2 balls · one set
+                    {equipmentPackageLabel(b.equipment_ball_count ?? 2)} · one
+                    set
                   </small>
                 </dt>
                 <dd>{money(b.equipment_amount)}</dd>

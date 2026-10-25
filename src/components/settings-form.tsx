@@ -4,7 +4,11 @@ import { useRouter } from "next/navigation";
 import { Check, Save, Upload } from "lucide-react";
 import { saveVenueSetting, saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
-import { canBook, openPlayCapacityLabel } from "@/lib/booking";
+import {
+  canBook,
+  equipmentPackageLabel,
+  openPlayCapacityLabel,
+} from "@/lib/booking";
 import type { VenueSettings } from "@/lib/types";
 import { TypedSettingField } from "./typed-setting-field";
 import type { IndividualSettingKey } from "@/lib/venue-setting";
@@ -292,7 +296,21 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             label: "Equipment rental package (PHP)",
             min: 0,
             max: 100000,
-            hint: "1 paddle + 2 balls. Added once per reservation when selected.",
+            hint: `${equipmentPackageLabel(venue.equipment_ball_count)}. Added once per reservation when selected.`,
+          })}
+          {numericField("equipment_ball_count", {
+            label: "Balls per rental paddle",
+            kind: "integer",
+            min: 1,
+            max: 20,
+            hint: "Each rental set includes 1 paddle and this number of balls. New reservations use the updated count.",
+          })}
+          {numericField("private_court_capacity", {
+            label: "Private-booking players per court",
+            kind: "integer",
+            min: 1,
+            max: 100,
+            hint: "Maximum players sharing one privately booked court. Open-play capacity is set separately below.",
           })}
           {numericField("hold_minutes", {
             label: "Unpaid hold duration (minutes)",

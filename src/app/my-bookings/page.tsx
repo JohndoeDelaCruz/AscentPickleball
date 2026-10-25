@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { ArrowUpRight, CalendarDays, Info } from "lucide-react";
 import { getSession, getVenue } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate, formatHour, money } from "@/lib/booking";
+import {
+  equipmentPackageLabel,
+  formatDate,
+  formatHour,
+  money,
+} from "@/lib/booking";
 import { bookingPayments } from "@/lib/payment";
 import { statusLabels, type Booking } from "@/lib/types";
 export const metadata: Metadata = { title: "My bookings" };
@@ -98,7 +103,8 @@ export default async function MyBookings() {
                   {b.equipment_rental && (
                     <>
                       <br />
-                      Includes 1 equipment set · 1 paddle + 2 balls
+                      Includes 1 equipment set ·{" "}
+                      {equipmentPackageLabel(b.equipment_ball_count ?? 2)}
                     </>
                   )}
                 </p>

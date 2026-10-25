@@ -44,6 +44,9 @@ export function money(amount: number) {
     maximumFractionDigits: 2,
   }).format(amount);
 }
+export function equipmentPackageLabel(ballCount: number) {
+  return `1 paddle + ${ballCount} ${ballCount === 1 ? "ball" : "balls"}`;
+}
 export function getRatePeriods(venue: VenueSettings) {
   if (
     venue.opening_hour === null ||
@@ -234,6 +237,8 @@ export const settingsSchema = z
     evening_hourly_rate: z.number().positive().max(100000),
     evening_start_hour: z.number().int().min(1).max(23),
     equipment_rental_price: z.number().min(0).max(100000),
+    equipment_ball_count: z.number().int().min(1).max(20),
+    private_court_capacity: z.number().int().min(1).max(100),
     opening_hour: z.number().int().min(0).max(23).nullable(),
     closing_hour: z.number().int().min(1).max(24).nullable(),
     hold_minutes: z.number().int().min(15).max(120),
