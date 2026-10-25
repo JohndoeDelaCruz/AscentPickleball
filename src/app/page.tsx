@@ -176,8 +176,6 @@ export default async function Home() {
                   <p className="court-rental">
                     Optional rental: {money(venue.equipment_rental_price)} ·{" "}
                     {equipmentPackageLabel(venue.equipment_ball_count)}
-                    <br />
-                    <span>Per session, separate from the court rate.</span>
                   </p>
                   <p className="small-print">
                     Up to {venue.private_court_capacity} players per private
