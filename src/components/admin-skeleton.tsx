@@ -122,6 +122,19 @@ export function AdminFinanceSkeleton() {
 export function AdminSettingsSkeleton() {
   return (
     <LoadingRegion label="Loading venue settings…">
+      <div className={`panel schedule-editor ${styles.settings}`}>
+        <Block className={styles.title} />
+        <Block className={styles.line} />
+        <div className="field-grid">
+          {Array.from({ length: 4 }, (_, field) => (
+            <div className={styles.settingField} key={field}>
+              <Block className={styles.label} />
+              <Block className={styles.input} />
+            </div>
+          ))}
+        </div>
+        <Block className={styles.action} />
+      </div>
       <div className="settings-layout">
         <div className={`panel ${styles.settings}`}>
           <Block className={styles.title} />

@@ -1,4 +1,6 @@
+import type { ScheduleConfig } from "./schedule";
 export type VenueSettings = {
+  schedule_config?: ScheduleConfig | null;
   id: boolean;
   name: string;
   tagline: string;
@@ -84,7 +86,12 @@ export type Booking = {
   initial_payment_amount: number;
   paid_amount: number;
   balance_payment_method:
-    "cash" | "gcash" | "bank_transfer" | "card" | "other" | null;
+    | "cash"
+    | "gcash"
+    | "bank_transfer"
+    | "card"
+    | "other"
+    | null;
   balance_payment_reference: string | null;
   balance_paid_at: string | null;
   equipment_rental: boolean;

@@ -9,9 +9,10 @@ import {
   localDate,
   money,
   courtScheduleLabel,
-  hasOpenPlay,
   openPlayCapacityLabel,
   equipmentPackageLabel,
+  calculateCourtTotal,
+  calculateReservationTotal,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import {
@@ -24,6 +25,7 @@ import { paymentMethods } from "@/lib/finance";
 import { EquipmentRental } from "./equipment-rental";
 import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
+import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 
 export function AdminCalendar({
   bookings,
@@ -46,10 +48,18 @@ export function AdminCalendar({
   const active = bookings.filter(
     (b) => !["cancelled", "expired"].includes(b.status),
   );
-  const hours = Array.from(
-    { length: (venue.closing_hour ?? 22) - (venue.opening_hour ?? 6) },
-    (_, i) => i + (venue.opening_hour ?? 6),
+  const schedule = resolveSchedule(venue, date);
+  const sessions = schedule.blocks.filter(
+    (block) => block.kind === "open_play",
   );
+  const hours = [
+    ...new Set([
+      ...scheduleHours(schedule.blocks),
+      ...active.flatMap((b) =>
+        Array.from({ length: b.duration }, (_, i) => b.start_hour + i),
+      ),
+    ]),
+  ].sort((a, b) => a - b);
   function update() {
     if (!action) return;
     setError("");
@@ -129,6 +139,18 @@ export function AdminCalendar({
           />
         </label>
       </div>
+      {schedule.override && (
+        <div className="notice" style={{ marginBottom: 20 }}>
+          {schedule.override.name} · through{" "}
+          {formatDate(schedule.override.end_date)}. Regular hours resume{" "}
+          {formatDate(addDays(schedule.override.end_date, 1))}.
+        </div>
+      )}
+      {!hours.length && (
+        <div className="notice" style={{ marginBottom: 20 }}>
+          No scheduled court time on this date.
+        </div>
+      )}
       <div className="availability-grid" style={{ marginBottom: 28 }}>
         <div className="availability-header">
           <div>PHT / UTC+8</div>
@@ -182,22 +204,26 @@ export function AdminCalendar({
           </div>
         ))}
       </div>
-      {hasOpenPlay(venue, date) && (
-        <div className="notice" style={{ marginBottom: 24 }}>
+      {sessions.map((session) => (
+        <div className="notice" style={{ marginBottom: 24 }} key={session.id}>
           <span>
             <strong>
-              Weekend open play · {formatHour(venue.open_play_start_hour)}–
-              {formatHour(venue.open_play_end_hour)}
+              Open play · {formatHour(session.start)}–{formatHour(session.end)}
             </strong>
             <br />
             {active
-              .filter((b) => b.booking_type === "open_play")
+              .filter(
+                (b) =>
+                  b.booking_type === "open_play" &&
+                  b.start_hour === session.start &&
+                  b.duration === session.end - session.start,
+              )
               .reduce((sum, b) => sum + b.participant_count, 0)}{" "}
-            players held or confirmed · {money(venue.open_play_price)} per
-            person · {openPlayCapacityLabel(venue.open_play_capacity)}
+            players held or confirmed · {money(session.rate)} per person ·{" "}
+            {openPlayCapacityLabel(session.capacity)}
           </span>
         </div>
-      )}
+      ))}
       <section className="panel" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "22px 24px" }}>
           <h3 style={{ fontSize: 17, margin: 0 }}>
@@ -440,10 +466,43 @@ function CreateBookingModal({
 }) {
   const [blocked, setBlocked] = useState(false);
   const [openPlay, setOpenPlay] = useState(false);
+  const [bookingDate, setBookingDate] = useState(
+    date < localDate() ? localDate() : date,
+  );
+  const [startHour, setStartHour] = useState(6);
+  const [sessionStart, setSessionStart] = useState<number | null>(null);
+  const [duration, setDuration] = useState(1);
+  const [people, setPeople] = useState(1);
   const [equipmentRental, setEquipmentRental] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const blocks = resolveSchedule(venue, bookingDate).blocks;
+  const sessions = blocks.filter((block) => block.kind === "open_play");
+  const startHours = blocked
+    ? Array.from({ length: 24 }, (_, i) => i)
+    : scheduleHours(blocks).filter((hour) =>
+        blocks.some(
+          (block) =>
+            block.kind === "court" && hour >= block.start && hour < block.end,
+        ),
+      );
+  const selectedHour = startHours.includes(startHour)
+    ? startHour
+    : startHours[0];
+  const selectedSession =
+    sessions.find((session) => session.start === sessionStart) ?? sessions[0];
+  const base = blocked
+    ? selectedHour !== undefined && selectedHour + duration <= 24
+      ? 0
+      : null
+    : openPlay
+      ? selectedSession
+        ? selectedSession.rate * people
+        : null
+      : selectedHour === undefined
+        ? null
+        : calculateCourtTotal(venue, selectedHour, duration, bookingDate);
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -498,7 +557,8 @@ function CreateBookingModal({
             <input
               type="date"
               name="booking_date"
-              defaultValue={date < localDate() ? localDate() : date}
+              value={bookingDate}
+              onChange={(event) => setBookingDate(event.target.value)}
               min={localDate()}
               max={addDays(localDate(), 30)}
               required
@@ -521,7 +581,8 @@ function CreateBookingModal({
                 name="participant_count"
                 min="1"
                 max="20"
-                defaultValue="1"
+                value={people}
+                onChange={(event) => setPeople(Number(event.target.value))}
                 required
               />
             </label>
@@ -529,14 +590,17 @@ function CreateBookingModal({
             <>
               <label className="field">
                 <span>Start time</span>
-                <select name="start_hour">
-                  {Array.from(
-                    {
-                      length:
-                        (venue.closing_hour ?? 22) - (venue.opening_hour ?? 6),
-                    },
-                    (_, i) => i + (venue.opening_hour ?? 6),
-                  ).map((h) => (
+                <select
+                  name="start_hour"
+                  value={selectedHour ?? ""}
+                  onChange={(event) => setStartHour(Number(event.target.value))}
+                  required
+                  disabled={!startHours.length}
+                >
+                  {!startHours.length && (
+                    <option value="">No private hours</option>
+                  )}
+                  {startHours.map((h) => (
                     <option value={h} key={h}>
                       {formatHour(h)}
                     </option>
@@ -545,7 +609,11 @@ function CreateBookingModal({
               </label>
               <label className="field">
                 <span>Duration</span>
-                <select name="duration">
+                <select
+                  name="duration"
+                  value={duration}
+                  onChange={(event) => setDuration(Number(event.target.value))}
+                >
                   {[1, 2, 3, 4].map((d) => (
                     <option value={d} key={d}>
                       {d} {d === 1 ? "hour" : "hours"}
@@ -556,6 +624,28 @@ function CreateBookingModal({
             </>
           )}
         </div>
+        {openPlay && (
+          <label className="field">
+            <span>Open-play session</span>
+            <select
+              name="start_hour"
+              value={selectedSession?.start ?? ""}
+              onChange={(event) => setSessionStart(Number(event.target.value))}
+              required
+              disabled={!sessions.length}
+            >
+              {!sessions.length && (
+                <option value="">No sessions on this date</option>
+              )}
+              {sessions.map((session) => (
+                <option value={session.start} key={session.id}>
+                  {formatHour(session.start)}–{formatHour(session.end)} ·{" "}
+                  {money(session.rate)} / person
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           <span>{blocked ? "Block reason" : "Customer name"}</span>
           <input
@@ -615,24 +705,32 @@ function CreateBookingModal({
             </label>
           </>
         )}
-        {!blocked && !openPlay && (
+        {base === null ? (
+          <div className="notice notice-warning">
+            Choose a time and duration within available private-booking hours,
+            or select a scheduled open-play session.
+          </div>
+        ) : (
+          !blocked && (
+            <div className="summary-total">
+              <span>Booking total</span>
+              <strong>
+                {money(
+                  calculateReservationTotal(
+                    base,
+                    venue.equipment_rental_price,
+                    equipmentRental,
+                  ),
+                )}
+              </strong>
+            </div>
+          )
+        )}
+        {!blocked && (
           <p className="small-print">
             Walk-ins are saved as confirmed reservations. Record these only
-            after collecting payment. Court rates:{" "}
-            {money(venue.hourly_rate ?? 0)}/hour before{" "}
-            {formatHour(venue.evening_start_hour)}, then{" "}
-            {money(venue.evening_hourly_rate)}/hour. The total is calculated for
-            the selected hours. Selected equipment adds{" "}
-            {money(venue.equipment_rental_price)} once per booking.
-          </p>
-        )}
-        {openPlay && (
-          <p className="small-print">
-            Saturday and Sunday, {formatHour(venue.open_play_start_hour)}–
-            {formatHour(venue.open_play_end_hour)}.{" "}
-            {money(venue.open_play_price)} per player. Record passes only after
-            collecting payment, including any selected equipment rental. The
-            session must be available on both courts.
+            after collecting the selected payment amount. Open play uses both
+            courts; places are checked when saving.
           </p>
         )}
         {error && (
@@ -640,7 +738,10 @@ function CreateBookingModal({
             {error}
           </div>
         )}
-        <button className="button button-dark" disabled={pending}>
+        <button
+          className="button button-dark"
+          disabled={pending || base === null}
+        >
           {pending
             ? "Saving…"
             : blocked

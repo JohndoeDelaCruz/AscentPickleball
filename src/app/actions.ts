@@ -8,6 +8,7 @@ import { financeBookingSchema, financeDaySchema } from "@/lib/finance";
 import { z } from "zod";
 import { balancePaymentSchema } from "@/lib/payment";
 import { venueSettingPatch } from "@/lib/venue-setting";
+import { scheduleConfigSchema } from "@/lib/schedule";
 
 export async function reserveCourt(input: unknown) {
   const parsed = bookingSchema.safeParse(input);
@@ -20,17 +21,23 @@ export async function reserveCourt(input: unknown) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please sign in before reserving a court." };
   const p = parsed.data;
-  const { data, error } = await supabase.rpc("reserve_with_payment", {
-    p_payment_option: p.payment_option,
-    p_kind: "court",
-    p_rental: p.equipment_rental,
-    p_court: p.court_id,
-    p_date: p.booking_date,
-    p_start: p.start_hour,
-    p_duration: p.duration,
-    p_name: p.customer_name,
-    p_phone: p.customer_phone,
-  });
+  const venue = (await getVenue()).venue;
+  const { data, error } = await supabase.rpc(
+    "schedule_config" in venue
+      ? "reserve_scheduled_booking"
+      : "reserve_with_payment",
+    {
+      p_payment_option: p.payment_option,
+      p_kind: "court",
+      p_rental: p.equipment_rental,
+      p_court: p.court_id,
+      p_date: p.booking_date,
+      p_start: p.start_hour,
+      p_duration: p.duration,
+      p_name: p.customer_name,
+      p_phone: p.customer_phone,
+    },
+  );
   if (error) return { error: bookingError(error) };
   revalidatePath("/book");
   revalidatePath("/my-bookings");
@@ -51,27 +58,39 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
     if (!user)
       return { error: "Please sign in before reserving open-play passes." };
     const p = parsed.data;
+    const venue = (await getVenue()).venue;
+    const reservationRpc =
+      "schedule_config" in venue
+        ? "reserve_scheduled_booking"
+        : "reserve_with_payment";
+    if (
+      reservationRpc === "reserve_scheduled_booking" &&
+      p.start_hour === undefined
+    )
+      return { error: "Choose an open-play session." };
     const finance = walkIn ? financeBookingSchema.safeParse(input) : null;
     if (finance && !finance.success)
       return { error: finance.error.issues[0].message };
     const { data, error } = walkIn
-      ? await supabase.rpc("reserve_with_payment", {
+      ? await supabase.rpc(reservationRpc, {
           p_payment_option: p.payment_option,
           p_kind: "open_play",
           p_walk_in: true,
           p_rental: p.equipment_rental,
           p_date: p.booking_date,
+          ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
           p_people: p.participant_count,
           p_name: p.customer_name,
           p_phone: p.customer_phone,
           p_method: finance!.data!.payment_method,
           p_notes: finance!.data!.finance_notes,
         })
-      : await supabase.rpc("reserve_with_payment", {
+      : await supabase.rpc(reservationRpc, {
           p_payment_option: p.payment_option,
           p_kind: "open_play",
           p_rental: p.equipment_rental,
           p_date: p.booking_date,
+          ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
           p_people: p.participant_count,
           p_name: p.customer_name,
           p_phone: p.customer_phone,
@@ -158,6 +177,34 @@ export async function saveSettings(input: unknown) {
   }
 }
 
+export async function saveSchedule(input: unknown, expected: unknown) {
+  const parsed = scheduleConfigSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const previous =
+    expected === null
+      ? { success: true as const, data: null }
+      : scheduleConfigSchema.safeParse(expected);
+  if (!previous.success)
+    return { error: "Reload your saved schedule before making changes." };
+  try {
+    const supabase = await staffClient();
+    const { error } = await supabase.rpc("save_booking_schedule", {
+      p_config: parsed.data,
+      p_expected: previous.data,
+    });
+    if (error)
+      return {
+        error: error.message.includes("Booking:")
+          ? bookingError(error)
+          : "The schedule could not be saved. Check that the latest database migration has been applied.",
+      };
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
 export async function saveVenueSetting(key: unknown, value: unknown) {
   try {
     const supabase = await staffClient();
@@ -229,21 +276,27 @@ export async function staffCreateBooking(input: unknown, blocked: boolean) {
   try {
     const supabase = await staffClient();
     const p = parsed.data;
-    const { error } = await supabase.rpc("reserve_with_payment", {
-      p_payment_option: blocked ? "full" : p.payment_option,
-      p_kind: "court",
-      p_walk_in: true,
-      p_rental: p.equipment_rental,
-      p_court: p.court_id,
-      p_date: p.booking_date,
-      p_start: p.start_hour,
-      p_duration: p.duration,
-      p_name: p.customer_name,
-      p_phone: "customer_phone" in p ? p.customer_phone : "",
-      p_blocked: blocked,
-      p_method: finance.data.payment_method,
-      p_notes: finance.data.finance_notes,
-    });
+    const venue = (await getVenue()).venue;
+    const { error } = await supabase.rpc(
+      "schedule_config" in venue
+        ? "reserve_scheduled_booking"
+        : "reserve_with_payment",
+      {
+        p_payment_option: blocked ? "full" : p.payment_option,
+        p_kind: "court",
+        p_walk_in: true,
+        p_rental: p.equipment_rental,
+        p_court: p.court_id,
+        p_date: p.booking_date,
+        p_start: p.start_hour,
+        p_duration: p.duration,
+        p_name: p.customer_name,
+        p_phone: "customer_phone" in p ? p.customer_phone : "",
+        p_blocked: blocked,
+        p_method: finance.data.payment_method,
+        p_notes: finance.data.finance_notes,
+      },
+    );
     if (error) return { error: bookingError(error) };
     revalidatePath("/admin");
     revalidatePath("/book");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Availability, VenueSettings } from "./types";
 import { paymentOptionSchema } from "./payment";
+import { resolveSchedule, scheduleCourtParts } from "./schedule";
 
 export const TIME_ZONE = "Asia/Manila";
 export function isValidDate(value: string | undefined): value is string {
@@ -71,7 +72,14 @@ export function getPriceBreakdown(
   venue: VenueSettings,
   start: number,
   duration: number,
+  date?: string,
 ) {
+  if (date)
+    return scheduleCourtParts(
+      resolveSchedule(venue, date).blocks,
+      start,
+      duration,
+    );
   return getRatePeriods(venue).flatMap((period) => {
     const from = Math.max(start, period.start);
     const to = Math.min(start + duration, period.end);
@@ -92,8 +100,9 @@ export function calculateCourtTotal(
   venue: VenueSettings,
   start: number,
   duration: number,
+  date?: string,
 ) {
-  const parts = getPriceBreakdown(venue, start, duration);
+  const parts = getPriceBreakdown(venue, start, duration, date);
   if (
     !Number.isInteger(start) ||
     !Number.isInteger(duration) ||
@@ -118,6 +127,10 @@ export function isWeekend(date: string) {
   return day === 0 || day === 6;
 }
 export function hasOpenPlay(venue: VenueSettings, date: string) {
+  if (venue.schedule_config)
+    return resolveSchedule(venue, date).blocks.some(
+      (b) => b.kind === "open_play",
+    );
   return venue.open_play_enabled && isWeekend(date);
 }
 export function openPlayCapacityLabel(capacity: number | null) {
@@ -133,6 +146,19 @@ export function courtScheduleLabel(
   start: number,
   duration = 1,
 ) {
+  if (venue.schedule_config) {
+    const blocks = resolveSchedule(venue, date).blocks;
+    if (
+      blocks.some(
+        (b) =>
+          b.kind === "open_play" && start < b.end && start + duration > b.start,
+      )
+    )
+      return "Open play";
+    return calculateCourtTotal(venue, start, duration, date) === null
+      ? "Closed"
+      : null;
+  }
   if (!hasOpenPlay(venue, date)) return null;
   if (
     start < venue.open_play_end_hour &&
@@ -158,6 +184,10 @@ export function isSlotAvailable(
   );
 }
 export function canBook(venue: VenueSettings) {
+  if (venue.schedule_config)
+    return (
+      venue.booking_enabled && Boolean(venue.gcash_qr_url && venue.gcash_name)
+    );
   return (
     venue.booking_enabled &&
     venue.hourly_rate !== null &&
@@ -199,7 +229,10 @@ export const openPlaySchema = bookingSchema
     equipment_rental: true,
     payment_option: true,
   })
-  .extend({ participant_count: z.coerce.number().int().min(1).max(20) });
+  .extend({
+    participant_count: z.coerce.number().int().min(1).max(20),
+    start_hour: z.coerce.number().int().min(0).max(23).optional(),
+  });
 export function calculateReservationTotal(
   base: number,
   equipmentPrice: number,

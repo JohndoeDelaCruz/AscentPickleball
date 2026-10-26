@@ -9,6 +9,7 @@ import {
 
 export function TypedSettingField({
   label,
+  ariaLabel,
   value,
   kind = "money",
   min,
@@ -23,6 +24,7 @@ export function TypedSettingField({
   onChange,
 }: {
   label: string;
+  ariaLabel?: string;
   value: number | null;
   kind?: "money" | "integer" | "hour";
   min: number;
@@ -58,6 +60,7 @@ export function TypedSettingField({
   const input = (
     <input
       id={inputId}
+      aria-label={ariaLabel}
       ref={inputRef}
       type={kind === "hour" ? "time" : "text"}
       step={kind === "hour" ? 3600 : undefined}

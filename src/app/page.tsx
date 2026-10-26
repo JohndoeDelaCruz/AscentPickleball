@@ -13,6 +13,7 @@ import {
 import { getVenue } from "@/lib/data";
 import { Starburst } from "@/components/starburst";
 import { LandingMotion } from "@/components/landing-motion";
+import { ScheduleOverview } from "@/components/schedule-overview";
 import {
   canBook,
   formatHour,
@@ -163,25 +164,34 @@ export default async function Home() {
               <div className="court-card-copy">
                 <div>
                   <h3>Court {court}</h3>
-                  <dl className="court-rates">
-                    {ratePeriods.map((period) => (
-                      <div key={period.start}>
-                        <dt>
-                          {formatHour(period.start)} – {formatHour(period.end)}
-                        </dt>
-                        <dd>
-                          <strong>{money(period.rate)}</strong> / hour
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  {venue.schedule_config ? (
+                    <p className="small-print">
+                      Private hours and rates vary by day. Choose a date to see
+                      available court time.
+                    </p>
+                  ) : (
+                    <dl className="court-rates">
+                      {ratePeriods.map((period) => (
+                        <div key={period.start}>
+                          <dt>
+                            {formatHour(period.start)} –{" "}
+                            {formatHour(period.end)}
+                          </dt>
+                          <dd>
+                            <strong>{money(period.rate)}</strong> / hour
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                   <p className="court-rental">
                     Optional rental: {money(venue.equipment_rental_price)} ·{" "}
                     {equipmentPackageLabel(venue.equipment_ball_count)}
                   </p>
                   <p className="small-print">
-                    Up to {venue.private_court_capacity} players per private
-                    court.
+                    {venue.schedule_config
+                      ? "Player limits are listed for each booking period."
+                      : `Up to ${venue.private_court_capacity} players per private court.`}
                   </p>
                 </div>
                 <span className="circle-arrow">
@@ -191,7 +201,10 @@ export default async function Home() {
             </Link>
           ))}
         </div>
-        {venue.open_play_enabled && (
+        {venue.schedule_config && (
+          <ScheduleOverview config={venue.schedule_config} />
+        )}
+        {!venue.schedule_config && venue.open_play_enabled && (
           <div className="weekend-home-callout" data-reveal="">
             <div>
               <span className="eyebrow">SATURDAY & SUNDAY</span>
@@ -265,13 +278,16 @@ export default async function Home() {
               <span>
                 COURT HOURS
                 <strong>
-                  {ratePeriods.length
-                    ? ratePeriods.map((period) => (
-                        <span className="court-hours-line" key={period.start}>
-                          {formatHour(period.start)} – {formatHour(period.end)}
-                        </span>
-                      ))
-                    : "Coming soon"}
+                  {venue.schedule_config
+                    ? "See our play schedule by date"
+                    : ratePeriods.length
+                      ? ratePeriods.map((period) => (
+                          <span className="court-hours-line" key={period.start}>
+                            {formatHour(period.start)} –{" "}
+                            {formatHour(period.end)}
+                          </span>
+                        ))
+                      : "Coming soon"}
                 </strong>
               </span>
             </div>

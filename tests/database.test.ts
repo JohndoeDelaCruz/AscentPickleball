@@ -97,6 +97,7 @@ test("Postgres migration, booking lifecycle, and access controls", async (t) => 
         "utf8",
       ),
     );
+    await db.exec(await readFile(resolve("supabase/migrations/202610260010_schedule_editor.sql"), "utf8"));
     for (const fn of [
       "public.snapshot_equipment_inclusions()",
       "public.staff_record_balance(uuid,text,text)",

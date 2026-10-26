@@ -123,9 +123,7 @@ export function BookingDetail({
             <div>
               <dt>{openPlay ? "Session" : "Court"}</dt>
               <dd>
-                {openPlay
-                  ? "Weekend open play · shared courts"
-                  : `Court ${b.court_id}`}
+                {openPlay ? "Open play · shared courts" : `Court ${b.court_id}`}
               </dd>
             </div>
             <div>

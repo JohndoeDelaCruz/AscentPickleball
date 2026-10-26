@@ -7,7 +7,12 @@ export const metadata: Metadata = { title: "Find your court" };
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ court?: string; date?: string; play?: string }>;
+  searchParams: Promise<{
+    court?: string;
+    date?: string;
+    play?: string;
+    session?: string;
+  }>;
 }) {
   const [{ venue, ready, openPlayReady }, { user }, params] = await Promise.all(
     [getVenue(), getSession(), searchParams],
@@ -35,6 +40,11 @@ export default async function BookPage({
         signedIn={Boolean(user)}
         userName={user?.user_metadata?.full_name || ""}
         initialDate={params.date}
+        initialSession={
+          params.session !== undefined && /^\d+$/.test(params.session)
+            ? Number(params.session)
+            : undefined
+        }
       />
     </main>
   );

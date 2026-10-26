@@ -20,7 +20,6 @@ import {
   localDate,
   money,
   courtScheduleLabel,
-  hasOpenPlay,
   openPlayCapacityLabel,
   equipmentPackageLabel,
 } from "@/lib/booking";
@@ -30,15 +29,21 @@ import { DateSlider } from "@/components/date-slider";
 import { OpenPlayBooking } from "@/components/open-play-booking";
 import { EquipmentRental } from "@/components/equipment-rental";
 import { PaymentOptions } from "@/components/payment-options";
+import {
+  resolveSchedule,
+  scheduleHours,
+  type DaySchedule,
+} from "@/lib/schedule";
 
 export function BookingCalendar({
-  venue,
+  venue: initialVenue,
   ready,
   signedIn,
   userName,
   initialDate,
   openPlayReady,
   initialOpenPlay = false,
+  initialSession,
 }: {
   venue: VenueSettings;
   ready: boolean;
@@ -47,6 +52,7 @@ export function BookingCalendar({
   initialDate?: string;
   openPlayReady: boolean;
   initialOpenPlay?: boolean;
+  initialSession?: number;
 }) {
   const [mode, setMode] = useState<"court" | "open_play">(
     initialOpenPlay ? "open_play" : "court",
@@ -59,6 +65,27 @@ export function BookingCalendar({
       ? initialDate
       : today;
   const [date, setDate] = useState(validInitial);
+  const [liveSchedule, setLiveSchedule] = useState<{
+    date: string;
+    schedule: DaySchedule;
+  } | null>(null);
+  const [selectedSession, setSelectedSession] = useState<number | null>(
+    initialSession ?? null,
+  );
+  const daySchedule =
+    liveSchedule?.date === date
+      ? liveSchedule.schedule
+      : resolveSchedule(initialVenue, date);
+  const venue =
+    liveSchedule?.date === date
+      ? {
+          ...initialVenue,
+          schedule_config: { weekly: daySchedule.blocks, overrides: [] },
+        }
+      : initialVenue;
+  const openSessions = daySchedule.blocks.filter((b) => b.kind === "open_play");
+  const selectedOpenSession =
+    openSessions.find((b) => b.start === selectedSession) ?? openSessions[0];
   const [duration, setDuration] = useState(1);
   const [selection, setSelection] = useState<{
     court: number;
@@ -80,10 +107,12 @@ export function BookingCalendar({
   const router = useRouter();
   const open = ready && openPlayReady && canBook(venue);
   const preview = venue.opening_hour === null || venue.closing_hour === null;
-  const hours = Array.from(
-    { length: (venue.closing_hour ?? 22) - (venue.opening_hour ?? 6) },
-    (_, i) => i + (venue.opening_hour ?? 6),
-  );
+  const hours = venue.schedule_config
+    ? scheduleHours(daySchedule.blocks)
+    : Array.from(
+        { length: (venue.closing_hour ?? 22) - (venue.opening_hour ?? 6) },
+        (_, i) => i + (venue.opening_hour ?? 6),
+      );
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30000);
@@ -96,13 +125,17 @@ export function BookingCalendar({
     const client = createClient();
     async function refresh() {
       setLoading(true);
-      const { data, error: requestError } = await client.rpc(
-        "get_availability",
-        { p_date: date },
+      const [{ data, error: requestError }, scheduleResult] = await Promise.all(
+        [
+          client.rpc("get_availability", { p_date: date }),
+          "schedule_config" in initialVenue
+            ? client.rpc("get_booking_schedule", { p_date: date })
+            : Promise.resolve({ data: null, error: null }),
+        ],
       );
       if (!active) return;
       setLoading(false);
-      if (requestError) {
+      if (requestError || scheduleResult.error) {
         setLoadError(
           "We couldn’t load live availability. Please try again before reserving.",
         );
@@ -110,9 +143,22 @@ export function BookingCalendar({
       }
       setLoadError("");
       setSlots(data || []);
+      if (scheduleResult.data)
+        setLiveSchedule({ date, schedule: scheduleResult.data as DaySchedule });
+      const checkedVenue = scheduleResult.data
+        ? {
+            ...initialVenue,
+            schedule_config: {
+              weekly: (scheduleResult.data as DaySchedule).blocks,
+              overrides: [],
+            },
+          }
+        : initialVenue;
       setSelection((selected) =>
         selected &&
-        isSlotAvailable(data || [], selected.court, selected.hour, duration)
+        isSlotAvailable(data || [], selected.court, selected.hour, duration) &&
+        calculateCourtTotal(checkedVenue, selected.hour, duration, date) !==
+          null
           ? selected
           : null,
       );
@@ -126,7 +172,7 @@ export function BookingCalendar({
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [date, ready, revision, duration]);
+  }, [date, ready, revision, duration, initialVenue]);
 
   function changeDate(value: string) {
     if (
@@ -138,6 +184,7 @@ export function BookingCalendar({
       return;
     setDate(value);
     setSelection(null);
+    setSelectedSession(null);
     setError("");
   }
   function selectSlot(court: number, hour: number) {
@@ -185,7 +232,9 @@ export function BookingCalendar({
             </span>
           </div>
         )}
-        {venue.open_play_enabled && (
+        {(venue.schedule_config ||
+          venue.open_play_enabled ||
+          "schedule_config" in initialVenue) && (
           <div
             className="booking-mode-switch"
             role="group"
@@ -209,7 +258,7 @@ export function BookingCalendar({
                 setSelection(null);
               }}
             >
-              Weekend open play
+              Open play
             </button>
           </div>
         )}
@@ -235,6 +284,15 @@ export function BookingCalendar({
           </label>
         </div>
         <DateSlider today={today} date={date} onChange={changeDate} />
+        {daySchedule.override && (
+          <div className="notice schedule-period-notice">
+            <span>
+              <strong>{daySchedule.override.name}</strong> · Temporary schedule
+              through {formatDate(daySchedule.override.end_date)}. Regular hours
+              resume {formatDate(addDays(daySchedule.override.end_date, 1))}.
+            </span>
+          </div>
+        )}
         {mode === "open_play" ? (
           <OpenPlayBooking
             venue={venue}
@@ -242,6 +300,8 @@ export function BookingCalendar({
             ready={ready && openPlayReady}
             signedIn={signedIn}
             userName={userName}
+            selectedStart={selectedSession}
+            onSessionChange={setSelectedSession}
           />
         ) : (
           <>
@@ -250,7 +310,15 @@ export function BookingCalendar({
               <span>
                 Private bookings allow up to{" "}
                 <strong>
-                  {venue.private_court_capacity} players per court
+                  {(selection
+                    ? daySchedule.blocks.find(
+                        (b) =>
+                          b.kind === "court" &&
+                          selection.hour >= b.start &&
+                          selection.hour < b.end,
+                      )?.capacity
+                    : null) ?? venue.private_court_capacity}{" "}
+                  players per court
                 </strong>
                 . Optional rental: {money(venue.equipment_rental_price)} per
                 session for {equipmentPackageLabel(venue.equipment_ball_count)}.{" "}
@@ -265,17 +333,17 @@ export function BookingCalendar({
                 .
               </span>
             </div>
-            {hasOpenPlay(venue, date) && (
+            {openSessions.length > 0 && (
               <div className="notice weekend-schedule-note">
                 <Info size={17} />
                 <span>
-                  Weekend court bookings: {formatHour(venue.opening_hour ?? 6)}–
-                  {formatHour(venue.weekend_court_end_hour)} and{" "}
-                  {formatHour(venue.open_play_end_hour)}–
-                  {formatHour(venue.closing_hour ?? 22)}. Open play is{" "}
-                  {money(venue.open_play_price)} per person during{" "}
-                  {formatHour(venue.open_play_start_hour)}–
-                  {formatHour(venue.open_play_end_hour)}.{" "}
+                  {openSessions
+                    .map(
+                      (s) =>
+                        `${formatHour(s.start)}–${formatHour(s.end)} · ${money(s.rate)}/person`,
+                    )
+                    .join("; ")}
+                  .{" "}
                   <button
                     type="button"
                     className="text-link"
@@ -353,59 +421,100 @@ export function BookingCalendar({
               {hours.map((hour) => (
                 <div className="availability-row" key={hour}>
                   <div className="time-label">{formatHour(hour)}</div>
-                  {[1, 2].map((court) => {
-                    const past = isPastSlot(date, hour, now);
-                    const fits = hour + duration <= (venue.closing_hour ?? 22);
-                    const available =
-                      fits && isSlotAvailable(slots, court, hour, duration);
-                    const selected =
-                      selection?.court === court && selection.hour === hour;
-                    const sessionLabel = courtScheduleLabel(
-                      venue,
-                      date,
-                      hour,
-                      duration,
-                    );
-                    const disabled =
-                      !available ||
-                      past ||
-                      loading ||
-                      Boolean(loadError) ||
-                      Boolean(sessionLabel);
-                    return (
-                      <div className="slot-cell" key={court}>
-                        <button
-                          type="button"
-                          className={`slot-button ${selected ? "active" : ""}`}
-                          disabled={disabled}
-                          aria-label={`Court ${court}, ${formatHour(hour)}, ${sessionLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
-                          aria-pressed={selected}
-                          onClick={() => selectSlot(court, hour)}
-                        >
-                          {sessionLabel ? (
-                            sessionLabel
-                          ) : selected ? (
-                            <>
-                              <Check size={12} />
-                              Selected
-                            </>
-                          ) : past ? (
-                            "Past"
-                          ) : !fits ? (
-                            "Outside hours"
-                          ) : !available ? (
-                            "Reserved"
-                          ) : open ? (
-                            "Available"
-                          ) : (
-                            "Preview"
-                          )}
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {openSessions.some((s) => hour >= s.start && hour < s.end)
+                    ? (() => {
+                        const session = openSessions.find(
+                          (s) => hour >= s.start && hour < s.end,
+                        )!;
+                        return (
+                          <div className="slot-cell open-play-grid-cell">
+                            <button
+                              type="button"
+                              className="open-play-grid-button"
+                              disabled={
+                                loading ||
+                                Boolean(loadError) ||
+                                isPastSlot(date, session.end, now)
+                              }
+                              aria-label={`Join open play, ${formatHour(session.start)} to ${formatHour(session.end)}`}
+                              onClick={() => {
+                                setSelectedSession(session.start);
+                                setMode("open_play");
+                              }}
+                            >
+                              Open play · Join session{" "}
+                              {hour === session.start && (
+                                <small>
+                                  {formatHour(session.start)}–
+                                  {formatHour(session.end)} ·{" "}
+                                  {money(session.rate)}/person
+                                </small>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })()
+                    : [1, 2].map((court) => {
+                        const past = isPastSlot(date, hour, now);
+                        const fits =
+                          calculateCourtTotal(venue, hour, duration, date) !==
+                          null;
+                        const available =
+                          fits && isSlotAvailable(slots, court, hour, duration);
+                        const selected =
+                          selection?.court === court && selection.hour === hour;
+                        const sessionLabel = courtScheduleLabel(
+                          venue,
+                          date,
+                          hour,
+                          duration,
+                        );
+                        const disabled =
+                          !available ||
+                          past ||
+                          loading ||
+                          Boolean(loadError) ||
+                          Boolean(sessionLabel);
+                        return (
+                          <div className="slot-cell" key={court}>
+                            <button
+                              type="button"
+                              className={`slot-button ${selected ? "active" : ""}`}
+                              disabled={disabled}
+                              aria-label={`Court ${court}, ${formatHour(hour)}, ${sessionLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
+                              aria-pressed={selected}
+                              onClick={() => selectSlot(court, hour)}
+                            >
+                              {sessionLabel ? (
+                                sessionLabel
+                              ) : selected ? (
+                                <>
+                                  <Check size={12} />
+                                  Selected
+                                </>
+                              ) : past ? (
+                                "Past"
+                              ) : !fits ? (
+                                "Outside hours"
+                              ) : !available ? (
+                                "Reserved"
+                              ) : open ? (
+                                "Available"
+                              ) : (
+                                "Preview"
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
                 </div>
               ))}
+              {!hours.length && (
+                <div className="empty-state">
+                  <h3>No sessions scheduled</h3>
+                  <p>The venue is closed on this date. Choose another date.</p>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -422,16 +531,31 @@ export function BookingCalendar({
           <div className="open-play-sidebar">
             <CalendarDays size={38} />
             <h3>
-              {formatHour(venue.open_play_start_hour)}–
-              {formatHour(venue.open_play_end_hour)}
+              {selectedOpenSession
+                ? `${formatHour(selectedOpenSession.start)}–${formatHour(selectedOpenSession.end)}`
+                : "No session scheduled"}
             </h3>
-            <p>Saturday & Sunday</p>
-            <strong>{money(venue.open_play_price)} / person</strong>
             <p>
-              One pass covers the session. Share both courts and rotate between
-              games.
+              {formatDate(date, {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })}
             </p>
-            <p>{openPlayCapacityLabel(venue.open_play_capacity)}.</p>
+            {selectedOpenSession && (
+              <strong>
+                {money(selectedOpenSession.rate)} / person / session
+              </strong>
+            )}
+            {selectedOpenSession && (
+              <p>
+                One pass covers the session. Share both courts and rotate
+                between games.
+              </p>
+            )}
+            {selectedOpenSession && (
+              <p>{openPlayCapacityLabel(selectedOpenSession.capacity)}.</p>
+            )}
           </div>
         ) : !selection ? (
           <div className="summary-placeholder">
@@ -466,7 +590,7 @@ export function BookingCalendar({
                   {duration} {duration === 1 ? "hour" : "hours"}
                 </dd>
               </div>
-              {getPriceBreakdown(venue, selection.hour, duration).map(
+              {getPriceBreakdown(venue, selection.hour, duration, date).map(
                 (part) => (
                   <div key={part.start}>
                     <dt>
@@ -492,7 +616,12 @@ export function BookingCalendar({
                 <dt>Court subtotal</dt>
                 <dd>
                   {money(
-                    calculateCourtTotal(venue, selection.hour, duration) ?? 0,
+                    calculateCourtTotal(
+                      venue,
+                      selection.hour,
+                      duration,
+                      date,
+                    ) ?? 0,
                   )}
                 </dd>
               </div>
@@ -506,10 +635,16 @@ export function BookingCalendar({
             <div className="summary-total">
               <span>Booking total</span>
               <strong>
-                {calculateCourtTotal(venue, selection.hour, duration) !== null
+                {calculateCourtTotal(venue, selection.hour, duration, date) !==
+                null
                   ? money(
                       calculateReservationTotal(
-                        calculateCourtTotal(venue, selection.hour, duration)!,
+                        calculateCourtTotal(
+                          venue,
+                          selection.hour,
+                          duration,
+                          date,
+                        )!,
                         venue.equipment_rental_price,
                         equipmentRental,
                       ),
@@ -519,7 +654,7 @@ export function BookingCalendar({
             </div>
             <PaymentOptions
               total={calculateReservationTotal(
-                calculateCourtTotal(venue, selection.hour, duration) ?? 0,
+                calculateCourtTotal(venue, selection.hour, duration, date) ?? 0,
                 venue.equipment_rental_price,
                 equipmentRental,
               )}

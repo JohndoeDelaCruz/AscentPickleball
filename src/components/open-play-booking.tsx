@@ -23,6 +23,7 @@ import type {
 } from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
 import { PaymentOptions } from "./payment-options";
+import { resolveSchedule } from "@/lib/schedule";
 
 export function OpenPlayBooking({
   venue,
@@ -30,12 +31,16 @@ export function OpenPlayBooking({
   ready,
   signedIn,
   userName,
+  selectedStart,
+  onSessionChange,
 }: {
   venue: VenueSettings;
   date: string;
   ready: boolean;
   signedIn: boolean;
   userName: string;
+  selectedStart: number | null;
+  onSessionChange: (start: number) => void;
 }) {
   const [people, setPeople] = useState(1);
   const [name, setName] = useState(userName);
@@ -43,17 +48,52 @@ export function OpenPlayBooking({
   const [equipmentRental, setEquipmentRental] = useState(false);
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
-  const [availability, setAvailability] = useState<OpenPlayAvailability | null>(
-    null,
-  );
+  const [availability, setAvailability] = useState<
+    OpenPlayAvailability[] | null
+  >(null);
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(ready);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [revision, setRevision] = useState(0);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
-  const scheduled = hasOpenPlay(venue, date);
   const [now, setNow] = useState(() => new Date());
+  const sessionApiReady = "schedule_config" in venue;
+  const previewSessions = resolveSchedule(venue, date)
+    .blocks.filter((b) => b.kind === "open_play")
+    .map((b) => ({
+      enabled: false,
+      start_hour: b.start,
+      end_hour: b.end,
+      price: b.rate,
+      capacity: b.capacity,
+      players: 0,
+      remaining: b.capacity,
+      conflict: false,
+    }));
+  const sessions =
+    loadedDate === date && availability ? availability : previewSessions;
+  const chosen =
+    sessions.find((s) => s.start_hour === selectedStart) ??
+    sessions.find((s) => !isPastSlot(date, s.end_hour, now)) ??
+    sessions[0];
+  const activeSession = chosen ?? {
+    enabled: false,
+    start_hour: 0,
+    end_hour: 0,
+    price: 0,
+    capacity: 0,
+    players: 0,
+    remaining: 0,
+    conflict: false,
+  };
+  const scheduled = Boolean(chosen);
+  useEffect(() => {
+    if (chosen) onSessionChange(chosen.start_hour);
+    setAccepted(false);
+    setError("");
+  }, [date, chosen?.start_hour, onSessionChange]);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
@@ -62,13 +102,19 @@ export function OpenPlayBooking({
     let active = true;
     setAvailability(null);
     setLoadError("");
-    setLoading(ready && scheduled);
-    if (!ready || !scheduled) return;
+    const shouldLoad = ready && (sessionApiReady || hasOpenPlay(venue, date));
+    setLoading(shouldLoad);
+    if (!shouldLoad) return;
     const client = createClient();
     async function refresh() {
-      const { data, error } = await client.rpc("get_open_play_availability", {
-        p_date: date,
-      });
+      const { data, error } = await client.rpc(
+        sessionApiReady
+          ? "get_open_play_sessions"
+          : "get_open_play_availability",
+        {
+          p_date: date,
+        },
+      );
       if (!active) return;
       setLoading(false);
       if (error) {
@@ -78,7 +124,13 @@ export function OpenPlayBooking({
         return;
       }
       setLoadError("");
-      setAvailability(data?.[0] || null);
+      setAvailability(
+        (data || []).map((s: OpenPlayAvailability) => ({
+          ...s,
+          price: Number(s.price),
+        })),
+      );
+      setLoadedDate(date);
     }
     refresh();
     const timer = setInterval(refresh, 30000);
@@ -88,19 +140,19 @@ export function OpenPlayBooking({
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [date, ready, scheduled, revision]);
+  }, [date, ready, sessionApiReady, revision]);
   useEffect(() => {
     setError("");
   }, [date]);
-  const ended = isPastSlot(date, venue.open_play_end_hour, now);
+  const ended = isPastSlot(date, activeSession.end_hour, now);
   const canReserve =
     ready &&
     scheduled &&
     canBook(venue) &&
-    availability?.enabled &&
-    !availability.conflict &&
+    activeSession.enabled &&
+    !activeSession.conflict &&
     !ended;
-  const remaining = availability?.remaining;
+  const remaining = activeSession.remaining;
   const tooMany =
     remaining !== null && remaining !== undefined && people > remaining;
   function submit(event: React.FormEvent) {
@@ -110,6 +162,7 @@ export function OpenPlayBooking({
     startTransition(async () => {
       const result = await reserveOpenPlay({
         booking_date: date,
+        start_hour: activeSession.start_hour,
         participant_count: people,
         customer_name: name,
         customer_phone: phone,
@@ -123,58 +176,95 @@ export function OpenPlayBooking({
     });
   }
   return (
-    <section className="panel open-play-panel" aria-label="Weekend open play">
+    <section className="panel open-play-panel" aria-label="Open play">
       <div className="open-play-heading">
         <span className="open-play-icon">
           <Users size={24} />
         </span>
         <div>
           <span className="eyebrow">SHARE THE COURT</span>
-          <h2>Weekend open play</h2>
+          <h2>Open play</h2>
         </div>
-        <strong className="open-play-price">
-          {money(venue.open_play_price)}
-          <small>/ person</small>
-        </strong>
+        {scheduled && (
+          <strong className="open-play-price">
+            {money(activeSession.price)}
+            <small>/ person</small>
+          </strong>
+        )}
       </div>
-      <p>
-        Come for a few rallies or stay for the session. Your pass covers{" "}
-        {formatHour(venue.open_play_start_hour)}–
-        {formatHour(venue.open_play_end_hour)}.
-      </p>
-      <p>
-        <strong>{openPlayCapacityLabel(venue.open_play_capacity)}.</strong>{" "}
-        Players share both courts and rotate between games.
-      </p>
-      <div className="open-play-meta">
-        <span>
-          {formatDate(date, {
-            weekday: "long",
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-        <span>
-          {venue.open_play_capacity === null
-            ? "No player limit"
-            : `${remaining ?? venue.open_play_capacity} places remaining`}
-        </span>
-      </div>
+      {sessions.length > 0 && (
+        <div
+          className="open-play-session-picker"
+          role="group"
+          aria-label="Open-play session"
+        >
+          {sessions.map((s) => (
+            <button
+              key={s.start_hour}
+              type="button"
+              aria-pressed={activeSession.start_hour === s.start_hour}
+              className={
+                activeSession.start_hour === s.start_hour ? "active" : ""
+              }
+              onClick={() => onSessionChange(s.start_hour)}
+            >
+              <strong>
+                {formatHour(s.start_hour)}–{formatHour(s.end_hour)}
+              </strong>
+              <span>{money(s.price)} / person / session</span>
+              <small>
+                {s.capacity === null
+                  ? "No player limit"
+                  : `${s.remaining ?? s.capacity} places remaining`}
+              </small>
+            </button>
+          ))}
+        </div>
+      )}
+      {scheduled && (
+        <>
+          <p>
+            Come for a few rallies or stay for the session. Your pass covers{" "}
+            {formatHour(activeSession.start_hour)}–
+            {formatHour(activeSession.end_hour)}.
+          </p>
+          <p>
+            <strong>{openPlayCapacityLabel(activeSession.capacity)}.</strong>{" "}
+            Players share both courts and rotate between games.
+          </p>
+          <div className="open-play-meta">
+            <span>
+              {formatDate(date, {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            <span>
+              {activeSession.capacity === null
+                ? "No player limit"
+                : `${remaining ?? activeSession.capacity} places remaining`}
+            </span>
+          </div>
+        </>
+      )}
       {!scheduled ? (
         <div className="notice">
-          Open play runs on Saturdays and Sundays. Choose a weekend date above.
+          {loading
+            ? "Checking sessions…"
+            : "No open-play sessions are scheduled for this date. Choose another date or book a private court."}
         </div>
       ) : (
         <>
-          {availability?.conflict && (
+          {activeSession.conflict && (
             <div className="notice notice-warning">
               Open play is unavailable on this date because a court is reserved
-              or blocked. Choose another weekend.
+              or blocked. Choose another session.
             </div>
           )}
           {ended && (
             <div className="notice">
-              This open-play session has ended. Choose another weekend date.
+              This open-play session has ended. Choose another session or date.
             </div>
           )}
           {(!ready || !venue.booking_enabled) && (
@@ -203,7 +293,7 @@ export function OpenPlayBooking({
           {!signedIn ? (
             <Link
               className="button button-dark"
-              href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}`)}`}
+              href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}&session=${activeSession.start_hour}`)}`}
             >
               Sign in for open play <ArrowRight size={16} />
             </Link>
@@ -258,9 +348,9 @@ export function OpenPlayBooking({
                 <div>
                   <dt>
                     {people || 0} {people === 1 ? "player" : "players"} ×{" "}
-                    {money(venue.open_play_price)}
+                    {money(activeSession.price)}
                   </dt>
-                  <dd>{money((people || 0) * venue.open_play_price)}</dd>
+                  <dd>{money((people || 0) * activeSession.price)}</dd>
                 </div>
                 <div>
                   <dt>Equipment rental</dt>
@@ -274,7 +364,7 @@ export function OpenPlayBooking({
                 <strong>
                   {money(
                     calculateReservationTotal(
-                      (people || 0) * venue.open_play_price,
+                      (people || 0) * activeSession.price,
                       venue.equipment_rental_price,
                       equipmentRental,
                     ),
@@ -283,7 +373,7 @@ export function OpenPlayBooking({
               </div>
               <PaymentOptions
                 total={calculateReservationTotal(
-                  (people || 0) * venue.open_play_price,
+                  (people || 0) * activeSession.price,
                   venue.equipment_rental_price,
                   equipmentRental,
                 )}

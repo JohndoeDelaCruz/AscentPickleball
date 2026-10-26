@@ -39,12 +39,18 @@ export default async function CourtRulesPage() {
       icon: Users,
       title: "Court capacity",
       rules: [
-        `Maximum of ${venue.private_court_capacity} players per court for a private booking.`,
-        ...(venue.open_play_enabled
+        venue.schedule_config
+          ? "Private bookings follow the player limit shown for the selected court time."
+          : `Maximum of ${venue.private_court_capacity} players per court for a private booking.`,
+        ...(venue.schedule_config
           ? [
-              `Open play: ${openPlayCapacityLabel(venue.open_play_capacity)}. Players share the courts and rotate between games.`,
+              "Open-play capacity applies separately to each session. Check the selected session's player limit before booking. Players share both courts and rotate between games.",
             ]
-          : []),
+          : venue.open_play_enabled
+            ? [
+                `Open play: ${openPlayCapacityLabel(venue.open_play_capacity)}. Players share the courts and rotate between games.`,
+              ]
+            : []),
       ],
     },
     {
