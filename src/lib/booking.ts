@@ -45,8 +45,43 @@ export function money(amount: number) {
     maximumFractionDigits: 2,
   }).format(amount);
 }
-export function equipmentPackageLabel(ballCount: number) {
-  return `1 paddle + ${ballCount} ${ballCount === 1 ? "ball" : "balls"}`;
+export function equipmentPackageLabel(ballCount: number, quantity = 1) {
+  const balls = ballCount * quantity;
+  return `${quantity} ${quantity === 1 ? "paddle" : "paddles"} + ${balls} ${balls === 1 ? "ball" : "balls"}`;
+}
+export function savedEquipmentQuantity(booking: {
+  equipment_rental: boolean;
+  equipment_quantity?: number;
+}) {
+  return booking.equipment_quantity ?? (booking.equipment_rental ? 1 : 0);
+}
+export function equipmentBookingLabel(booking: {
+  equipment_rental: boolean;
+  equipment_quantity?: number;
+  equipment_ball_count?: number;
+}) {
+  const quantity = savedEquipmentQuantity(booking);
+  return `${quantity} equipment ${quantity === 1 ? "set" : "sets"} · ${equipmentPackageLabel(booking.equipment_ball_count ?? 2, quantity)}`;
+}
+export function privateEquipmentLimit(
+  venue: VenueSettings,
+  date: string,
+  start?: number,
+  duration = 1,
+) {
+  const limits =
+    start === undefined
+      ? []
+      : resolveSchedule(venue, date)
+          .blocks.filter(
+            (b) =>
+              b.kind === "court" && b.start < start + duration && b.end > start,
+          )
+          .map((b) => b.capacity ?? venue.private_court_capacity);
+  return Math.min(
+    100,
+    ...(limits.length ? limits : [venue.private_court_capacity]),
+  );
 }
 export function getRatePeriods(venue: VenueSettings) {
   if (
@@ -204,6 +239,7 @@ export function canBook(venue: VenueSettings) {
 export const bookingSchema = z.object({
   payment_option: paymentOptionSchema.default("full"),
   equipment_rental: z.boolean().default(false),
+  equipment_quantity: z.number().int().min(0).max(100).optional(),
   court_id: z.coerce.number().int().min(1).max(2),
   booking_date: z.iso.date(),
   start_hour: z.coerce.number().int().min(0).max(23),
@@ -227,6 +263,7 @@ export const openPlaySchema = bookingSchema
     customer_name: true,
     customer_phone: true,
     equipment_rental: true,
+    equipment_quantity: true,
     payment_option: true,
   })
   .extend({
@@ -236,12 +273,14 @@ export const openPlaySchema = bookingSchema
 export function calculateReservationTotal(
   base: number,
   equipmentPrice: number,
-  equipmentRental: boolean,
+  equipmentRental: boolean | number,
 ) {
+  const quantity =
+    typeof equipmentRental === "boolean"
+      ? Number(equipmentRental)
+      : equipmentRental;
   return (
-    (Math.round(base * 100) +
-      (equipmentRental ? Math.round(equipmentPrice * 100) : 0)) /
-    100
+    (Math.round(base * 100) + quantity * Math.round(equipmentPrice * 100)) / 100
   );
 }
 export function bookingBaseAmount(booking: {

@@ -8,7 +8,7 @@ test("customer RPC gateway counts invalid forms and preserves rate-limit feedbac
   const client = {
     rpc: async (name: string, args: unknown) => {
       calls++;
-      assert.equal(name, "request_customer_booking");
+      assert.equal(name, "request_customer_booking_v2");
       assert.deepEqual(args, { p_action: "reserve_court", p_input: null });
       return {
         data:
@@ -51,7 +51,7 @@ test("customer mutations fail closed on missing setup, network errors, or malfor
   const missing = {
     rpc: async (name: string) => {
       calls++;
-      assert.equal(name, "request_customer_booking");
+      assert.equal(name, "request_customer_booking_v2");
       return {
         data: null,
         error: { code: "PGRST202", message: "not installed" },

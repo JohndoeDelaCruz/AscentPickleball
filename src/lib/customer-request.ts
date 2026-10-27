@@ -9,7 +9,7 @@ export type CustomerBookingAction =
 type RpcError = { code?: string; message: string };
 type RequestClient = {
   rpc(
-    name: "request_customer_booking",
+    name: "request_customer_booking_v2",
     args: { p_action: CustomerBookingAction; p_input: unknown },
   ): PromiseLike<{ data: unknown; error: RpcError | null }>;
 };
@@ -50,7 +50,7 @@ export async function requestCustomerBooking(
   validationError?: string,
 ): Promise<CustomerBookingResult> {
   try {
-    const { data, error } = await client.rpc("request_customer_booking", {
+    const { data, error } = await client.rpc("request_customer_booking_v2", {
       p_action: action,
       p_input: validationError ? null : input,
     });

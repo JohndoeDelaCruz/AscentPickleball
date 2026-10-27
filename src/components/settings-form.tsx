@@ -279,7 +279,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               label: "Equipment rental package (PHP)",
               min: 0,
               max: 100000,
-              hint: `${equipmentPackageLabel(venue.equipment_ball_count)}. Added once per reservation when selected.`,
+              hint: `${equipmentPackageLabel(venue.equipment_ball_count)} per set. Price multiplied by the number of sets selected.`,
             })}
             {numericField("equipment_ball_count", {
               label: "Balls per rental paddle",

@@ -35,7 +35,7 @@ test("customer request limits persist failures and protect every mutation entry 
     const files = (await readdir("supabase/migrations"))
       .filter((f) => f.endsWith(".sql"))
       .sort();
-    for (const file of files.filter((f) => !f.includes("0011_")))
+    for (const file of files.filter((f) => f < "202610270011"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
     await db.query("insert into public.staff_members values($1)", [staff]);
     await db.exec(
@@ -77,15 +77,21 @@ test("customer request limits persist failures and protect every mutation entry 
       [alice, day],
     );
     const original = (
-      await db.query("select to_jsonb(b) b from public.bookings b")
+      await db.query(
+        "select to_jsonb(b)-'equipment_quantity'-'equipment_unit_price' b from public.bookings b",
+      )
     ).rows;
     const originalVenue = (
       await db.query("select to_jsonb(v) v from public.venue_settings v")
     ).rows;
-    for (const file of files.filter((f) => f.includes("0011_")))
+    for (const file of files.filter((f) => f >= "202610270011"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
     assert.deepEqual(
-      (await db.query("select to_jsonb(b) b from public.bookings b")).rows,
+      (
+        await db.query(
+          "select to_jsonb(b)-'equipment_quantity'-'equipment_unit_price' b from public.bookings b",
+        )
+      ).rows,
       original,
     );
     assert.deepEqual(

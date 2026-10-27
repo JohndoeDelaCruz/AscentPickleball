@@ -75,31 +75,26 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
   try {
     const supabase = await staffClient();
     const p = parsed.data;
-    const venue = (await getVenue()).venue;
-    const reservationRpc =
-      "schedule_config" in venue
-        ? "reserve_scheduled_booking"
-        : "reserve_with_payment";
-    if (
-      reservationRpc === "reserve_scheduled_booking" &&
-      p.start_hour === undefined
-    )
+    if (p.start_hour === undefined)
       return { error: "Choose an open-play session." };
     const finance = financeBookingSchema.safeParse(input);
     if (!finance.success) return { error: finance.error.issues[0].message };
-    const { data, error } = await supabase.rpc(reservationRpc, {
-      p_payment_option: p.payment_option,
-      p_kind: "open_play",
-      p_walk_in: true,
-      p_rental: p.equipment_rental,
-      p_date: p.booking_date,
-      ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
-      p_people: p.participant_count,
-      p_name: p.customer_name,
-      p_phone: p.customer_phone,
-      p_method: finance.data.payment_method,
-      p_notes: finance.data.finance_notes,
-    });
+    const { data, error } = await supabase.rpc(
+      "reserve_staff_equipment_booking",
+      {
+        p_payment_option: p.payment_option,
+        p_kind: "open_play",
+        p_rental: p.equipment_rental,
+        p_quantity: p.equipment_quantity ?? Number(p.equipment_rental),
+        p_date: p.booking_date,
+        ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
+        p_people: p.participant_count,
+        p_name: p.customer_name,
+        p_phone: p.customer_phone,
+        p_method: finance.data.payment_method,
+        p_notes: finance.data.finance_notes,
+      },
+    );
     if (error) return { error: bookingError(error) };
     revalidatePath("/book");
     revalidatePath("/admin");
@@ -282,27 +277,23 @@ export async function staffCreateBooking(input: unknown, blocked: boolean) {
   try {
     const supabase = await staffClient();
     const p = parsed.data;
-    const venue = (await getVenue()).venue;
-    const { error } = await supabase.rpc(
-      "schedule_config" in venue
-        ? "reserve_scheduled_booking"
-        : "reserve_with_payment",
-      {
-        p_payment_option: blocked ? "full" : p.payment_option,
-        p_kind: "court",
-        p_walk_in: true,
-        p_rental: p.equipment_rental,
-        p_court: p.court_id,
-        p_date: p.booking_date,
-        p_start: p.start_hour,
-        p_duration: p.duration,
-        p_name: p.customer_name,
-        p_phone: "customer_phone" in p ? p.customer_phone : "",
-        p_blocked: blocked,
-        p_method: finance.data.payment_method,
-        p_notes: finance.data.finance_notes,
-      },
-    );
+    const { error } = await supabase.rpc("reserve_staff_equipment_booking", {
+      p_payment_option: blocked ? "full" : p.payment_option,
+      p_kind: "court",
+      p_rental: p.equipment_rental,
+      p_quantity: blocked
+        ? 0
+        : (p.equipment_quantity ?? Number(p.equipment_rental)),
+      p_court: p.court_id,
+      p_date: p.booking_date,
+      p_start: p.start_hour,
+      p_duration: p.duration,
+      p_name: p.customer_name,
+      p_phone: "customer_phone" in p ? p.customer_phone : "",
+      p_blocked: blocked,
+      p_method: finance.data.payment_method,
+      p_notes: finance.data.finance_notes,
+    });
     if (error) return { error: bookingError(error) };
     revalidatePath("/admin");
     revalidatePath("/book");

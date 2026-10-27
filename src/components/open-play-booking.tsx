@@ -45,7 +45,12 @@ export function OpenPlayBooking({
   const [people, setPeople] = useState(1);
   const [name, setName] = useState(userName);
   const [phone, setPhone] = useState("");
-  const [equipmentRental, setEquipmentRental] = useState(false);
+  const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
+  const equipmentLimit = Math.max(0, Math.min(20, Math.floor(people) || 0));
+  const equipmentQuantity = Math.min(
+    requestedEquipmentQuantity,
+    equipmentLimit,
+  );
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
   const [availability, setAvailability] = useState<
@@ -166,7 +171,8 @@ export function OpenPlayBooking({
         participant_count: people,
         customer_name: name,
         customer_phone: phone,
-        equipment_rental: equipmentRental,
+        equipment_rental: equipmentQuantity > 0,
+        equipment_quantity: equipmentQuantity,
         payment_option: paymentOption,
       });
       if (result.error) {
@@ -340,8 +346,9 @@ export function OpenPlayBooking({
               <EquipmentRental
                 price={venue.equipment_rental_price}
                 ballCount={venue.equipment_ball_count}
-                checked={equipmentRental}
-                onChange={setEquipmentRental}
+                quantity={equipmentQuantity}
+                maxQuantity={equipmentLimit}
+                onChange={setEquipmentQuantity}
                 disabled={pending}
               />
               <dl className="summary-rows equipment-cost-rows">
@@ -355,7 +362,7 @@ export function OpenPlayBooking({
                 <div>
                   <dt>Equipment rental</dt>
                   <dd>
-                    {money(equipmentRental ? venue.equipment_rental_price : 0)}
+                    {money(equipmentQuantity * venue.equipment_rental_price)}
                   </dd>
                 </div>
               </dl>
@@ -366,7 +373,7 @@ export function OpenPlayBooking({
                     calculateReservationTotal(
                       (people || 0) * activeSession.price,
                       venue.equipment_rental_price,
-                      equipmentRental,
+                      equipmentQuantity,
                     ),
                   )}
                 </strong>
@@ -375,7 +382,7 @@ export function OpenPlayBooking({
                 total={calculateReservationTotal(
                   (people || 0) * activeSession.price,
                   venue.equipment_rental_price,
-                  equipmentRental,
+                  equipmentQuantity,
                 )}
                 value={paymentOption}
                 onChange={setPaymentOption}

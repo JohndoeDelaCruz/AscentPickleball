@@ -14,7 +14,7 @@ import {
   formatDate,
   formatHour,
   money,
-  equipmentPackageLabel,
+  equipmentBookingLabel,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import { bookingPayments } from "@/lib/payment";
@@ -170,8 +170,7 @@ export function BookingDetail({
                 <dt>
                   Equipment rental
                   <small className="equipment-description">
-                    {equipmentPackageLabel(b.equipment_ball_count ?? 2)} · one
-                    set
+                    {equipmentBookingLabel(b)}
                   </small>
                 </dt>
                 <dd>{money(b.equipment_amount)}</dd>

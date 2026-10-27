@@ -22,6 +22,7 @@ import {
   courtScheduleLabel,
   openPlayCapacityLabel,
   equipmentPackageLabel,
+  privateEquipmentLimit,
 } from "@/lib/booking";
 import type { Availability, PaymentOption, VenueSettings } from "@/lib/types";
 import { reserveCourt } from "@/app/actions";
@@ -97,7 +98,17 @@ export function BookingCalendar({
   const [error, setError] = useState("");
   const [name, setName] = useState(userName);
   const [phone, setPhone] = useState("");
-  const [equipmentRental, setEquipmentRental] = useState(false);
+  const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
+  const equipmentLimit = privateEquipmentLimit(
+    venue,
+    date,
+    selection?.hour,
+    duration,
+  );
+  const equipmentQuantity = Math.min(
+    requestedEquipmentQuantity,
+    equipmentLimit,
+  );
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -208,7 +219,8 @@ export function BookingCalendar({
         duration,
         customer_name: name,
         customer_phone: phone,
-        equipment_rental: equipmentRental,
+        equipment_rental: equipmentQuantity > 0,
+        equipment_quantity: equipmentQuantity,
         payment_option: paymentOption,
       });
       if (result.error) {
@@ -321,7 +333,8 @@ export function BookingCalendar({
                   players per court
                 </strong>
                 . Optional rental: {money(venue.equipment_rental_price)} per
-                session for {equipmentPackageLabel(venue.equipment_ball_count)}.{" "}
+                session per set:{" "}
+                {equipmentPackageLabel(venue.equipment_ball_count)}.{" "}
                 <Link
                   href="/court-rules"
                   target="_blank"
@@ -607,8 +620,9 @@ export function BookingCalendar({
             <EquipmentRental
               price={venue.equipment_rental_price}
               ballCount={venue.equipment_ball_count}
-              checked={equipmentRental}
-              onChange={setEquipmentRental}
+              quantity={equipmentQuantity}
+              maxQuantity={equipmentLimit}
+              onChange={setEquipmentQuantity}
               disabled={pending}
             />
             <dl className="summary-rows equipment-cost-rows">
@@ -628,7 +642,7 @@ export function BookingCalendar({
               <div>
                 <dt>Equipment rental</dt>
                 <dd>
-                  {money(equipmentRental ? venue.equipment_rental_price : 0)}
+                  {money(equipmentQuantity * venue.equipment_rental_price)}
                 </dd>
               </div>
             </dl>
@@ -646,7 +660,7 @@ export function BookingCalendar({
                           date,
                         )!,
                         venue.equipment_rental_price,
-                        equipmentRental,
+                        equipmentQuantity,
                       ),
                     )
                   : "To be announced"}
@@ -656,7 +670,7 @@ export function BookingCalendar({
               total={calculateReservationTotal(
                 calculateCourtTotal(venue, selection.hour, duration, date) ?? 0,
                 venue.equipment_rental_price,
-                equipmentRental,
+                equipmentQuantity,
               )}
               value={paymentOption}
               onChange={setPaymentOption}

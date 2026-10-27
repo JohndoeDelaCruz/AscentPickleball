@@ -10,9 +10,10 @@ import {
   money,
   courtScheduleLabel,
   openPlayCapacityLabel,
-  equipmentPackageLabel,
+  equipmentBookingLabel,
   calculateCourtTotal,
   calculateReservationTotal,
+  privateEquipmentLimit,
 } from "@/lib/booking";
 import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
 import {
@@ -281,8 +282,7 @@ export function AdminCalendar({
                       </small>
                       {b.equipment_rental && (
                         <small>
-                          Equipment:{" "}
-                          {equipmentPackageLabel(b.equipment_ball_count ?? 2)} ·{" "}
+                          Equipment: {equipmentBookingLabel(b)} ·{" "}
                           {money(b.equipment_amount)}
                         </small>
                       )}
@@ -473,7 +473,7 @@ function CreateBookingModal({
   const [sessionStart, setSessionStart] = useState<number | null>(null);
   const [duration, setDuration] = useState(1);
   const [people, setPeople] = useState(1);
-  const [equipmentRental, setEquipmentRental] = useState(false);
+  const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -503,13 +503,20 @@ function CreateBookingModal({
       : selectedHour === undefined
         ? null
         : calculateCourtTotal(venue, selectedHour, duration, bookingDate);
+  const equipmentLimit = openPlay
+    ? Math.max(0, Math.min(20, Math.floor(people) || 0))
+    : privateEquipmentLimit(venue, bookingDate, selectedHour, duration);
+  const equipmentQuantity = blocked
+    ? 0
+    : Math.min(requestedEquipmentQuantity, equipmentLimit);
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     const form = new FormData(event.currentTarget);
     const input = {
       ...Object.fromEntries(form.entries()),
-      equipment_rental: form.get("equipment_rental") === "on",
+      equipment_rental: equipmentQuantity > 0,
+      equipment_quantity: equipmentQuantity,
     };
     startTransition(async () => {
       const result = openPlay
@@ -672,8 +679,9 @@ function CreateBookingModal({
             <EquipmentRental
               price={venue.equipment_rental_price}
               ballCount={venue.equipment_ball_count}
-              checked={equipmentRental}
-              onChange={setEquipmentRental}
+              quantity={equipmentQuantity}
+              maxQuantity={equipmentLimit}
+              onChange={setEquipmentQuantity}
               disabled={pending}
             />
             <label className="field">
@@ -719,7 +727,7 @@ function CreateBookingModal({
                   calculateReservationTotal(
                     base,
                     venue.equipment_rental_price,
-                    equipmentRental,
+                    equipmentQuantity,
                   ),
                 )}
               </strong>

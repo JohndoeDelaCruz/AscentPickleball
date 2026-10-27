@@ -6,6 +6,7 @@ import {
   isValidDate,
   localDate,
   bookingBaseAmount,
+  savedEquipmentQuantity,
 } from "./booking";
 import type { Booking } from "./types";
 import { bookingPayments } from "./payment";
@@ -199,7 +200,7 @@ export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
         ? Math.round((bookingBaseAmount(b) * 100) / b.duration) / 100
         : "",
       bookingBaseAmount(b),
-      b.equipment_rental ? 1 : 0,
+      savedEquipmentQuantity(b),
       Number(b.equipment_amount || 0),
       Number(b.total_amount),
       b.status === "confirmed" ? bookingPayments(b).paid : 0,

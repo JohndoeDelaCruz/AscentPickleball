@@ -95,6 +95,8 @@ export type Booking = {
   balance_payment_reference: string | null;
   balance_paid_at: string | null;
   equipment_rental: boolean;
+  equipment_quantity?: number;
+  equipment_unit_price?: number;
   equipment_amount: number;
   equipment_ball_count: number;
   status: BookingStatus;

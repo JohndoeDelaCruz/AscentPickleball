@@ -5,7 +5,7 @@ import { ArrowUpRight, CalendarDays, Info } from "lucide-react";
 import { getSession, getVenue } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import {
-  equipmentPackageLabel,
+  equipmentBookingLabel,
   formatDate,
   formatHour,
   money,
@@ -103,8 +103,7 @@ export default async function MyBookings() {
                   {b.equipment_rental && (
                     <>
                       <br />
-                      Includes 1 equipment set ·{" "}
-                      {equipmentPackageLabel(b.equipment_ball_count ?? 2)}
+                      Includes {equipmentBookingLabel(b)}
                     </>
                   )}
                 </p>
