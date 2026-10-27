@@ -6,6 +6,8 @@ import { ArrowUpRight, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authRedirect, safeRedirect } from "@/lib/redirect";
 import { authCallbackUrl } from "@/lib/site-url";
+import { captchaOptions, captchaTokenSchema } from "@/lib/captcha";
+import { TurnstileCheck } from "./turnstile-check";
 
 export function AuthForm({
   next,
@@ -25,10 +27,18 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
   const [message, setMessage] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaRevision, setCaptchaRevision] = useState(0);
+  const needsCaptcha = mode !== "reset";
   const router = useRouter();
   const safeNext = safeRedirect(next, "");
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (busy) return;
+    if (needsCaptcha && !captchaTokenSchema.safeParse(captchaToken).success) {
+      setError("Complete the security check before continuing.");
+      return;
+    }
     setBusy(true);
     setError("");
     setMessage("");
@@ -47,6 +57,7 @@ export function AuthForm({
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
+          options: captchaOptions(captchaToken),
         });
         if (error) throw error;
         await finishSignIn();
@@ -55,6 +66,7 @@ export function AuthForm({
           email,
           password,
           options: {
+            ...captchaOptions(captchaToken),
             data: { full_name: name },
             emailRedirectTo: authCallbackUrl(window.location.origin, safeNext),
           },
@@ -68,6 +80,7 @@ export function AuthForm({
           );
       } else if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          ...captchaOptions(captchaToken),
           redirectTo: authCallbackUrl(
             window.location.origin,
             "/login?recovery=true",
@@ -84,14 +97,22 @@ export function AuthForm({
       }
     } catch (err) {
       setError(
-        (err as Error).message || "Something went wrong. Please try again.",
+        (err as { code?: string }).code === "captcha_failed"
+          ? "The security check couldn’t be verified. Please try again."
+          : (err as Error).message || "Something went wrong. Please try again.",
       );
     } finally {
+      if (needsCaptcha) {
+        setCaptchaToken("");
+        setCaptchaRevision((value) => value + 1);
+      }
       setBusy(false);
     }
   }
   function changeMode(value: typeof mode) {
     setMode(value);
+    setCaptchaToken("");
+    setCaptchaRevision((revision) => revision + 1);
     setError("");
     setMessage("");
   }
@@ -123,12 +144,14 @@ export function AuthForm({
           <>
             <button
               className={mode === "login" ? "active" : ""}
+              disabled={busy}
               onClick={() => changeMode("login")}
             >
               Log in
             </button>
             <button
               className={mode === "signup" ? "active" : ""}
+              disabled={busy}
               onClick={() => changeMode("signup")}
             >
               Create account
@@ -185,6 +208,14 @@ export function AuthForm({
             </label>
           )}
         </div>
+        {needsCaptcha && (
+          <TurnstileCheck
+            key={mode}
+            action={mode === "forgot" ? "password_reset" : mode}
+            revision={captchaRevision}
+            onToken={setCaptchaToken}
+          />
+        )}
         <div className="auth-feedback">
           {error && (
             <div className="error-message" role="alert">
@@ -197,7 +228,10 @@ export function AuthForm({
             </div>
           )}
         </div>
-        <button className="button button-dark" disabled={busy}>
+        <button
+          className="button button-dark"
+          disabled={busy || (needsCaptcha && !captchaToken)}
+        >
           {busy
             ? "One moment…"
             : mode === "signup"

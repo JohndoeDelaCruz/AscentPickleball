@@ -33,6 +33,21 @@ on conflict (user_id) do nothing;
 
 Rates, hours, address, city, contact details, introduction, GCash details, unpaid hold duration, and cancellation policy are editable. Before a custom schedule is saved, starter hours are **6 AM–4 PM at ₱100/hour** and **4 PM–10 PM at ₱200/hour**. On weekdays, a booking spanning 3–5 PM totals **₱300**. Saturdays and Sundays offer **private court bookings from 6–9 AM**, **open play from 9 AM–4 PM at ₱50 per person**, then **private court bookings from 4–10 PM**. Open play accommodates **12 rotating players per court, with a 24-player limit across both courts in the legacy session**. Staff manages rotation between games; passes share the session rather than assigning players to a specific court. Current saved rates are preserved during conversion. The schedule, session prices, and player limits are editable in the new Booking schedule table. Customers and staff can select one optional **₱30 rental set containing 1 paddle + 1 ball by default** per reservation. The charge is added **once per booking**, included in the GCash total, and saved at the current equipment price. Court and open-play rates stay separate; no equipment inventory tracking is configured. Booking starts **closed**. Public pages work before setup and availability is labeled as a preview until the database is ready. Court slots start on the hour and bookings last 1–4 hours, up to 30 days ahead.
 
+## Turnstile authentication protection
+
+The app includes Cloudflare Turnstile on sign-in, sign-up, password-reset requests, and the signed-in password-change form's current-password verification. It uses the public sitekey `0x4AAAAAAFnx7p5dsT8C-AVD` by default. To change it, set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` in Vercel (Production and any applicable Preview environments), then redeploy. No secret key is stored in the app.
+
+Rollout order:
+
+1. In Cloudflare, allow `ascentpickleball.vercel.app` on the matching **Managed** widget. Add any other actual deployment hostnames explicitly.
+2. Deploy this app update first and confirm the widget renders on login, signup, password reset, and account settings.
+3. In Supabase **Authentication → Bot and Abuse Protection**, enable CAPTCHA, select **Cloudflare Turnstile**, and save the matching widget's **Secret key** directly in Supabase. Keep the secret out of Git, client code, and `NEXT_PUBLIC_` variables.
+4. Test customer and staff sign-in, registration, reset email requests, and changing a password. An authenticated password-recovery link updates the password using its existing Supabase session; that update does not use a second CAPTCHA.
+
+Supabase performs authoritative token verification for the Auth endpoints, including direct requests that bypass the website. The app passes tokens through the supported `captchaToken` options, resets verification after every attempt or mode change, and clears expired/failed checks. Do not validate the same token separately in Next.js: Turnstile tokens are single use. Disabling the submit button alone is not bot protection; the Supabase CAPTCHA setting must also be enabled after deployment. No database migration is required.
+
+For isolated local testing, override the public sitekey with Cloudflare's documented dummy keys and use a separate test Supabase project with its matching dummy secret, or a local auth stub. Production rejects dummy-key overrides. Dummy tokens cannot authenticate against a production Turnstile secret. Cloudflare recommends keeping local hostnames off the production widget; use separate development configuration. Do not enable CAPTCHA on the live project with a test secret. See [Supabase CAPTCHA](https://supabase.com/docs/guides/auth/auth-captcha), [Turnstile widget options](https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/), and [official test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/).
+
 ## Schedule editor rollout
 
 Apply **`supabase/migrations/202610260010_schedule_editor.sql`** after migration 009, then deploy the updated app. This additive migration leaves `schedule_config` null, so the current schedule and all saved reservations continue unchanged. If it has not been applied, the editor shows a setup notice and disables saving.

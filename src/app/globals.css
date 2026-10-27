@@ -3503,6 +3503,13 @@ img {
 .password-form > .button {
   align-self: flex-start;
 }
+.captcha-field { margin-block: 18px; min-width: 0; }
+.captcha-label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.captcha-widget { width: 100%; min-height: 65px; display: flex; justify-content: center; }
+.captcha-widget-compact { min-height: 140px; }
+.captcha-field .small-print { margin: 8px 0 0; }
+.captcha-field .error-message { margin-top: 10px; }
+.captcha-field .text-link { display: block; margin-top: 8px; }
 .field input,
 .field select,
 .field textarea,
