@@ -60,6 +60,18 @@ Temporary overrides replace the weekly schedule within their date range and auto
 
 Customer calendars, staff walk-ins, session availability, prices, and homepage schedules use the same effective date-based schedule. Active reservations and unpaid holds consume places in their selected session only. Prices and capacity are validated in Postgres, including requests from older clients. Regular weekly and temporary schedule edits require staff access. Tests use an isolated database and do not write live bookings.
 
+## Booking request limits
+
+Apply `supabase/migrations/202610270011_booking_rate_limits.sql` **after migration 010 and deployment of this app version**. The new app fails closed with a setup message until migration 011 is installed. The migration revokes direct customer access to older mutation RPCs, so old deployments/browser tabs must be updated or refreshed. Do not roll back the app alone to an older booking implementation after applying it. Existing reservations, saved prices, payment details, and venue settings are preserved.
+
+Each signed-in account can make **five reservation attempts per rolling ten minutes**, shared between private courts and open play. Cancellations and initial payment-reference submissions each have their own five-attempt/ten-minute allowance. Failed validation, unavailable slots, invalid references, and attempts against reservations the caller does not own count too. Cancelling a reservation does not refund its creation attempt. Browsing availability and staff calendar walk-ins/blocks are unaffected. The two-pending-reservation cap still applies separately.
+
+Every customer mutation goes through `request_customer_booking`, including forms rejected by server validation. An atomic, row-locked counter in the non-public `private` schema is shared across servers and browser tabs; it stores at most three rows of five timestamps per account and is deleted with the account. Its clock is the database clock. No extra service, API secret, in-memory cache, or client-supplied user ID/IP is used. Customers cannot read, clear, or modify counters, and older customer creation/payment/cancellation RPCs cannot be called directly. The remaining `reserve_scheduled_booking` entry point verifies staff membership before delegating.
+
+The gateway returns a structured `error`, `code`, and `retry_after_seconds` on cooldown; the UI displays the retry time in minutes. Business errors use the same response envelope. **These are normal RPC responses, not HTTP errors**: the transaction must commit its attempt counter even when the underlying booking operation rolls back. Clients must inspect the response's `error` field. Only the business operation runs inside an exception subtransaction; counters stay outside it. Unexpected database details are hidden from the customer. Request timeouts/connection failures that abort the entire transaction cannot retain a counter increment.
+
+This is account-based booking abuse protection, separate from Supabase Auth/Turnstile and network-level flood protection. It does not limit public reads, anonymous traffic, privileged staff actions, or an attacker spreading requests over many accounts. An additional trusted-IP limit at the hosting/API edge can be added separately; do not trust an arbitrary forwarded header or throttle all venue Wi-Fi customers as one account.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

@@ -9,54 +9,71 @@ import { z } from "zod";
 import { balancePaymentSchema } from "@/lib/payment";
 import { venueSettingPatch } from "@/lib/venue-setting";
 import { scheduleConfigSchema } from "@/lib/schedule";
+import {
+  bookingError,
+  requestCustomerBooking,
+  type CustomerBookingAction,
+  type CustomerBookingResult,
+} from "@/lib/customer-request";
+
+async function customerRequest(
+  action: CustomerBookingAction,
+  input: unknown,
+  validationError?: string,
+): Promise<CustomerBookingResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Please sign in before continuing." };
+    return await requestCustomerBooking(
+      supabase,
+      action,
+      input,
+      validationError,
+    );
+  } catch {
+    return {
+      error: "We couldn’t complete that request. Please refresh and try again.",
+    };
+  }
+}
 
 export async function reserveCourt(input: unknown) {
   const parsed = bookingSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (!(await getVenue()).openPlayReady)
-    return { error: "Reservations are being updated. Please check back soon." };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in before reserving a court." };
-  const p = parsed.data;
-  const venue = (await getVenue()).venue;
-  const { data, error } = await supabase.rpc(
-    "schedule_config" in venue
-      ? "reserve_scheduled_booking"
-      : "reserve_with_payment",
-    {
-      p_payment_option: p.payment_option,
-      p_kind: "court",
-      p_rental: p.equipment_rental,
-      p_court: p.court_id,
-      p_date: p.booking_date,
-      p_start: p.start_hour,
-      p_duration: p.duration,
-      p_name: p.customer_name,
-      p_phone: p.customer_phone,
-    },
+  const result = await customerRequest(
+    "reserve_court",
+    parsed.success ? parsed.data : null,
+    parsed.success ? undefined : parsed.error.issues[0].message,
   );
-  if (error) return { error: bookingError(error) };
+  if (result.error) return result;
   revalidatePath("/book");
   revalidatePath("/my-bookings");
   revalidatePath("/admin/finance");
-  return { id: data as string };
+  return result;
 }
 
 export async function reserveOpenPlay(input: unknown, walkIn = false) {
   const parsed = openPlaySchema.safeParse(input);
+  if (!walkIn) {
+    const result = await customerRequest(
+      "reserve_open_play",
+      parsed.success ? parsed.data : null,
+      parsed.success ? undefined : parsed.error.issues[0].message,
+    );
+    if (result.error) return result;
+    revalidatePath("/book");
+    revalidatePath("/admin");
+    revalidatePath("/my-bookings");
+    revalidatePath("/admin/finance");
+    return result;
+  }
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (!(await getVenue()).openPlayReady)
     return { error: "Open-play reservations aren’t available yet." };
   try {
-    const supabase = walkIn ? await staffClient() : await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user)
-      return { error: "Please sign in before reserving open-play passes." };
+    const supabase = await staffClient();
     const p = parsed.data;
     const venue = (await getVenue()).venue;
     const reservationRpc =
@@ -68,34 +85,21 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
       p.start_hour === undefined
     )
       return { error: "Choose an open-play session." };
-    const finance = walkIn ? financeBookingSchema.safeParse(input) : null;
-    if (finance && !finance.success)
-      return { error: finance.error.issues[0].message };
-    const { data, error } = walkIn
-      ? await supabase.rpc(reservationRpc, {
-          p_payment_option: p.payment_option,
-          p_kind: "open_play",
-          p_walk_in: true,
-          p_rental: p.equipment_rental,
-          p_date: p.booking_date,
-          ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
-          p_people: p.participant_count,
-          p_name: p.customer_name,
-          p_phone: p.customer_phone,
-          p_method: finance!.data!.payment_method,
-          p_notes: finance!.data!.finance_notes,
-        })
-      : await supabase.rpc(reservationRpc, {
-          p_payment_option: p.payment_option,
-          p_kind: "open_play",
-          p_rental: p.equipment_rental,
-          p_date: p.booking_date,
-          ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
-          p_people: p.participant_count,
-          p_name: p.customer_name,
-          p_phone: p.customer_phone,
-          p_walk_in: walkIn,
-        });
+    const finance = financeBookingSchema.safeParse(input);
+    if (!finance.success) return { error: finance.error.issues[0].message };
+    const { data, error } = await supabase.rpc(reservationRpc, {
+      p_payment_option: p.payment_option,
+      p_kind: "open_play",
+      p_walk_in: true,
+      p_rental: p.equipment_rental,
+      p_date: p.booking_date,
+      ...(p.start_hour === undefined ? {} : { p_start: p.start_hour }),
+      p_people: p.participant_count,
+      p_name: p.customer_name,
+      p_phone: p.customer_phone,
+      p_method: finance.data.payment_method,
+      p_notes: finance.data.finance_notes,
+    });
     if (error) return { error: bookingError(error) };
     revalidatePath("/book");
     revalidatePath("/admin");
@@ -107,41 +111,43 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
   }
 }
 
-function bookingError(error: { code?: string; message: string }) {
-  if (error.code === "23P01")
-    return "That time was just reserved. Please choose another slot.";
-  if (["PGRST202", "PGRST205"].includes(error.code || ""))
-    return "Reservations aren’t open yet. Please check back soon.";
-  return error.message.includes("Booking:")
-    ? error.message.replace("Booking: ", "")
-    : "We couldn’t complete that request. Please refresh and try again.";
-}
-
 export async function submitPayment(bookingId: string, reference: string) {
-  if (!/^[a-zA-Z0-9 -]{6,40}$/.test(reference.trim()))
-    return { error: "Enter a valid GCash reference number (6–40 characters)." };
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("submit_payment_reference", {
-    p_booking: bookingId,
-    p_reference: reference.trim(),
-  });
-  if (error) return { error: bookingError(error) };
+  const parsed = z
+    .object({
+      booking_id: z.uuid(),
+      reference: z
+        .string()
+        .trim()
+        .regex(
+          /^[a-zA-Z0-9 -]{6,40}$/,
+          "Enter a valid GCash reference number (6–40 characters).",
+        ),
+    })
+    .safeParse({ booking_id: bookingId, reference });
+  const result = await customerRequest(
+    "payment",
+    parsed.success ? parsed.data : null,
+    parsed.success ? undefined : parsed.error.issues[0].message,
+  );
+  if (result.error) return result;
   revalidatePath(`/booking/${bookingId}`);
   revalidatePath("/my-bookings");
   revalidatePath("/admin/finance");
-  return { success: true };
+  return result;
 }
 
 export async function cancelBooking(bookingId: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("cancel_booking", {
-    p_booking: bookingId,
-  });
-  if (error) return { error: bookingError(error) };
+  const parsed = z.uuid().safeParse(bookingId);
+  const result = await customerRequest(
+    "cancel",
+    parsed.success ? { booking_id: parsed.data } : null,
+    parsed.success ? undefined : "Choose a valid reservation.",
+  );
+  if (result.error) return result;
   revalidatePath("/my-bookings");
   revalidatePath(`/booking/${bookingId}`);
   revalidatePath("/admin/finance");
-  return { success: true };
+  return result;
 }
 
 async function staffClient() {

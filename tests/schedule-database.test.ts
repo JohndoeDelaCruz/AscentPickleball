@@ -235,8 +235,9 @@ test("schedule migration, session limits, snapshots, and staff-only editing", as
       async () =>
         (
           await db.query<{ id: string }>(
-            `select public.reserve_scheduled_booking(p_kind=>'court',p_date=>$1,p_name=>'Private Player',p_phone=>'09171234567',
-        p_court=>2,p_start=>6,p_duration=>2,p_rental=>true,p_payment_option=>'reservation_fee') id`,
+            `select (public.request_customer_booking('reserve_court',jsonb_build_object(
+        'booking_date',$1::text,'customer_name','Private Player','customer_phone','09171234567',
+        'court_id',2,'start_hour',6,'duration',2,'equipment_rental',true,'payment_option','reservation_fee'))->>'id')::uuid id`,
             [privateDate],
           )
         ).rows[0].id,
@@ -254,17 +255,15 @@ test("schedule migration, session limits, snapshots, and staff-only editing", as
     assert.equal(Number(quote.total_amount), 381);
     assert.equal(Number(quote.initial_payment_amount), 190.5);
     assert.equal(Number(quote.paid_amount), 0);
-    await assert.rejects(
-      () =>
-        as(player, () =>
-          db.query(
-            `select public.reserve_scheduled_booking(p_kind=>'court',p_date=>$1,
-      p_name=>'Private Player',p_phone=>'09171234567',p_court=>1,p_start=>7,p_duration=>2)`,
-            [privateDate],
-          ),
-        ),
-      /private-booking time/,
+    const rejected = await as(player, () =>
+      db.query<{ error: string }>(
+        `select public.request_customer_booking('reserve_court',jsonb_build_object(
+        'booking_date',$1::text,'customer_name','Private Player','customer_phone','09171234567',
+        'court_id',1,'start_hour',7,'duration',2))->>'error' error`,
+        [privateDate],
+      ),
     );
+    assert.match(rejected.rows[0].error, /private-booking time/);
     const invalidDays = structuredClone(custom) as unknown as {
       weekly: { days: unknown[] }[];
     };
