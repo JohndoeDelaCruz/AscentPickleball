@@ -139,7 +139,7 @@ export function ScheduleEditor({ initial }: { initial: VenueSettings }) {
         </div>
       )}
       <fieldset key={active} disabled={pending} className="schedule-fields">
-        <div className="schedule-editor-toolbar">
+        <div className="schedule-editor-toolbar schedule-picker-toolbar">
           <label className="field">
             <span>Edit schedule</span>
             <select value={active} onChange={(e) => setActive(e.target.value)}>

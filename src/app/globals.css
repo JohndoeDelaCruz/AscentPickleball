@@ -2105,6 +2105,14 @@ img {
   min-width: 220px;
   max-width: 420px;
 }
+.schedule-picker-toolbar {
+  align-items: flex-end;
+}
+.schedule-picker-toolbar select,
+.schedule-picker-toolbar > .button,
+.schedule-picker-toolbar > .text-link {
+  min-height: 50px;
+}
 .schedule-period-fields {
   grid-template-columns: 2fr 1fr 1fr;
 }
