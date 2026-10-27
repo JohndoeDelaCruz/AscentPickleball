@@ -67,15 +67,18 @@ export function Header({
                 Book a court <ArrowUpRight size={16} />
               </Link>
               <Link
-                href={signedIn ? (staff ? "/admin" : "/my-bookings") : "/login"}
+                href={signedIn ? (staff ? "/admin" : "/book") : "/login"}
                 className="button button-dark button-small nav-mobile-primary"
                 onClick={() => setOpen(false)}
               >
                 {signedIn
                   ? staff
                     ? "Dashboard"
-                    : "My bookings"
+                    : "Book a court"
                   : "Log in / Sign up"}
+                {signedIn && !staff && (
+                  <ArrowUpRight size={16} aria-hidden="true" />
+                )}
               </Link>
             </>
           )}
@@ -135,7 +138,9 @@ export function Header({
             href={signedIn ? "/account" : "/login"}
             onClick={() => setOpen(false)}
           >
-            {signedIn ? "Account settings / Change password" : "Log in / Sign up"}
+            {signedIn
+              ? "Account settings / Change password"
+              : "Log in / Sign up"}
           </Link>
           {signedIn && <button onClick={signOut}>Sign out</button>}
           <Link
