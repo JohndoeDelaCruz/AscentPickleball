@@ -1,3 +1,5 @@
+import { paddleStackPath } from "./paddle-stack";
+
 export const workspaceTabs = [
   { id: "overview", label: "Overview" },
   { id: "pos", label: "Point of sale" },
@@ -11,7 +13,7 @@ export type WorkspaceTab = (typeof workspaceTabs)[number]["id"];
 export type WorkspaceView = WorkspaceTab | "calendar" | "finance" | "settings" | "account";
 
 export function isWorkspacePath(path: string) {
-  return path === "/staff" || path === "/admin" || path.startsWith("/admin/") || path === "/account";
+  return path === "/staff" || path === paddleStackPath || path === "/admin" || path.startsWith("/admin/") || path === "/account";
 }
 
 export function workspaceTab(value: unknown): WorkspaceTab {

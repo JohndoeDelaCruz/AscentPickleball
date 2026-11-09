@@ -94,6 +94,8 @@ For rollout, pause staff cash processing while applying the migrations and deplo
 
 **Collections report** tracks payments and refunds by the day money moved. **Booking finance** retains booking collections by play date, including collections from before the POS rollout. When staff collect a balance on an existing deposit, the new register records only that balance as new money.
 
+Apply `202611090016_paddle_stack.sql` and `202611090017_paddle_stack_rotation.sql` in order after 015 to enable **Paddle Stack** in the staff workspace. Staff open check-in for a scheduled open-play session, add display names, and can shuffle everyone waiting. Calling the next four keeps the remaining queue in order and splits recent teammates where possible. The Player board QR opens a live scoreboard and waiting queue. A scorekeeper link grants access to one court for that session, and staff can replace or revoke it. Players who finish a game can be requeued at the back. Keep any payments or reservations in the existing booking and POS flows.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
