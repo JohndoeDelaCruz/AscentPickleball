@@ -1,4 +1,5 @@
 "use client";
+import { courtName } from "@/lib/courts";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -123,7 +124,7 @@ export function BookingDetail({
             <div>
               <dt>{openPlay ? "Session" : "Court"}</dt>
               <dd>
-                {openPlay ? "Open play · shared courts" : `Court ${b.court_id}`}
+                {openPlay ? "Open play · shared courts" : courtName(venue.courts, b.court_id)}
               </dd>
             </div>
             <div>

@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { getSession } from "@/lib/data";
-import { AdminNav } from "@/components/admin-nav";
 export const metadata: Metadata = {
   title: "Admin Dashboard",
   robots: { index: false, follow: false },
@@ -13,8 +12,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, staff } = await getSession();
+  const { user, staff, role } = await getSession();
   if (!user) redirect("/login?next=/admin");
+  if (role === "cashier") redirect("/staff");
   if (!staff)
     return (
       <main
@@ -36,17 +36,5 @@ export default async function AdminLayout({
         </div>
       </main>
     );
-  return (
-    <main id="main" className="admin-shell">
-      <aside className="admin-sidebar">
-        <AdminNav />
-      </aside>
-      <div className="admin-content">
-        <div className="page-heading">
-          <h1>Admin Dashboard</h1>
-        </div>
-        {children}
-      </div>
-    </main>
-  );
+  return children;
 }

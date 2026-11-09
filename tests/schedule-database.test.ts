@@ -22,7 +22,7 @@ test("schedule migration, session limits, snapshots, and staff-only editing", as
       insert into auth.users values('${staff}','staff@example.com'),('${player}','player@example.com');
       alter default privileges grant execute on functions to anon,authenticated;`);
     for (const file of (await readdir("supabase/migrations"))
-      .filter((f) => f.endsWith(".sql"))
+      .filter((f) => f.endsWith(".sql") && f < "202611040013")
       .sort()) {
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
     }

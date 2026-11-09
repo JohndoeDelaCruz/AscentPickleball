@@ -1,5 +1,7 @@
 import type { ScheduleConfig } from "./schedule";
+import type { Court } from "./courts";
 export type VenueSettings = {
+  courts?: Court[];
   schedule_config?: ScheduleConfig | null;
   id: boolean;
   name: string;
@@ -112,6 +114,7 @@ export type Availability = Pick<
   "court_id" | "start_hour" | "duration" | "status"
 >;
 export type VenueResult = {
+  courtsReady?: boolean;
   venue: VenueSettings;
   ready: boolean;
   openPlayReady: boolean;

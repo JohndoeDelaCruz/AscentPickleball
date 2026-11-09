@@ -28,7 +28,7 @@ select id from auth.users where lower(email) = lower('your-email@example.com')
 on conflict (user_id) do nothing;
 ```
 
-5. Sign in, open `/admin/settings`, and save your venue details. Staff accounts land on `/admin` after signing in; customers land on `/my-bookings`. Signing in from a booking or other protected page returns to that page. Upload a real GCash QR or paste a direct **HTTPS image URL**, not a GCash app link or a file sharing page. An image is necessary for customers to see and save the QR.
+5. Sign in, open `/admin/settings`, and save your venue details. Staff accounts land on `/staff` after signing in. Customers land on `/my-bookings`. Signing in from a booking or other protected page returns to that page. Upload a real GCash QR or paste a direct **HTTPS image URL**, not a GCash app link or a file sharing page. An image is necessary for customers to see and save the QR.
 6. Review the configured rates and hours, then add the GCash account name and QR image. Add an address, contact details, and your final cancellation/refund policy. Enable **Open online reservations** when ready. Existing reservations remain visible when you close new bookings.
 
 Rates, hours, address, city, contact details, introduction, GCash details, unpaid hold duration, and cancellation policy are editable. Before a custom schedule is saved, starter hours are **6 AM–4 PM at ₱100/hour** and **4 PM–10 PM at ₱200/hour**. On weekdays, a booking spanning 3–5 PM totals **₱300**. Saturdays and Sundays offer **private court bookings from 6–9 AM**, **open play from 9 AM–4 PM at ₱50 per person**, then **private court bookings from 4–10 PM**. Open play accommodates **12 rotating players per court, with a 24-player limit across both courts in the legacy session**. Staff manages rotation between games; passes share the session rather than assigning players to a specific court. Current saved rates are preserved during conversion. The schedule, session prices, and player limits are editable in the new Booking schedule table. Customers and staff can choose multiple optional **₱30 rental sets containing 1 paddle + 1 ball each by default** per reservation. The charge is the saved per-set price multiplied by the selected quantity, included in the GCash total once per session. Court and open-play rates stay separate; no equipment inventory tracking is configured. Booking starts **closed**. Public pages work before setup and availability is labeled as a preview until the database is ready. Court slots start on the hour and bookings last 1–4 hours, up to 30 days ahead.
@@ -80,6 +80,20 @@ Use the compact **Equipment** minus/plus controls or type a quantity; **0 means 
 
 Previous rentals become quantity 1 with their original price and ball count; no historical total or payment is changed. Customer booking details, booking history, staff calendar, finance details, and daily CSV exports show the saved quantity. Confirmed walk-ins include the quantity in the collected amount. No rental inventory or automatic membership discount is introduced. Customer gateway versions share the same request-limit counter, and direct access to the new internal helper is revoked.
 
+## Staff workspace and POS rollout
+
+On the **existing Ascent Supabase project**, after migration 012, apply these files once in order before using the new staff workspace:
+
+1. `202611040013_pos.sql` adds the cashier, inventory, transactions, and collections ledger.
+2. `202611050014_court_management.sql` enables editing and deactivating courts while preserving their IDs.
+3. `202611070015_court_deletion.sql` enables deletion of unused courts, with checks for reservations and history.
+
+Use the individual files under `supabase/migrations/`. A fresh database setup from PickleballBookingPOS would target a different project. The upgrade leaves Ascent’s saved weekly schedule, temporary overrides, court names, bookings, and venue settings in place. Existing staff become managers. Managers and owners can edit inventory, configure the venue and courts, and record refunds. Cashiers can run the register and verify or collect booking payments. Cashier reservation access excludes customer contact details and private staff notes.
+
+For rollout, pause staff cash processing while applying the migrations and deploying the matching app. Then open `/staff`, add products and opening stock, and open a shift before recording cash sales, walk-ins, or booking balances. GCash payments still require manual verification. An unreferenced GCash walk-in must go through the booking payment-reference flow. Transaction slips are printable and identify themselves as transaction records.
+
+**Collections report** tracks payments and refunds by the day money moved. **Booking finance** retains booking collections by play date, including collections from before the POS rollout. When staff collect a balance on an existing deposit, the new register records only that balance as new money.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
@@ -92,6 +106,7 @@ Previous rentals become quantity 1 with their original price and ball count; no 
 | `/account`        | Signed-in customers and staff: change password after verifying the current password |
 | `/my-bookings`    | Your reservations and statuses                                                      |
 | `/booking/[id]`   | Booking details, GCash QR, payment reference, unpaid cancellation                   |
+| `/staff`          | Overview, point of sale, reservations, inventory, transactions, collections report |
 | `/admin`          | Staff calendar, GCash reviews, confirmed walk-ins, maintenance blocks               |
 | `/admin/settings` | Editable venue details, rates/hours, QR upload, booking toggle                      |
 | `/admin/finance`  | Daily log, monthly sales/hours, payment methods, private staff notes, CSV downloads |
@@ -120,7 +135,7 @@ Previous rentals become quantity 1 with their original price and ball count; no 
 
 The Finance tab follows the supplied daily rental log and monthly summary. It reads existing bookings automatically. **Verified collections are grouped by Philippine play date**, including future confirmed reservations; this is not a cash-receipt-date or profit statement. Confirmed booking value and unpaid balances appear separately from collections. A verified 50% fee contributes only the amount received. Pending, cancelled, expired, and blocked bookings do not contribute to collections. Open-play collections and player counts are separate from private court collections and booked hours.
 
-Staff can record Cash, GCash, Bank transfer, Card, or Other for paid walk-ins and balance payments. These labels record payment collected externally; they do not add payment processing. Online initial payments remain GCash; a later venue balance can use a different method. Older walk-ins start as **Not recorded** rather than guessing their payment method. Staff can classify initial payments and add private reservation notes from the daily log. Worker on duty and manager notes are saved per day and are visible only to staff.
+Managers can record Cash, Bank transfer, Card, or Other for paid walk-ins, and can also record GCash for balances with a verified reference. These labels describe payments collected externally. Online initial payments use GCash. Older walk-ins without a saved method appear as **Not recorded**. Managers can add private reservation notes from the daily log. A payment method is locked once it is recorded in the POS ledger. Worker on duty and manager notes are saved per day and are visible only to managers and owners.
 
 Daily and monthly CSV downloads open in Excel. The daily download includes all records for that date, regardless of the displayed page. Monthly totals cover the actual calendar month, including leap years, and are aggregated in Postgres rather than being truncated at an API row limit. Equipment collections are allocated proportionally to the verified amount, rounded to centavos; court/pass collections receive the remainder so totals reconcile. Saved hourly averages exclude equipment and use the full saved booking value. CSVs include payment terms, collections, and unpaid balances. Expenses and refunds are outside these reports. A cancelled paid booking is excluded from collections; refunds must still be handled separately.
 

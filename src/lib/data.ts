@@ -1,44 +1,60 @@
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import { defaultVenue, type VenueResult } from "./types";
+import { defaultCourts, type Court } from "./courts";
+import { readSessionAccess } from "./session-access";
 
-export const getVenue = cache(async (): Promise<VenueResult> => {
+export const getCourtInventory = cache(async () => {
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("venue_settings")
-      .select("*")
-      .eq("id", true)
-      .single();
-    if (error || !data)
-      return { venue: defaultVenue, ready: false, openPlayReady: false };
-    if (!("evening_hourly_rate" in data))
-      return {
-        venue: {
-          ...defaultVenue,
-          ...data,
-          hourly_rate: data.hourly_rate ?? defaultVenue.hourly_rate,
-          opening_hour: data.opening_hour ?? defaultVenue.opening_hour,
-          closing_hour: data.closing_hour ?? defaultVenue.closing_hour,
-        },
-        ready: false,
-        openPlayReady: false,
-      };
-    return {
-      venue: { ...defaultVenue, ...data },
-      ready: true,
-      openPlayReady: "open_play_enabled" in data,
-    };
+  const db = await createClient();
+  const { data, error } = await db.from("courts").select("*").order("id");
+  if (error || !data) return { courts: defaultCourts, ready: false, loaded: false };
+  return {
+    courts: data.map((c) => ({ id: c.id, name: c.name, active: c.active ?? true, revision: c.revision ?? 0 })) as Court[],
+    ready: data.every((c) => typeof c.active === "boolean" && typeof c.revision === "number"),
+    loaded: true,
+  };
+  } catch { return { courts: defaultCourts, ready: false, loaded: false }; }
+});
+
+export const getVenueSettings = cache(async () => {
+  try {
+    const db = await createClient();
+    const { data, error } = await db.from("venue_settings").select("*").eq("id", true).single();
+    return error ? null : data;
   } catch {
-    return { venue: defaultVenue, ready: false, openPlayReady: false };
+    return null;
   }
 });
+
+export const getVenue = cache(async (): Promise<VenueResult> => {
+  const [inventory, data] = await Promise.all([getCourtInventory(), getVenueSettings()]);
+  const defaults = { ...defaultVenue, courts: inventory.courts };
+  if (!data)
+    return { venue: defaults, ready: false, openPlayReady: false, courtsReady: inventory.ready };
+  if (!("evening_hourly_rate" in data))
+    return {
+      venue: {
+        ...defaults,
+        ...data,
+        hourly_rate: data.hourly_rate ?? defaultVenue.hourly_rate,
+        opening_hour: data.opening_hour ?? defaultVenue.opening_hour,
+        closing_hour: data.closing_hour ?? defaultVenue.closing_hour,
+      },
+      ready: false,
+      openPlayReady: false,
+    };
+  return {
+    venue: { ...defaults, ...data },
+    ready: inventory.loaded,
+    courtsReady: inventory.ready,
+    openPlayReady: "open_play_enabled" in data,
+  };
+});
 export const getSession = cache(async () => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { user: null, staff: false };
-  const { data } = await supabase.rpc("is_staff");
-  return { user, staff: data === true };
+  return readSessionAccess(await createClient());
+});
+
+export const getWorkspaceRole = cache(async () => {
+  return (await getSession()).role;
 });

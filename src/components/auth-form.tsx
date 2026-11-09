@@ -8,6 +8,7 @@ import { authRedirect, safeRedirect } from "@/lib/redirect";
 import { authCallbackUrl } from "@/lib/site-url";
 import { captchaOptions, captchaTokenSchema } from "@/lib/captcha";
 import { TurnstileCheck } from "./turnstile-check";
+import { readStaffMembership } from "@/lib/session-access";
 
 export function AuthForm({
   next,
@@ -45,12 +46,15 @@ export function AuthForm({
     try {
       const supabase = createClient();
       async function finishSignIn() {
-        const { data: staff, error } = await supabase.rpc("is_staff");
-        if (error)
+        let staff: boolean;
+        try {
+          staff = await readStaffMembership(supabase);
+        } catch {
           throw new Error(
             "You’re signed in, but we couldn’t load your account access. Please try again.",
           );
-        router.replace(authRedirect(next, staff === true));
+        }
+        router.replace(authRedirect(next, staff));
         router.refresh();
       }
       if (mode === "login") {

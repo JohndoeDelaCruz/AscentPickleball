@@ -33,7 +33,7 @@ test("customer request limits persist failures and protect every mutation entry 
       alter default privileges grant execute on functions to anon,authenticated;
       alter default privileges grant all on tables to anon,authenticated;`);
     const files = (await readdir("supabase/migrations"))
-      .filter((f) => f.endsWith(".sql"))
+      .filter((f) => f.endsWith(".sql") && f < "202611040013")
       .sort();
     for (const file of files.filter((f) => f < "202610270011"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));

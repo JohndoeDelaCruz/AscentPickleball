@@ -266,7 +266,7 @@ test("booking validation rejects invalid phones, court IDs, durations, and impos
   };
   assert.equal(bookingSchema.safeParse(valid).success, true);
   for (const patch of [
-    { court_id: 3 },
+    { court_id: 32768 },
     { duration: 5 },
     { customer_phone: "123" },
     { booking_date: "2026-02-30" },

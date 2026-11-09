@@ -11,6 +11,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
+import { activeCourts, courtPhoto } from "@/lib/courts";
 import { Starburst } from "@/components/starburst";
 import { LandingMotion } from "@/components/landing-motion";
 import { ScheduleOverview } from "@/components/schedule-overview";
@@ -25,6 +26,7 @@ import {
 
 export default async function Home() {
   const { venue } = await getVenue();
+  const courts = activeCourts(venue.courts);
   const open = canBook(venue);
   const ratePeriods = getRatePeriods(venue);
   const faqs = [
@@ -137,14 +139,14 @@ export default async function Home() {
           <div>
             <span className="eyebrow">YOUR SPACE TO PLAY</span>
             <h2>
-              TWO COURTS.
+              {courts.length === 2 ? "TWO COURTS." : "THE COURTS."}
               <br />
               MAKE THEM YOURS.
             </h2>
           </div>
         </div>
         <div className="court-cards">
-          {[1, 2].map((court) => (
+          {courts.map(({ id: court, name }, index) => (
             <Link
               href={`/book?court=${court}`}
               className="court-card"
@@ -153,17 +155,17 @@ export default async function Home() {
             >
               <div className={`court-card-art court-art-${court}`}>
                 <Image
-                  src={`/court-${court}.jpg`}
-                  alt={`Ascent Pickleball Court ${court}`}
+                  src={courtPhoto(court)}
+                  alt=""
                   fill
                   loading="eager"
                   sizes="(max-width: 700px) 100vw, 50vw"
                 />
-                <span className="court-number">0{court}</span>
+                <span className="court-number">{String(index + 1).padStart(2, "0")}</span>
               </div>
               <div className="court-card-copy">
                 <div>
-                  <h3>Court {court}</h3>
+                  <h3>{name}</h3>
                   {venue.schedule_config ? (
                     <p className="small-print">
                       Private hours and rates vary by day. Choose a date to see
@@ -202,7 +204,7 @@ export default async function Home() {
           ))}
         </div>
         {venue.schedule_config && (
-          <ScheduleOverview config={venue.schedule_config} />
+          <ScheduleOverview config={venue.schedule_config} courtCount={courts.length} />
         )}
         {!venue.schedule_config && venue.open_play_enabled && (
           <div className="weekend-home-callout" data-reveal="">
@@ -213,8 +215,8 @@ export default async function Home() {
                 {formatHour(venue.open_play_start_hour)}–
                 {formatHour(venue.open_play_end_hour)} ·{" "}
                 {money(venue.open_play_price)} per person ·{" "}
-                {openPlayCapacityLabel(venue.open_play_capacity)}. Share both
-                courts and rotate throughout the session.
+                {openPlayCapacityLabel(venue.open_play_capacity, courts.length)}. Players
+                rotate throughout the session.
               </p>
               <p className="small-print">
                 Weekend private court bookings:{" "}
@@ -270,7 +272,7 @@ export default async function Home() {
             <div>
               <CalendarDays />
               <span>
-                THE COURTS<strong>Two courts. Your choice.</strong>
+                THE COURTS<strong>{courts.length === 2 ? "Two courts. Your choice." : "Find your court."}</strong>
               </span>
             </div>
             <div>

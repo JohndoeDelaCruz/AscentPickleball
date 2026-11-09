@@ -1,4 +1,7 @@
 "use client";
+import { WorkspacePageHeading } from "./workspace-page-heading";
+import type { CSSProperties } from "react";
+import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
@@ -38,6 +41,7 @@ export function AdminCalendar({
   venue: VenueSettings;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
+  const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
   const [balanceBooking, setBalanceBooking] = useState<Booking | null>(null);
   const [action, setAction] = useState<{
     booking: Booking;
@@ -75,27 +79,15 @@ export function AdminCalendar({
   }
   return (
     <>
-      <div className="admin-header">
-        <div>
-          <h2
-            style={{
-              fontFamily: "var(--font-body)",
-              fontSize: 23,
-              letterSpacing: "-.5px",
-              margin: 0,
-            }}
-          >
-            Court calendar
-          </h2>
-        </div>
+      <WorkspacePageHeading title="Court calendar" actions={
         <button
           className="button button-dark button-small"
           onClick={() => setCreateOpen(true)}
         >
           <Plus size={16} />
-          Add booking / block
+          Add booking or block
         </button>
-      </div>
+      } />
       <div className="admin-stats">
         <div className="panel stat-card">
           <span>Active reservations</span>
@@ -152,16 +144,15 @@ export function AdminCalendar({
           No scheduled court time on this date.
         </div>
       )}
-      <div className="availability-grid" style={{ marginBottom: 28 }}>
+      <div className="availability-grid dynamic-court-grid" style={{ marginBottom: 28, "--court-columns": Math.max(1, courts.length) } as CSSProperties}>
         <div className="availability-header">
           <div>PHT / UTC+8</div>
-          <div>Court 1</div>
-          <div>Court 2</div>
+          {courts.map((court) => <div key={court.id}>{court.name}{!court.active && " · Inactive"}</div>)}
         </div>
         {hours.map((hour) => (
           <div className="availability-row" key={hour}>
             <div className="time-label">{formatHour(hour)}</div>
-            {[1, 2].map((court) => {
+            {courts.map(({ id: court }) => {
               const b = active.find(
                 (b) =>
                   b.court_id === court &&
@@ -221,7 +212,7 @@ export function AdminCalendar({
               )
               .reduce((sum, b) => sum + b.participant_count, 0)}{" "}
             players held or confirmed · {money(session.rate)} per person ·{" "}
-            {openPlayCapacityLabel(session.capacity)}
+            {openPlayCapacityLabel(session.capacity, activeCourts(venue.courts).length)}
           </span>
         </div>
       ))}
@@ -238,8 +229,8 @@ export function AdminCalendar({
         {!bookings.length ? (
           <div className="empty-state" style={{ border: 0 }}>
             <CalendarDays />
-            <h2>A clear court, a fresh start.</h2>
-            <p>No reservations for this date.</p>
+            <h2>No reservations</h2>
+            <p>There are no bookings for this date.</p>
           </div>
         ) : (
           <div className="table-scroll">
@@ -275,7 +266,7 @@ export function AdminCalendar({
                     <td>
                       {b.booking_type === "open_play"
                         ? `Open play · ${b.participant_count} ${b.participant_count === 1 ? "player" : "players"}`
-                        : `Court ${b.court_id}`}
+                        : courtName(venue.courts, b.court_id)}
                       <small>
                         {formatHour(b.start_hour)} –{" "}
                         {formatHour(b.start_hour + b.duration)}
@@ -464,6 +455,7 @@ function CreateBookingModal({
   venue: VenueSettings;
   onClose: () => void;
 }) {
+  const courts = activeCourts(venue.courts);
   const [blocked, setBlocked] = useState(false);
   const [openPlay, setOpenPlay] = useState(false);
   const [bookingDate, setBookingDate] = useState(
@@ -575,8 +567,7 @@ function CreateBookingModal({
             <label className="field">
               <span>Court</span>
               <select name="court_id">
-                <option value="1">Court 1</option>
-                <option value="2">Court 2</option>
+                {courts.map((court) => <option key={court.id} value={court.id}>{court.name}</option>)}
               </select>
             </label>
           )}
@@ -699,13 +690,14 @@ function CreateBookingModal({
               <span>Payment received via</span>
               <select name="payment_method" defaultValue="cash">
                 {Object.entries(paymentMethods)
-                  .filter(([key]) => key !== "unspecified")
+                  .filter(([key]) => key !== "unspecified" && key !== "gcash")
                   .map(([key, label]) => (
                     <option value={key} key={key}>
                       {label}
                     </option>
                   ))}
               </select>
+              <small>Cash requires an open cashier shift. Verify GCash reservations from the Reservations tab.</small>
             </label>
             <label className="field">
               <span>Staff notes (optional)</span>

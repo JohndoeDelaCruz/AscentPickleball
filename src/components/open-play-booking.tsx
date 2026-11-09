@@ -24,6 +24,7 @@ import type {
 import { EquipmentRental } from "./equipment-rental";
 import { PaymentOptions } from "./payment-options";
 import { resolveSchedule } from "@/lib/schedule";
+import { activeCourts } from "@/lib/courts";
 
 export function OpenPlayBooking({
   venue,
@@ -235,8 +236,8 @@ export function OpenPlayBooking({
             {formatHour(activeSession.end_hour)}.
           </p>
           <p>
-            <strong>{openPlayCapacityLabel(activeSession.capacity)}.</strong>{" "}
-            Players share both courts and rotate between games.
+            <strong>{openPlayCapacityLabel(activeSession.capacity, activeCourts(venue.courts).length)}.</strong>{" "}
+            Players share the active courts and rotate between games.
           </p>
           <div className="open-play-meta">
             <span>

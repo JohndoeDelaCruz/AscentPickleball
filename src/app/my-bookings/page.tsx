@@ -12,11 +12,12 @@ import {
 } from "@/lib/booking";
 import { bookingPayments } from "@/lib/payment";
 import { statusLabels, type Booking } from "@/lib/types";
+import { courtName } from "@/lib/courts";
 export const metadata: Metadata = { title: "My bookings" };
 export default async function MyBookings() {
   const { user } = await getSession();
   if (!user) redirect("/login?next=/my-bookings");
-  const { ready } = await getVenue();
+  const { ready, venue } = await getVenue();
   const supabase = await createClient();
   if (ready) await supabase.rpc("expire_unpaid_holds");
   const { data, error } = ready
@@ -77,7 +78,7 @@ export default async function MyBookings() {
                 <h3>
                   {b.booking_type === "open_play"
                     ? `Open play · ${b.participant_count} ${b.participant_count === 1 ? "player" : "players"}`
-                    : `Court ${b.court_id}`}{" "}
+                    : courtName(venue.courts, b.court_id)}{" "}
                   <span
                     style={{
                       fontSize: 14,

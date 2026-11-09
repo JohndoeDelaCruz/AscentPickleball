@@ -13,7 +13,7 @@ import {
   type ScheduleConfig,
 } from "@/lib/schedule";
 
-function ScheduleRows({ blocks }: { blocks: ScheduleBlock[] }) {
+function ScheduleRows({ blocks, courtCount }: { blocks: ScheduleBlock[]; courtCount: number }) {
   return blocks.length ? (
     <div className="table-scroll">
       <table className="admin-table public-schedule-table">
@@ -44,7 +44,7 @@ function ScheduleRows({ blocks }: { blocks: ScheduleBlock[] }) {
                   {block.kind === "court" ? "Private booking" : "Open play"}
                   <small>
                     {block.kind === "open_play"
-                      ? openPlayCapacityLabel(block.capacity)
+                      ? openPlayCapacityLabel(block.capacity, courtCount)
                       : `${block.capacity} players per court`}
                   </small>
                 </td>
@@ -66,7 +66,7 @@ function ScheduleRows({ blocks }: { blocks: ScheduleBlock[] }) {
   );
 }
 
-export function ScheduleOverview({ config }: { config: ScheduleConfig }) {
+export function ScheduleOverview({ config, courtCount }: { config: ScheduleConfig; courtCount: number }) {
   const today = localDate();
   const active = config.overrides.find(
     (p) => today >= p.start_date && today <= p.end_date,
@@ -95,17 +95,17 @@ export function ScheduleOverview({ config }: { config: ScheduleConfig }) {
             <strong>{active.name}</strong> · {formatDate(active.start_date)}–
             {formatDate(active.end_date)}
           </p>
-          <ScheduleRows blocks={active.blocks} />
+          <ScheduleRows blocks={active.blocks} courtCount={courtCount} />
           <p className="small-print">
             Regular hours resume {formatDate(addDays(active.end_date, 1))}.
           </p>
           <details>
             <summary>Regular weekly schedule</summary>
-            <ScheduleRows blocks={config.weekly} />
+            <ScheduleRows blocks={config.weekly} courtCount={courtCount} />
           </details>
         </>
       ) : (
-        <ScheduleRows blocks={config.weekly} />
+        <ScheduleRows blocks={config.weekly} courtCount={courtCount} />
       )}
       {upcoming && (
         <details>
@@ -113,7 +113,7 @@ export function ScheduleOverview({ config }: { config: ScheduleConfig }) {
             {upcoming.name} · {formatDate(upcoming.start_date)}–
             {formatDate(upcoming.end_date)}
           </summary>
-          <ScheduleRows blocks={upcoming.blocks} />
+          <ScheduleRows blocks={upcoming.blocks} courtCount={courtCount} />
         </details>
       )}
       <p className="small-print">

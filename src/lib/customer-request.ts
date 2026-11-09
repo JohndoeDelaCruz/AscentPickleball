@@ -38,6 +38,8 @@ export function bookingError(error: RpcError) {
     return "Reservations are being updated. Please check back soon.";
   return error.message.startsWith("Booking: ")
     ? error.message.slice(9)
+    : error.message.startsWith("POS: ")
+      ? error.message.slice(5)
     : "We couldn’t complete that request. Please refresh and try again.";
 }
 

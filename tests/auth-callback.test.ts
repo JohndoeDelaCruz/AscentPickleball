@@ -92,7 +92,7 @@ function fixture({
       },
     },
     rpc: async (name) => {
-      assert.equal(name, "is_staff");
+      assert.equal(name, accessError && calls.roleChecks > 0 ? "is_staff" : "is_club_staff");
       calls.roleChecks++;
       return {
         data: staff,
@@ -113,7 +113,7 @@ test("confirmation exchanges the session before choosing the customer or staff d
       }),
       client,
     );
-    assert.equal(destination, staff ? "/admin" : "/my-bookings");
+    assert.equal(destination, staff ? "/staff" : "/my-bookings");
     assert.equal(calls.code, "test-confirmation-code");
     assert.equal(calls.flowId, "test-flow");
     assert.equal(calls.roleChecks, 1);

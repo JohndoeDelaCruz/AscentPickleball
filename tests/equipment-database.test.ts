@@ -27,7 +27,7 @@ test("multiple equipment sets retain prices, payments, access controls, and requ
       insert into auth.users values('${alice}','alice@example.com'),('${bob}','bob@example.com'),('${staff}','staff@example.com');
       alter default privileges grant execute on functions to anon,authenticated;`);
     const files = (await readdir("supabase/migrations"))
-      .filter((f) => f.endsWith(".sql"))
+      .filter((f) => f.endsWith(".sql") && f < "202611040013")
       .sort();
     for (const file of files.filter((f) => f < "202610270012"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));

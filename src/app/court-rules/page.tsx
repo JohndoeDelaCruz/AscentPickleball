@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { getVenue } from "@/lib/data";
+import { activeCourts } from "@/lib/courts";
 import {
   equipmentPackageLabel,
   money,
@@ -44,11 +45,11 @@ export default async function CourtRulesPage() {
           : `Maximum of ${venue.private_court_capacity} players per court for a private booking.`,
         ...(venue.schedule_config
           ? [
-              "Open-play capacity applies separately to each session. Check the selected session's player limit before booking. Players share both courts and rotate between games.",
+              "Open-play capacity applies separately to each session. Check the selected session's player limit before booking. Players share the active courts and rotate between games.",
             ]
           : venue.open_play_enabled
             ? [
-                `Open play: ${openPlayCapacityLabel(venue.open_play_capacity)}. Players share the courts and rotate between games.`,
+                `Open play: ${openPlayCapacityLabel(venue.open_play_capacity, activeCourts(venue.courts).length)}. Players share the courts and rotate between games.`,
               ]
             : []),
       ],

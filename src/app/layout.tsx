@@ -37,7 +37,7 @@ export default async function RootLayout({
         </a>
         <Header signedIn={Boolean(user)} staff={staff} />
         {children}
-        <Footer />
+        <Footer staff={staff} year={new Date().getFullYear()} />
       </body>
     </html>
   );

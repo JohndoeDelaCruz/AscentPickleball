@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/data";
+import { getSession, getCourtInventory } from "@/lib/data";
 import { dayCsv, isReportMonth, monthCsv } from "@/lib/finance";
 import {
   readAllFinanceBookings,
@@ -8,8 +8,8 @@ import {
 import { isValidDate } from "@/lib/booking";
 
 export async function GET(request: Request) {
-  const { user, staff } = await getSession();
-  if (!user || !staff)
+  const { user, staff, role } = await getSession();
+  if (!user || !staff || role === "cashier")
     return new Response("Staff access is required.", {
       status: user ? 403 : 401,
     });
@@ -23,12 +23,14 @@ export async function GET(request: Request) {
     return new Response("Choose a valid report period.", { status: 400 });
   try {
     const days = await readFinanceMonth(month);
+    const { courts } = await getCourtInventory();
     const csv = date
       ? dayCsv(
           await readAllFinanceBookings(date),
           await readFinanceDayNotes(date),
+          courts,
         )
-      : monthCsv(days);
+      : monthCsv(days, courts);
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",

@@ -1,9 +1,9 @@
 import { Suspense } from "react";
-import { getVenue } from "@/lib/data";
+import { getSession, getVenue } from "@/lib/data";
 import { localDate, addDays, isValidDate } from "@/lib/booking";
 import { createClient } from "@/lib/supabase/server";
 import { AdminCalendar } from "@/components/admin-calendar";
-import { AdminCalendarSkeleton } from "@/components/admin-skeleton";
+import { WorkspaceRouteLoading } from "@/components/workspace-route-loading";
 import type { Booking } from "@/lib/types";
 export default async function AdminPage({
   searchParams,
@@ -19,13 +19,16 @@ export default async function AdminPage({
       ? params.date
       : today;
   return (
-    <Suspense key={date} fallback={<AdminCalendarSkeleton />}>
+    <Suspense key={date} fallback={<WorkspaceRouteLoading />}>
       <CalendarData date={date} />
     </Suspense>
   );
 }
 
 async function CalendarData({ date }: { date: string }) {
+  const { staff, role } = await getSession();
+  if (!staff || role === "cashier") return null;
+  const venueRequest = getVenue();
   const supabase = await createClient();
   await supabase.rpc("expire_unpaid_holds");
   const [{ data, error }, { venue }] = await Promise.all([
@@ -34,7 +37,7 @@ async function CalendarData({ date }: { date: string }) {
       .select("*")
       .eq("booking_date", date)
       .order("start_hour"),
-    getVenue(),
+    venueRequest,
   ]);
   if (error)
     return (

@@ -19,5 +19,5 @@ export function safeRedirect(value: unknown, fallback = "/my-bookings") {
 }
 
 export function authRedirect(value: unknown, staff: boolean) {
-  return safeRedirect(value, staff ? "/admin" : "/my-bookings");
+  return safeRedirect(value, staff ? "/staff" : "/my-bookings");
 }

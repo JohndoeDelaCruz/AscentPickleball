@@ -10,6 +10,7 @@ import {
 } from "./booking";
 import type { Booking } from "./types";
 import { bookingPayments } from "./payment";
+import { courtName, defaultCourts, type Court } from "./courts";
 
 export const paymentMethods = {
   cash: "Cash",
@@ -61,16 +62,27 @@ export const financeMetrics = [
   "booking_value",
   "balance_due",
 ] as const;
-export type FinanceSummary = Record<(typeof financeMetrics)[number], number>;
+export type CourtFinance = { sales: number; hours: number };
+export type FinanceSummary = Record<(typeof financeMetrics)[number], number> & { court_totals?: Record<string, CourtFinance> };
 export type FinanceDay = FinanceSummary & { report_date: string };
 export function sumFinance(days: FinanceDay[]): FinanceSummary {
-  return Object.fromEntries(
+  const totals: FinanceSummary = Object.fromEntries(
     financeMetrics.map((key) => [
       key,
       days.reduce((sum, day) => sum + Math.round(Number(day[key]) * 100), 0) /
         100,
     ]),
-  ) as FinanceSummary;
+  ) as Record<(typeof financeMetrics)[number], number>;
+  const ids = new Set(days.flatMap((day) => Object.keys(day.court_totals ?? {})));
+  if (ids.size) totals.court_totals = Object.fromEntries([...ids].map((id) => [id, {
+    sales: days.reduce((sum, day) => sum + Math.round((day.court_totals?.[id]?.sales ?? 0) * 100), 0) / 100,
+    hours: days.reduce((sum, day) => sum + (day.court_totals?.[id]?.hours ?? 0), 0),
+  }]));
+  return totals;
+}
+export function courtFinance(day: FinanceSummary, id: number): CourtFinance {
+  return day.court_totals?.[id] ?? (id === 1 ? { sales: day.court_1_sales, hours: day.court_1_hours }
+    : id === 2 ? { sales: day.court_2_sales, hours: day.court_2_hours } : { sales: 0, hours: 0 });
 }
 export function isReportMonth(value: unknown): value is string {
   return (
@@ -97,10 +109,10 @@ export function bookingPaymentMethod(b: FinanceBooking): PaymentMethod {
     b.booking_finance?.payment_method ?? (b.user_id ? "gcash" : "unspecified")
   );
 }
-export function bookingFinanceDescription(b: FinanceBooking) {
+export function bookingFinanceDescription(b: FinanceBooking, courts?: Court[]) {
   return b.booking_type === "open_play"
     ? `Open play · ${b.participant_count} ${b.participant_count === 1 ? "player" : "players"}`
-    : `Court ${b.court_id}`;
+    : courtName(courts, b.court_id);
 }
 // Neutralize spreadsheet formulas in names/notes without changing numeric data.
 export function toCsv(rows: (string | number)[][]) {
@@ -123,15 +135,13 @@ export function toCsv(rows: (string | number)[][]) {
       .join("\r\n")
   );
 }
-export function monthCsv(days: FinanceDay[]) {
+export function monthCsv(days: FinanceDay[], courts: Court[] = defaultCourts) {
   const headers = [
     "Date (PHT)",
-    "Court 1 sales (PHP)",
-    "Court 2 sales (PHP)",
+    ...courts.map((court) => `${court.name} sales (PHP)`),
     "Open-play sales (PHP)",
     "Verified collections (PHP)",
-    "Court 1 hours",
-    "Court 2 hours",
+    ...courts.map((court) => `${court.name} hours`),
     "Open-play players",
     "Cash (PHP)",
     "GCash (PHP)",
@@ -145,15 +155,19 @@ export function monthCsv(days: FinanceDay[]) {
     "Confirmed booking value (PHP)",
     "Unpaid balance (PHP)",
   ];
-  const fields = financeMetrics;
+  const fields = financeMetrics.slice(6);
   const totals = sumFinance(days);
+  const values = (day: FinanceSummary) => [
+    ...courts.map((c) => courtFinance(day, c.id).sales), day.open_play_sales, day.total_sales,
+    ...courts.map((c) => courtFinance(day, c.id).hours), ...fields.map((key) => Number(day[key])),
+  ];
   return toCsv([
     headers,
-    ...days.map((d) => [d.report_date, ...fields.map((key) => Number(d[key]))]),
-    ["MONTH TOTAL", ...fields.map((key) => totals[key])],
+    ...days.map((d) => [d.report_date, ...values(d)]),
+    ["MONTH TOTAL", ...values(totals)],
   ]);
 }
-export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
+export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes, courts?: Court[]) {
   return toCsv([
     ["Play date (PHT)", notes.report_date],
     ["Worker on duty", notes.worker_on_duty],
@@ -190,7 +204,7 @@ export function dayCsv(bookings: FinanceBooking[], notes: FinanceDayNotes) {
     ...bookings.map((b) => [
       b.reference,
       b.booking_date,
-      bookingFinanceDescription(b),
+      bookingFinanceDescription(b, courts),
       b.customer_name,
       formatHour(b.start_hour),
       formatHour(b.start_hour + b.duration),

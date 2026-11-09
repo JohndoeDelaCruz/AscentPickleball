@@ -1304,6 +1304,24 @@ img {
   display: grid;
   grid-template-columns: 95px minmax(0, 1fr) minmax(0, 1fr);
 }
+.dynamic-court-grid {
+  overflow-x: auto;
+}
+.dynamic-court-grid :is(.availability-header, .availability-row) {
+  --court-cell-width: 140px;
+  grid-template-columns: 80px repeat(var(--court-columns), minmax(var(--court-cell-width), 1fr));
+  min-width: calc(80px + var(--court-columns) * var(--court-cell-width));
+}
+.dynamic-court-grid .court-column-label {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 650px) {
+  .dynamic-court-grid :is(.availability-header, .availability-row) {
+    --court-cell-width: 105px;
+    grid-template-columns: 64px repeat(var(--court-columns), minmax(var(--court-cell-width), 1fr));
+    min-width: calc(64px + var(--court-columns) * var(--court-cell-width));
+  }
+}
 .availability-header {
   background: #f0f2e8;
   border-bottom: 1px solid var(--line);

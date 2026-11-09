@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CalendarDays, Check, Info, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { activeCourts, courtName, courtPhoto } from "@/lib/courts";
 import {
   addDays,
   canBook,
@@ -55,6 +56,7 @@ export function BookingCalendar({
   initialOpenPlay?: boolean;
   initialSession?: number;
 }) {
+  const courts = activeCourts(initialVenue.courts);
   const [mode, setMode] = useState<"court" | "open_play">(
     initialOpenPlay ? "open_play" : "court",
   );
@@ -414,19 +416,21 @@ export function BookingCalendar({
               </span>
               {loading && <span>Updating…</span>}
             </div>
-            <div className="availability-grid" aria-busy={loading}>
+            {!courts.length && <div className="notice">No active courts are available. Please contact the venue.</div>}
+            <div className="availability-grid dynamic-court-grid" aria-busy={loading} hidden={!courts.length}
+              style={{ "--court-columns": courts.length } as CSSProperties}>
               <div className="availability-header booking-court-header">
                 <div>PHT / UTC+8</div>
-                {[1, 2].map((court) => (
+                {courts.map(({ id: court, name }) => (
                   <div className="court-column-heading" key={court}>
                     <div className="court-column-photo">
                       <Image
-                        src={`/court-${court}.jpg`}
-                        alt={`Ascent Pickleball Court ${court}`}
+                        src={courtPhoto(court)}
+                        alt=""
                         fill
                         sizes="(max-width: 650px) 35vw, (max-width: 850px) 40vw, 30vw"
                       />
-                      <span className="court-column-label">Court {court}</span>
+                      <span className="court-column-label">{name}</span>
                     </div>
                   </div>
                 ))}
@@ -467,7 +471,7 @@ export function BookingCalendar({
                           </div>
                         );
                       })()
-                    : [1, 2].map((court) => {
+                    : courts.map(({ id: court, name }) => {
                         const past = isPastSlot(date, hour, now);
                         const fits =
                           calculateCourtTotal(venue, hour, duration, date) !==
@@ -494,7 +498,7 @@ export function BookingCalendar({
                               type="button"
                               className={`slot-button ${selected ? "active" : ""}`}
                               disabled={disabled}
-                              aria-label={`Court ${court}, ${formatHour(hour)}, ${sessionLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
+                              aria-label={`${name}, ${formatHour(hour)}, ${sessionLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
                               aria-pressed={selected}
                               onClick={() => selectSlot(court, hour)}
                             >
@@ -562,12 +566,12 @@ export function BookingCalendar({
             )}
             {selectedOpenSession && (
               <p>
-                One pass covers the session. Share both courts and rotate
+                One pass covers the session. Share the active courts and rotate
                 between games.
               </p>
             )}
             {selectedOpenSession && (
-              <p>{openPlayCapacityLabel(selectedOpenSession.capacity)}.</p>
+              <p>{openPlayCapacityLabel(selectedOpenSession.capacity, courts.length)}.</p>
             )}
           </div>
         ) : !selection ? (
@@ -584,7 +588,7 @@ export function BookingCalendar({
             <dl className="summary-rows">
               <div>
                 <dt>Court</dt>
-                <dd>Court {selection.court}</dd>
+                <dd>{courtName(venue.courts, selection.court)}</dd>
               </div>
               <div>
                 <dt>Date</dt>

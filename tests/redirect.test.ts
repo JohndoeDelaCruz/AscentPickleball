@@ -25,7 +25,7 @@ test("auth redirects retain local booking paths and reject external or normalize
 
 test("staff land on the dashboard and customers land on their bookings by default", () => {
   for (const value of [undefined, null, "", "https://example.com", ["/book"]]) {
-    assert.equal(authRedirect(value, true), "/admin");
+    assert.equal(authRedirect(value, true), "/staff");
     assert.equal(authRedirect(value, false), "/my-bookings");
   }
 });

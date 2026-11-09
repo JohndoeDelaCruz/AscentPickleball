@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Download, Pencil, RefreshCw } from "lucide-react";
 import {
   bookingBaseAmount,
@@ -17,6 +17,7 @@ import {
   monthLabel,
   paymentMethods,
   sumFinance,
+  courtFinance,
   type FinanceBooking,
   type FinanceDay,
   type FinanceDayNotes,
@@ -28,6 +29,10 @@ import { saveBookingFinance, saveFinanceDay } from "@/app/actions";
 import { Modal } from "./modal";
 import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
+import { defaultCourts, type Court } from "@/lib/courts";
+import { WorkspaceSkeleton } from "./workspace-skeleton";
+import { WorkspacePageHeading } from "./workspace-page-heading";
+import { WorkspaceTabs } from "./workspace-tabs";
 
 type Period = { month: string; date: string; start: string; end: string };
 export function FinanceDashboard({
@@ -37,6 +42,7 @@ export function FinanceDashboard({
   bookings,
   count,
   page,
+  courts = defaultCourts,
 }: {
   period: Period;
   days: FinanceDay[];
@@ -44,10 +50,15 @@ export function FinanceDashboard({
   bookings: FinanceBooking[];
   count: number;
   page: number;
+  courts?: Court[];
 }) {
   const router = useRouter();
+  const params = useSearchParams();
+  const view = params.get("view") === "daily" ? "daily" : "month";
   const totals = sumFinance(days);
   const daily = days.find((d) => d.report_date === period.date)!;
+  const paidMethods = (Object.keys(paymentMethods) as PaymentMethod[])
+    .filter((method) => Number(daily[`${method}_sales`]) !== 0);
   const [editing, setEditing] = useState<FinanceBooking | null>(null);
   const [balanceBooking, setBalanceBooking] = useState<FinanceBooking | null>(
     null,
@@ -57,8 +68,9 @@ export function FinanceDashboard({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [refreshing, startRefresh] = useTransition();
   const href = (date: string, nextPage = 1) =>
-    `/admin/finance?month=${period.month}&date=${date}&page=${nextPage}`;
+    `/admin/finance?month=${period.month}&date=${date}&page=${nextPage}&view=daily`;
   function saveNotes(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -78,30 +90,36 @@ export function FinanceDashboard({
   }
   return (
     <>
-      <div className="finance-heading">
-        <div>
-          <h2>Finance</h2>
-        </div>
+      <WorkspacePageHeading title="Booking finance" actions={
         <div className="finance-actions">
           <button
             className="icon-button"
             aria-label="Refresh finance reports"
-            onClick={() => router.refresh()}
+            disabled={refreshing}
+            onClick={() => startRefresh(() => router.refresh())}
           >
             <RefreshCw size={16} />
           </button>
           <a
             className="button button-dark button-small"
-            href={`/admin/finance/export?month=${period.month}`}
+            href={`/admin/finance/export?month=${period.month}${view === "daily" ? `&date=${period.date}` : ""}`}
             download
           >
-            <Download size={15} /> Monthly CSV
+            <Download size={15} /> Export {view === "daily" ? "day" : "month"}
           </a>
         </div>
-      </div>
+      } />
+      {!refreshing && <WorkspaceTabs id="finance" label="Booking finance views" value={view}
+        items={[{ id: "month", label: "Monthly summary" }, { id: "daily", label: "Daily ledger" }]} onChange={(next) => {
+          const url = new URL(window.location.href);
+          url.searchParams.set("view", next);
+          window.history.replaceState(null, "", url);
+        }} />}
+      {refreshing && <WorkspaceSkeleton view="finance" financeView={view} heading={false} courtCount={courts.length} />}
+      <div hidden={refreshing}>
+      <div id="finance-panel-month" role="tabpanel" aria-labelledby="finance-tab-month" hidden={view !== "month"} tabIndex={0}>
       <div className="finance-toolbar">
         <div>
-          <span className="eyebrow">MONTHLY SUMMARY</span>
           <h3>{monthLabel(period.month)}</h3>
         </div>
         <label className="field">
@@ -113,7 +131,7 @@ export function FinanceDashboard({
             max="2100-12"
             onChange={(e) =>
               e.target.value &&
-              router.push(`/admin/finance?month=${e.target.value}`)
+              router.push(`/admin/finance?month=${e.target.value}&view=month`)
             }
           />
         </label>
@@ -129,9 +147,9 @@ export function FinanceDashboard({
         </div>
         <div className="panel stat-card">
           <span>Private court hours</span>
-          <strong>{totals.court_1_hours + totals.court_2_hours}</strong>
+          <strong>{courts.reduce((sum, court) => sum + courtFinance(totals, court.id).hours, 0)}</strong>
           <small>
-            Court 1: {totals.court_1_hours} · Court 2: {totals.court_2_hours}
+            {courts.length} courts · includes inactive courts
           </small>
         </div>
         <div className="panel stat-card">
@@ -155,13 +173,16 @@ export function FinanceDashboard({
           <small>Not yet verified</small>
         </div>
       </div>
-      <p className="small-print finance-report-note">
+      <details className="workspace-disclosure finance-report-note">
+        <summary>How this report is calculated</summary>
+        <p className="small-print">
         Collections include verified payments for confirmed reservations,
         assigned to the Philippine play date. Reservation fees count only as the
         amount collected. Unpaid balances are separate. Court/pass and equipment
         collections are allocated proportionally. Cancelled, expired, and
         pending reservations are excluded. Refunds are outside this report.
-      </p>
+        </p>
+      </details>
       <section className="panel finance-month-panel">
         <div className="table-scroll">
           <table className="admin-table finance-month-table">
@@ -171,14 +192,12 @@ export function FinanceDashboard({
             <thead>
               <tr>
                 <th scope="col">Date</th>
-                <th scope="col">Court 1 sales</th>
-                <th scope="col">Court 2 sales</th>
+                {courts.map((court) => <th scope="col" key={`sales-${court.id}`}>{court.name} sales</th>)}
                 <th scope="col">Open play</th>
                 <th scope="col">Equipment</th>
                 <th scope="col">Collected</th>
                 <th scope="col">Balance due</th>
-                <th scope="col">Court 1 hours</th>
-                <th scope="col">Court 2 hours</th>
+                {courts.map((court) => <th scope="col" key={`hours-${court.id}`}>{court.name} hours</th>)}
                 <th scope="col">Open-play players</th>
               </tr>
             </thead>
@@ -204,16 +223,14 @@ export function FinanceDashboard({
                       })}
                     </Link>
                   </th>
-                  <td>{money(d.court_1_sales)}</td>
-                  <td>{money(d.court_2_sales)}</td>
+                  {courts.map((court) => <td key={`sales-${court.id}`}>{money(courtFinance(d, court.id).sales)}</td>)}
                   <td>{money(d.open_play_sales)}</td>
                   <td>{money(d.equipment_sales)}</td>
                   <td>
                     <strong>{money(d.total_sales)}</strong>
                   </td>
                   <td>{money(d.balance_due)}</td>
-                  <td>{d.court_1_hours}</td>
-                  <td>{d.court_2_hours}</td>
+                  {courts.map((court) => <td key={`hours-${court.id}`}>{courtFinance(d, court.id).hours}</td>)}
                   <td>{d.open_play_players}</td>
                 </tr>
               ))}
@@ -221,24 +238,22 @@ export function FinanceDashboard({
             <tfoot>
               <tr>
                 <th scope="row">Month total</th>
-                <td>{money(totals.court_1_sales)}</td>
-                <td>{money(totals.court_2_sales)}</td>
+                {courts.map((court) => <td key={`sales-${court.id}`}>{money(courtFinance(totals, court.id).sales)}</td>)}
                 <td>{money(totals.open_play_sales)}</td>
                 <td>{money(totals.equipment_sales)}</td>
                 <td>{money(totals.total_sales)}</td>
                 <td>{money(totals.balance_due)}</td>
-                <td>{totals.court_1_hours}</td>
-                <td>{totals.court_2_hours}</td>
+                {courts.map((court) => <td key={`hours-${court.id}`}>{courtFinance(totals, court.id).hours}</td>)}
                 <td>{totals.open_play_players}</td>
               </tr>
             </tfoot>
           </table>
         </div>
       </section>
-      <section className="finance-daily-section" aria-label="Daily finance log">
+      </div>
+      <section id="finance-panel-daily" role="tabpanel" aria-labelledby="finance-tab-daily" hidden={view !== "daily"} tabIndex={0} className="finance-daily-section" aria-label="Daily finance log">
         <div className="finance-toolbar">
           <div>
-            <span className="eyebrow">DAILY LOG</span>
             <h3>{formatDate(period.date)}</h3>
           </div>
           <div className="finance-actions">
@@ -254,26 +269,14 @@ export function FinanceDashboard({
                 }
               />
             </label>
-            <a
-              className="button button-outline button-small"
-              href={`/admin/finance/export?month=${period.month}&date=${period.date}`}
-              download
-            >
-              <Download size={15} /> Daily CSV
-            </a>
           </div>
         </div>
         <div className="finance-day-totals">
-          <div>
-            <span>Court 1 sales</span>
-            <strong>{money(daily.court_1_sales)}</strong>
-            <small>{daily.court_1_hours} private court hours</small>
-          </div>
-          <div>
-            <span>Court 2 sales</span>
-            <strong>{money(daily.court_2_sales)}</strong>
-            <small>{daily.court_2_hours} private court hours</small>
-          </div>
+          {courts.map((court) => <div key={court.id}>
+            <span>{court.name} sales{!court.active && " · Inactive"}</span>
+            <strong>{money(courtFinance(daily, court.id).sales)}</strong>
+            <small>{courtFinance(daily, court.id).hours} private court hours</small>
+          </div>)}
           <div>
             <span>Open-play sales</span>
             <strong>{money(daily.open_play_sales)}</strong>
@@ -285,28 +288,19 @@ export function FinanceDashboard({
             <small>{daily.confirmed_bookings} reservations</small>
           </div>
         </div>
-        <p className="small-print">
+        {Number(daily.equipment_sales) !== 0 && <p className="small-print">
           Equipment rental sales:{" "}
           <strong>{money(daily.equipment_sales)}</strong>. Included in the day’s
           collections; court and open-play amounts above exclude rental.
-        </p>
-        <div className="finance-payment-totals">
-          {(
-            [
-              "cash",
-              "gcash",
-              "bank_transfer",
-              "card",
-              "other",
-              "unspecified",
-            ] as const
-          ).map((method) => (
+        </p>}
+        {paidMethods.length > 0 ? <div className="finance-payment-totals">
+          {paidMethods.map((method) => (
             <div key={method}>
               <span>{paymentMethods[method]}</span>
               <strong>{money(daily[`${method}_sales`])}</strong>
             </div>
           ))}
-        </div>
+        </div> : <p className="small-print">No recorded payments for this date.</p>}
         {Number(daily.unspecified_sales) > 0 && (
           <div className="notice notice-warning">
             Some confirmed walk-ins have no recorded payment method. Use “Edit”
@@ -385,7 +379,7 @@ export function FinanceDashboard({
                   bookings.map((b) => (
                     <tr key={b.id}>
                       <td>
-                        <strong>{bookingFinanceDescription(b)}</strong>
+                        <strong>{bookingFinanceDescription(b, courts)}</strong>
                         <small>
                           {formatHour(b.start_hour)}–
                           {formatHour(b.start_hour + b.duration)}
@@ -504,6 +498,7 @@ export function FinanceDashboard({
           </div>
         </section>
       </section>
+      </div>
       {editing && (
         <FinanceBookingEditor
           booking={editing}

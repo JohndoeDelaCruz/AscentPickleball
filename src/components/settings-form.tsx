@@ -1,7 +1,8 @@
 "use client";
-import { useRef, useState, useTransition, type ComponentProps } from "react";
+import { useEffect, useRef, useState, useTransition, type ComponentProps } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, Save, Upload } from "lucide-react";
+import { Check, Save, Upload, Building2, Package, QrCode, ShieldCheck, CalendarDays, ArrowUpRight } from "lucide-react";
 import { saveVenueSetting, saveSettings } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -12,7 +13,21 @@ import {
 import type { VenueSettings } from "@/lib/types";
 import { TypedSettingField } from "./typed-setting-field";
 import { ScheduleEditor } from "./schedule-editor";
+import { CourtManager } from "./court-manager";
+import { activeCourts, defaultCourts } from "@/lib/courts";
 import type { IndividualSettingKey } from "@/lib/venue-setting";
+import { WorkspacePageHeading } from "./workspace-page-heading";
+import { WorkspaceTabs } from "./workspace-tabs";
+
+const sections = [
+  { id: "details", label: "Venue details" },
+  { id: "courts", label: "Courts" },
+  { id: "schedule", label: "Hours & rates" },
+  { id: "payments", label: "Payments" },
+  { id: "equipment", label: "Rentals & limits" },
+  { id: "policy", label: "Booking rules" },
+] as const;
+type SettingsSection = (typeof sections)[number]["id"];
 
 type SettingFieldOptions = Pick<
   ComponentProps<typeof TypedSettingField>,
@@ -20,8 +35,10 @@ type SettingFieldOptions = Pick<
 >;
 type FieldFeedback = { error?: string; message?: string };
 
-export function SettingsForm({ initial }: { initial: VenueSettings }) {
+export function SettingsForm({ initial, courtsReady = false }: { initial: VenueSettings; courtsReady?: boolean }) {
   const [venue, setVenue] = useState(initial);
+  const [section, setSection] = useState<SettingsSection>("details");
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -36,11 +53,27 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
     Partial<Record<IndividualSettingKey, HTMLInputElement | null>>
   >({});
   const router = useRouter();
+  useEffect(() => {
+    const syncSection = () => {
+      const next = sections.find((item) => `#venue-${item.id}` === window.location.hash);
+      setSection(next?.id ?? "details");
+    };
+    syncSection();
+    window.addEventListener("hashchange", syncSection);
+    return () => window.removeEventListener("hashchange", syncSection);
+  }, []);
+  function selectSection(next: SettingsSection) {
+    setSection(next);
+    const url = new URL(window.location.href);
+    url.hash = `venue-${next}`;
+    window.history.replaceState(null, "", url);
+  }
   function update<K extends keyof VenueSettings>(
     key: K,
     value: VenueSettings[K],
   ) {
     setVenue((old) => ({ ...old, [key]: value }));
+    setDirty(true);
     setMessage("");
   }
   async function upload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -80,9 +113,21 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
       setUploading(false);
     }
   }
-  function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (fieldPending) return;
+    if (pending || fieldPending || uploading) return;
+    // Hidden panels stay mounted to preserve drafts. Reveal invalid fields before
+    // asking the browser to focus them, including fields on a different tab.
+    const invalid = Array.from(event.currentTarget.elements).find((field) =>
+      (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)
+      && field.willValidate && !field.validity.valid,
+    ) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | undefined;
+    if (invalid) {
+      const target = invalid.closest<HTMLElement>("[data-settings-section]")?.dataset.settingsSection;
+      if (sections.some((item) => item.id === target)) flushSync(() => selectSection(target as SettingsSection));
+      invalid.reportValidity();
+      return;
+    }
     setError("");
     setMessage("");
     startTransition(async () => {
@@ -90,6 +135,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
       if (result.error) setError(result.error);
       else {
         setFieldFeedback({});
+        setDirty(false);
         setMessage("Settings saved. Your website is up to date.");
         router.refresh();
       }
@@ -120,7 +166,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             [key]: {
               message:
                 key === "open_play_capacity"
-                  ? `Player limit applied. ${openPlayCapacityLabel(value)}.`
+                  ? `Player limit applied. ${openPlayCapacityLabel(value, activeCourts(venue.courts).length)}.`
                   : "Applied.",
             },
           }));
@@ -169,14 +215,15 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             fieldInputs.current[key] = input;
           }}
           disabled={pending || fieldPending}
-          onDraftChange={() =>
-            setFieldFeedback((old) => ({ ...old, [key]: {} }))
-          }
+          onDraftChange={() => {
+            setDirty(true);
+            setFieldFeedback((old) => ({ ...old, [key]: {} }));
+          }}
           onChange={(value) => update(key, value)}
           action={
             <button
               type="button"
-              className="button button-dark button-small"
+              className="console-button primary"
               aria-label={
                 key === "open_play_capacity"
                   ? "Apply player limit"
@@ -237,13 +284,29 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
   );
   return (
     <>
-      <ScheduleEditor initial={initial} />
-      <div className="settings-layout">
-        <form className="panel form-stack" onSubmit={submit}>
-          <div>
-            <h2 className="form-section-title">Venue settings</h2>
-          </div>
-          <h3 className="form-section-title">The basics</h3>
+      <WorkspacePageHeading title="Venue settings" actions={<>
+          <a className="console-button" href="/" target="_blank" rel="noreferrer">View website <ArrowUpRight size={15} /></a>
+          {section !== "courts" && section !== "schedule" &&
+          <button type="submit" form="venue-settings-form" className="console-button primary" disabled={pending || fieldPending || uploading}>
+            <Save size={16} />{pending ? "Saving…" : "Save changes"}
+          </button>}
+      </>} />
+      <div className="settings-status-bar">
+        <span><CalendarDays size={16} />{activeCourts(venue.courts).length} active courts</span>
+        <span className={dirty ? "settings-unsaved" : ""}>{dirty ? "Unsaved venue changes" : "Saved venue settings"}</span>
+      </div>
+      <WorkspaceTabs id="settings" label="Venue settings sections" items={sections} value={section} onChange={selectSection} />
+      <div className="venue-settings-layout">
+        <div className="venue-settings-main">
+        <div id="settings-panel-courts" role="tabpanel" aria-labelledby="settings-tab-courts" hidden={section !== "courts"} tabIndex={0}>
+        <CourtManager initial={initial.courts ?? defaultCourts} ready={courtsReady}
+          onChange={(courts) => setVenue((old) => ({ ...old, courts }))} />
+        </div>
+        <form id="venue-settings-form" className="venue-settings-form" onSubmit={submit} noValidate hidden={section === "courts" || section === "schedule"}>
+          <section id="settings-panel-details" data-settings-section="details" role="tabpanel" aria-labelledby="settings-tab-details" hidden={section !== "details"} tabIndex={0} className="console-panel settings-card">
+            <header className="settings-card-heading"><span className="settings-card-icon"><Building2 size={20} /></span><div><h2>Venue details</h2></div></header>
+          <div className="settings-card-body">
+          <div className="field-grid settings-details-grid">
           {textField("name", "Venue name")}
           {textField("tagline", "A short introduction")}
           {textField(
@@ -251,6 +314,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             "Street address",
             "Add your venue address later",
           )}
+          </div>
           <div className="field-grid">
             {textField("city", "City / municipality", "Add your city later")}
             {textField(
@@ -272,8 +336,11 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               "url",
             )}
           </div>
-          <hr className="form-divider" />
-          <h3 className="form-section-title">Equipment & booking defaults</h3>
+          </div>
+          </section>
+          <section id="settings-panel-equipment" data-settings-section="equipment" role="tabpanel" aria-labelledby="settings-tab-equipment" hidden={section !== "equipment"} tabIndex={0} className="console-panel settings-card">
+            <header className="settings-card-heading"><span className="settings-card-icon"><Package size={20} /></span><div><h2>Rentals & booking limits</h2></div></header>
+          <div className="settings-card-body">
           <div className="field-grid">
             {numericField("equipment_rental_price", {
               label: "Equipment rental package (PHP)",
@@ -300,11 +367,13 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               max: 120,
             })}
           </div>
-          <hr className="form-divider" />
-          <h3 className="form-section-title">Your GCash QR</h3>
+          </div>
+          </section>
+          <section id="settings-panel-payments" data-settings-section="payments" role="tabpanel" aria-labelledby="settings-tab-payments" hidden={section !== "payments"} tabIndex={0} className="console-panel settings-card">
+            <header className="settings-card-heading"><span className="settings-card-icon"><QrCode size={20} /></span><div><h2>GCash payments</h2></div></header>
+          <div className="settings-card-body">
           <p className="small-print">
-            Use the QR image exported from GCash. Customers pay you directly;
-            staff checks incoming payments and confirms reservations.
+            Upload your GCash QR. Staff must verify incoming payments before confirming bookings.
           </p>
           <div className="field-grid">
             {textField(
@@ -327,16 +396,7 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
           )}
           <label className="field">
             <span>Or upload your QR image</span>
-            <div
-              style={{
-                padding: 18,
-                border: "1px dashed #c6d3b2",
-                borderRadius: 7,
-                display: "flex",
-                alignItems: "center",
-                gap: 13,
-              }}
-            >
+            <div className="settings-qr-upload">
               <Upload size={20} />
               <input
                 type="file"
@@ -372,8 +432,11 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               </p>
             </div>
           )}
-          <hr className="form-divider" />
-          <h3 className="form-section-title">Booking policy</h3>
+          </div>
+          </section>
+          <section id="settings-panel-policy" data-settings-section="policy" role="tabpanel" aria-labelledby="settings-tab-policy" hidden={section !== "policy"} tabIndex={0} className="console-panel settings-card">
+            <header className="settings-card-heading"><span className="settings-card-icon"><ShieldCheck size={20} /></span><div><h2>Booking rules</h2></div></header>
+          <div className="settings-card-body">
           <label className="field">
             <span>Cancellation & refund policy</span>
             <textarea
@@ -403,6 +466,8 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               </small>
             </span>
           </label>
+          </div>
+          </section>
           {error && (
             <div className="error-message" role="alert">
               {error}
@@ -413,22 +478,25 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
               {message}
             </div>
           )}
-          <div className="settings-save">
+          <div className="settings-save workspace-save-bar">
             <button
-              className="button button-dark"
+              className="console-button primary"
               disabled={pending || fieldPending || uploading}
             >
               <Save size={16} />
               {pending ? "Saving…" : "Save venue settings"}
             </button>
             <span className="small-print">
-              Changes appear on the website after saving.
+              Courts and hours are saved in their own sections.
             </span>
           </div>
         </form>
-        <aside className="panel settings-aside">
-          <span className="eyebrow">GETTING READY TO PLAY</span>
-          <h3 style={{ marginTop: 13 }}>Your launch checklist</h3>
+        <section id="settings-panel-schedule" role="tabpanel" aria-labelledby="settings-tab-schedule" hidden={section !== "schedule"} tabIndex={0} className="venue-schedule-section">
+          <ScheduleEditor initial={initial} />
+        </section>
+        </div>
+        <details className="console-panel settings-readiness workspace-disclosure">
+          <summary>Booking setup <span className={`status-pill ${canBook(venue) ? "status-ok" : "status-pending"}`}>{canBook(venue) ? "Ready" : "Needs attention"}</span></summary>
           <ul style={{ listStyle: "none", padding: 0 }}>
             {[
               [
@@ -452,11 +520,10 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
             ].map(([label, done]) => (
               <li
                 key={String(label)}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
+                className={done ? "checklist-done" : ""}
               >
                 <Check
-                  size={13}
-                  style={{ color: done ? "#49752c" : "#c7ceba" }}
+                  size={16}
                 />
                 {label}
               </li>
@@ -468,15 +535,12 @@ export function SettingsForm({ initial }: { initial: VenueSettings }) {
           >
             <span>
               {canBook(venue)
-                ? "Your settings are ready for reservations. Remember to save your changes."
-                : "Reservations stay closed until the required details are set and you enable booking."}
+                ? "Required details are complete. Save any changes to publish them."
+                : "Complete the required details and enable online reservations in Booking rules."}
             </span>
           </div>
-          <p style={{ marginTop: 20, marginBottom: 0 }}>
-            Payment references need a manual check in GCash. The website never
-            sends or refunds money automatically.
-          </p>
-        </aside>
+          <button type="button" onClick={() => selectSection("schedule")} className="console-button settings-schedule-link">Edit hours & rates <CalendarDays size={16} /></button>
+        </details>
       </div>
     </>
   );

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import { changePassword } from "@/app/account/actions";
+import { changePassword } from "@/app/(workspace)/account/actions";
 import { TurnstileCheck } from "./turnstile-check";
 
 const fields = [

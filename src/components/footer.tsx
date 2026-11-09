@@ -1,8 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 import { Brand } from "./brand";
 import { Starburst } from "./starburst";
-export function Footer() {
+import { isWorkspacePath } from "@/lib/workspace";
+export function Footer({ staff, year }: { staff: boolean; year: number }) {
+  const path = usePathname();
+  if (staff && isWorkspacePath(path)) return null;
   return (
     <footer className="site-footer">
       <div className="container footer-top">
@@ -22,7 +28,7 @@ export function Footer() {
           <Link href="/membership">Membership</Link>
           <Link href="/court-rules">Court rules</Link>
           <Link href="/#faq">Questions & answers</Link>
-          <Link href="/admin">Staff access</Link>
+          <Link href="/staff">Staff access</Link>
         </div>
         <div className="footer-note">
           <span className="eyebrow">SEE YOU ON COURT</span>
@@ -34,7 +40,7 @@ export function Footer() {
         </div>
       </div>
       <div className="container footer-bottom">
-        <span>© {new Date().getFullYear()} Ascent Pickleball</span>
+        <span>© {year} Ascent Pickleball</span>
         <span>
           Made for the love of the game. <Starburst className="tiny-ball" />
         </span>

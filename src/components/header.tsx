@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowUpRight, Menu, X, LogOut, UserRound } from "lucide-react";
 import { Brand } from "./brand";
 import { createClient } from "@/lib/supabase/client";
+import { isWorkspacePath } from "@/lib/workspace";
 
 export function Header({
   signedIn,
@@ -18,6 +19,7 @@ export function Header({
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  if (staff && isWorkspacePath(pathname)) return null;
   async function signOut() {
     await createClient().auth.signOut();
     setOpen(false);
@@ -55,7 +57,7 @@ export function Header({
           ) : (
             <>
               <Link
-                href={staff ? "/admin" : signedIn ? "/my-bookings" : "/login"}
+                href={staff ? "/staff" : signedIn ? "/my-bookings" : "/login"}
                 className="nav-account"
               >
                 {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
@@ -67,7 +69,7 @@ export function Header({
                 Book a court <ArrowUpRight size={16} />
               </Link>
               <Link
-                href={signedIn ? (staff ? "/admin" : "/book") : "/login"}
+                href={signedIn ? (staff ? "/staff" : "/book") : "/login"}
                 className="button button-dark button-small nav-mobile-primary"
                 onClick={() => setOpen(false)}
               >
@@ -128,7 +130,7 @@ export function Header({
                 My bookings
               </Link>
               {staff && (
-                <Link href="/admin" onClick={() => setOpen(false)}>
+                <Link href="/staff" onClick={() => setOpen(false)}>
                   Dashboard
                 </Link>
               )}

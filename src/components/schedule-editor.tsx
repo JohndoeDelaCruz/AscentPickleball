@@ -350,7 +350,7 @@ export function ScheduleEditor({ initial }: { initial: VenueSettings }) {
                   <small>
                     {block.kind === "court"
                       ? "per court"
-                      : "across both courts"}
+                      : "across active courts"}
                   </small>
                 </td>
                 <td>

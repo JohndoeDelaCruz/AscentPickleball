@@ -168,7 +168,11 @@ export function hasOpenPlay(venue: VenueSettings, date: string) {
     );
   return venue.open_play_enabled && isWeekend(date);
 }
-export function openPlayCapacityLabel(capacity: number | null) {
+export function openPlayCapacityLabel(capacity: number | null, courtCount = 2) {
+  if (courtCount !== 2)
+    return capacity === null
+      ? "No player limit for the session"
+      : `${capacity} ${capacity === 1 ? "player" : "players"} total per session`;
   if (capacity === null) return "No player limit across both courts";
   const total = `${capacity} ${capacity === 1 ? "player" : "players"} total`;
   if (capacity % 2 !== 0) return `${total} across both courts`;
@@ -219,6 +223,7 @@ export function isSlotAvailable(
   );
 }
 export function canBook(venue: VenueSettings) {
+  if (venue.courts && !venue.courts.some((court) => court.active)) return false;
   if (venue.schedule_config)
     return (
       venue.booking_enabled && Boolean(venue.gcash_qr_url && venue.gcash_name)
@@ -240,7 +245,7 @@ export const bookingSchema = z.object({
   payment_option: paymentOptionSchema.default("full"),
   equipment_rental: z.boolean().default(false),
   equipment_quantity: z.number().int().min(0).max(100).optional(),
-  court_id: z.coerce.number().int().min(1).max(2),
+  court_id: z.coerce.number().int().min(1).max(32767),
   booking_date: z.iso.date(),
   start_hour: z.coerce.number().int().min(0).max(23),
   duration: z.coerce.number().int().min(1).max(4),
