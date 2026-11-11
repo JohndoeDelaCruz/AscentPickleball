@@ -1592,10 +1592,16 @@ img {
   justify-items: center;
   align-items: safe center;
   padding: clamp(20px, 4svh, 40px) 16px;
-  background: radial-gradient(ellipse at top, #fbfbfc, #f3f3f6);
+  background: radial-gradient(ellipse at 22% 0%, #eaf2df, #f6f7f4 72%);
+}
+.auth-layout {
+  width: min(100%, 440px);
+}
+.auth-court-photo {
+  display: none;
 }
 .auth-card {
-  width: min(100%, 440px);
+  min-width: 0;
   padding: 32px;
   border: 1px solid #e9e9ed;
   border-radius: 26px;
@@ -1699,11 +1705,55 @@ img {
   line-height: 1.5;
   text-align: center;
 }
+@media (min-width: 850px) {
+  .auth-layout {
+    width: min(100%, 980px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+    align-items: center;
+    gap: clamp(24px, 3vw, 36px);
+  }
+  .auth-court-photo {
+    display: block;
+    position: relative;
+    aspect-ratio: 1 / 1.03;
+    overflow: hidden;
+    border: 1px solid #24473621;
+    border-radius: 26px;
+    background: #dce7d1;
+    box-shadow: 0 14px 44px #2447361a;
+  }
+  .auth-court-photo img {
+    object-fit: cover;
+    object-position: 53% center;
+  }
+}
 @media (max-width: 600px) {
   .auth-section {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
     align-items: start;
     padding: 24px 20px;
-    background: #fff;
+    background: linear-gradient(165deg, #edf4e2, #fff 225px);
+  }
+  .auth-section::before {
+    --court-line: #5d845230;
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: -44px;
+    right: -48px;
+    width: 252px;
+    aspect-ratio: 2.2;
+    border: 1px solid var(--court-line);
+    border-radius: 3px;
+    background:
+      linear-gradient(var(--court-line), var(--court-line)) center / 100% 1px no-repeat,
+      linear-gradient(90deg, transparent calc(50% - 0.5px), var(--court-line) 0 calc(50% + 0.5px), transparent 0)
+        left / calc(100% / 3) 100%;
+    transform: rotate(-24deg);
+    pointer-events: none;
   }
   .auth-card {
     padding: 0;
