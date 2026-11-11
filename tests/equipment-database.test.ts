@@ -101,7 +101,7 @@ test("multiple equipment sets retain prices, payments, access controls, and requ
     assert.deepEqual(
       (
         await db.query<{ b: unknown }>(
-          "select to_jsonb(b)-'equipment_quantity'-'equipment_unit_price' b from public.bookings b where id=$1",
+          "select to_jsonb(b)-array['equipment_quantity','equipment_unit_price','payment_submitted_at','payment_rejected_at'] b from public.bookings b where id=$1",
           [old],
         )
       ).rows[0].b,

@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
 import {
   addDays,
@@ -18,7 +19,7 @@ import {
   calculateReservationTotal,
   privateEquipmentLimit,
 } from "@/lib/booking";
-import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
+import { bookingStatusLabel, type Booking, type VenueSettings } from "@/lib/types";
 import {
   staffCreateBooking,
   staffSetStatus,
@@ -98,6 +99,9 @@ export function AdminCalendar({
           <strong>
             {active.filter((b) => b.status === "awaiting_verification").length}
           </strong>
+          <Link className="text-link" href="/staff?tab=bookings&review=1">
+            Open GCash review queue
+          </Link>
         </div>
         <div className="panel stat-card">
           <span>Confirmed booking value</span>
@@ -174,7 +178,7 @@ export function AdminCalendar({
                     >
                       {b.status === "blocked"
                         ? b.customer_name
-                        : `${b.customer_name} · ${statusLabels[b.status]}`}
+                        : `${b.customer_name} · ${bookingStatusLabel(b)}`}
                     </span>
                   ) : (
                     <span
@@ -310,7 +314,7 @@ export function AdminCalendar({
                     <td>{b.payment_reference || "—"}</td>
                     <td>
                       <span className={`status-badge status-${b.status}`}>
-                        {statusLabels[b.status]}
+                        {bookingStatusLabel(b)}
                       </span>
                     </td>
                     <td>

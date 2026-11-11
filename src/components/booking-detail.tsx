@@ -17,7 +17,7 @@ import {
   money,
   equipmentBookingLabel,
 } from "@/lib/booking";
-import { statusLabels, type Booking, type VenueSettings } from "@/lib/types";
+import { bookingStatusLabel, type Booking, type VenueSettings } from "@/lib/types";
 import { bookingPayments } from "@/lib/payment";
 
 export function BookingDetail({
@@ -117,7 +117,7 @@ export function BookingDetail({
               <h2 style={{ margin: "10px 0 0" }}>{b.reference}</h2>
             </div>
             <span className={`status-badge status-${b.status}`}>
-              {statusLabels[b.status]}
+              {bookingStatusLabel(b)}
             </span>
           </div>
           <dl className="summary-rows">
@@ -262,7 +262,17 @@ export function BookingDetail({
               </span>
             </div>
           )}
-          {b.status === "cancelled" && (
+          {b.status === "cancelled" && b.payment_rejected_at && (
+            <div className="notice notice-warning">
+              <Info size={18} />
+              <span>
+                <strong>We couldn’t match your GCash reference to a payment.</strong>
+                <br />
+                Your reservation was cancelled and the slot was released. If you sent money, contact the venue with your booking and GCash references before paying again.
+              </span>
+            </div>
+          )}
+          {b.status === "cancelled" && !b.payment_rejected_at && (
             <div className="notice">
               <Info size={18} />
               <span>

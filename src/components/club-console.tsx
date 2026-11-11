@@ -52,6 +52,7 @@ type Modal =
   | "refund"
   | "balance"
   | "verify"
+  | "reject-payment"
   | "receipt"
   | null;
 const dateLabel = (value: string) =>
@@ -121,7 +122,7 @@ export function ClubConsole({
     const controls = () =>
       Array.from(
         dialog?.querySelectorAll<HTMLElement>(
-          "button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href]",
+          "button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]",
         ) ?? [],
       );
     const first = controls()[0];
@@ -151,9 +152,23 @@ export function ClubConsole({
   const manager = data.role === "owner" || data.role === "manager";
   const shift = data.shifts.find((s) => !s.closed_at);
   const metrics = reportFor(data, date);
-  const pending = data.bookings.filter(
+  const pending = data.paymentReviews ?? data.bookings.filter(
     (b) => b.status === "awaiting_verification",
   );
+  const overdue = data.paymentReviews?.filter((b) => b.overdue).length ?? 0;
+  const reviewOnly = params.get("review") === "1";
+  const reviewingPayment = modal === "verify" || modal === "reject-payment";
+  const reservationRows = (reviewOnly ? pending : data.bookings).filter((b) =>
+    `${b.customer_name} ${b.reference}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  const paymentReviews = new Map(data.paymentReviews?.map((b) => [b.id, b]));
+  useEffect(() => {
+    if ((tab !== "overview" && tab !== "bookings") || modal || isNavigating || !data.ready) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [tab, modal, isNavigating, data.ready, router]);
   const setPendingCount = workspace?.setPendingCount;
   useEffect(() => {
     setPendingCount?.(pending.length);
@@ -175,9 +190,11 @@ export function ClubConsole({
     "All items",
     ...new Set(activeProducts.map((p) => p.category)),
   ];
-  function go(t: Tab) {
+  function go(t: Tab, paymentReview = false) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", t);
+    if (paymentReview) url.searchParams.set("review", "1");
+    else url.searchParams.delete("review");
     window.history.replaceState(null, "", url);
   }
   function open(type: Modal, item: typeof selected = null) {
@@ -361,6 +378,13 @@ export function ClubConsole({
           await run(
             { op: "verify", id: selected!.id, verified: true },
             "Payment verified. Booking confirmed.",
+          );
+          break;
+        case "reject-payment":
+          if (!verified) throw new Error("Confirm that you checked the GCash account.");
+          await run(
+            { op: "reject_payment", id: selected!.id, reason: text("reason"), verified: true },
+            "Payment reference rejected. Availability released.",
           );
           break;
         case "balance":
@@ -656,13 +680,14 @@ export function ClubConsole({
                   </div>
                   <button
                     className="attention-row"
-                    onClick={() => go("bookings")}
+                    onClick={() => go("bookings", true)}
                   >
                     <span className="attention-icon lavender">
                       <QrCode size={20} />
                     </span>
                     <span>
                       <strong>Payments to verify</strong>
+                      {overdue > 0 && <small className="review-overdue">{overdue} overdue</small>}
                     </span>
                     <b>{pending.length}</b>
                     <ChevronRight size={15} />
@@ -908,8 +933,27 @@ export function ClubConsole({
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <span className="subtle-pill">{pending.length} to verify</span>
               </div>
+              <div className="category-tabs payment-review-tabs" role="group" aria-label="Reservation views">
+                <button type="button" aria-pressed={!reviewOnly} className={!reviewOnly ? "active" : ""}
+                  onClick={() => go("bookings")}>
+                  All reservations
+                </button>
+                <button type="button" aria-pressed={reviewOnly} className={reviewOnly ? "active" : ""}
+                  onClick={() => go("bookings", true)}>
+                  GCash review ({pending.length})
+                </button>
+              </div>
+              {reviewOnly && !data.paymentReviews && (
+                <p className="payment-review-notice" role="status">
+                  The full GCash review queue is unavailable. Showing payments from the selected reservation period. Check migration 018 and refresh.
+                </p>
+              )}
+              {reviewOnly && overdue > 0 && (
+                <p className="payment-review-notice review-overdue" role="status">
+                  {overdue === 1 ? "1 payment review is overdue." : `${overdue} payment reviews are overdue.`} Check your GCash account to verify or reject the references.
+                </p>
+              )}
               <div className="console-table-wrap">
                 <table className="console-table">
                   <thead>
@@ -922,13 +966,9 @@ export function ClubConsole({
                     </tr>
                   </thead>
                   <tbody>
-                    {data.bookings
-                      .filter((b) =>
-                        `${b.customer_name} ${b.reference}`
-                          .toLowerCase()
-                          .includes(search.toLowerCase()),
-                      )
-                      .map((b) => (
+                    {reservationRows.map((b) => {
+                      const review = paymentReviews.get(b.id);
+                      return (
                         <tr key={b.id}>
                           <td>
                             <strong>{b.customer_name}</strong>
@@ -958,8 +998,11 @@ export function ClubConsole({
                             <span
                               className={`status-pill ${b.status === "confirmed" ? "status-ok" : b.status.includes("awaiting") ? "status-pending" : "status-muted"}`}
                             >
-                              {statusName(b.status)}
+                              {review?.overdue ? "Review overdue" : statusName(b.status)}
                             </span>
+                            {reviewOnly && review?.payment_submitted_at && (
+                              <small>Submitted {dateLabel(review.payment_submitted_at)}</small>
+                            )}
                           </td>
                           <td>
                             {b.status === "awaiting_verification" ? (
@@ -967,7 +1010,7 @@ export function ClubConsole({
                                 className="console-button small primary"
                                 onClick={() => open("verify", b)}
                               >
-                                Verify payment
+                                Review payment
                               </button>
                             ) : b.status === "confirmed" &&
                               Number(b.paid_amount) < Number(b.total_amount) ? (
@@ -984,13 +1027,14 @@ export function ClubConsole({
                             )}
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                   </tbody>
                 </table>
-                {!data.bookings.length && (
+                {!reservationRows.length && (
                   <Empty
-                    title="No reservations"
-                    text="Customer bookings and staff walk-ins appear here."
+                    title={search ? "No matching reservations" : reviewOnly ? "No GCash payments to review" : "No reservations"}
+                    text={search ? "Try a different name or booking reference." : reviewOnly ? "Submitted GCash references will appear here." : "Customer bookings and staff walk-ins appear here."}
                   />
                 )}
               </div>
@@ -1309,7 +1353,7 @@ export function ClubConsole({
             role="dialog"
             aria-modal="true"
             aria-label={
-              modal === "receipt" ? "Transaction receipt" : `${modal} form`
+              modal === "receipt" ? "Transaction receipt" : reviewingPayment ? "Review GCash payment" : `${modal} form`
             }
             onKeyDown={(e) => {
               if (e.key === "Escape" && !busy) setModal(null);
@@ -1395,7 +1439,7 @@ export function ClubConsole({
                 </button>
               </>
             ) : (
-              <form onSubmit={submit}>
+              <form key={modal} onSubmit={submit}>
                 <h2>
                   {
                     (
@@ -1410,6 +1454,7 @@ export function ClubConsole({
                         refund: "Record refund",
                         balance: "Collect balance",
                         verify: "Verify GCash payment",
+                        "reject-payment": "Reject GCash reference",
                       } as Record<string, string>
                     )[modal]
                   }
@@ -1682,7 +1727,7 @@ export function ClubConsole({
                     <Verified text="I have returned the full collected amount to the customer." />
                   </>
                 )}
-                {(modal === "balance" || modal === "verify") && (
+                {(modal === "balance" || reviewingPayment) && (
                   <>
                     <div className="modal-amount">
                       <span>
@@ -1692,7 +1737,7 @@ export function ClubConsole({
                       <strong>
                         {peso(
                           Math.round(
-                            (modal === "verify"
+                            (reviewingPayment
                               ? Number(
                                   (selected as PosBooking)
                                     .initial_payment_amount,
@@ -1704,7 +1749,7 @@ export function ClubConsole({
                         )}
                       </strong>
                     </div>
-                    {modal === "verify" ? (
+                    {reviewingPayment ? (
                       <>
                         <p className="payment-reference-box">
                           <QrCode size={20} />
@@ -1715,11 +1760,25 @@ export function ClubConsole({
                             </strong>
                           </span>
                         </p>
-                        <p className="form-note">
-                          Match the amount, reference, and recipient against the
-                          actual incoming GCash transaction.
-                        </p>
-                        <Verified text="I verified the incoming payment in the GCash account." />
+                        {modal === "reject-payment" ? (
+                          <>
+                            <p className="form-note">
+                              Rejecting this reference cancels the reservation and releases the court or open-play places.
+                            </p>
+                            <label>
+                              Rejection reason (staff only)
+                              <textarea name="reason" required minLength={3} maxLength={200} rows={3} />
+                            </label>
+                            <Verified text="I checked the GCash account and found no matching incoming payment." />
+                          </>
+                        ) : (
+                          <>
+                            <p className="form-note">
+                              Match the amount, reference, and recipient against the actual incoming GCash transaction.
+                            </p>
+                            <Verified text="I verified the incoming payment in the GCash account." />
+                          </>
+                        )}
                       </>
                     ) : (
                       <>
@@ -1753,7 +1812,7 @@ export function ClubConsole({
                 <button
                   type="submit"
                   disabled={busy || !data.ready}
-                  className="console-button primary full-width"
+                  className={`console-button full-width ${modal === "reject-payment" ? "reject-payment-button" : "primary"}`}
                 >
                   {busy
                     ? "Saving…"
@@ -1761,6 +1820,8 @@ export function ClubConsole({
                       ? `Complete sale · ${peso(total)}`
                       : modal === "verify"
                         ? "Verify payment & confirm booking"
+                        : modal === "reject-payment"
+                          ? "Reject reference & release reservation"
                         : modal === "refund"
                           ? "Record completed refund"
                           : modal === "close"
@@ -1768,13 +1829,19 @@ export function ClubConsole({
                             : "Save & continue"}
                   <Check size={17} />
                 </button>
+                {modal === "verify" && selected && paymentReviews.has(selected.id) && (
+                  <button type="button" className="console-button full-width" disabled={busy}
+                    onClick={() => open("reject-payment", selected)}>
+                    Reject reference
+                  </button>
+                )}
                 <button
                   type="button"
                   className="cancel-button"
                   disabled={busy}
-                  onClick={() => setModal(null)}
+                  onClick={() => modal === "reject-payment" ? open("verify", selected) : setModal(null)}
                 >
-                  Cancel
+                  {modal === "reject-payment" ? "Back to payment review" : "Cancel"}
                 </button>
               </form>
             )}

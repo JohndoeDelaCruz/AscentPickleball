@@ -20,7 +20,7 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
     const db = await createClient();
     const start = `${day}T00:00:00+08:00`;
     const end = new Date(new Date(start).getTime() + 86400000).toISOString();
-    const results = await Promise.all([
+    const [products, payments, refunds, shifts, movements, bookings, role, reviews] = await Promise.all([
       db.from("pos_products").select("*").order("name").limit(1000),
       db
         .from("pos_payments")
@@ -43,28 +43,25 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
         .limit(50),
       db.rpc("pos_reservations", { p_date: day }).limit(1000),
       db.rpc("club_role"),
+      db.rpc("pos_payment_reviews").limit(1000),
     ]);
-    if (results.some((r) => r.error))
+    if ([products, payments, refunds, shifts, movements, bookings, role].some((r) => r.error))
       return {
         ...empty,
         error:
           "The staff workspace could not load. Confirm that Ascent migrations 013–015 are applied, then refresh.",
       };
     if (
-      results
-        .slice(0, 3)
-        .some((r) => Array.isArray(r.data) && r.data.length >= 1000)
+      [products, payments, refunds].some((r) => Array.isArray(r.data) && r.data.length >= 1000)
     )
       return {
         ...empty,
         error:
           "This report exceeds the first-release record limit. Export or narrow the reporting period before continuing.",
       };
-    const [products, payments, refunds, shifts, movements, bookings, role] =
-      results.map((r) => r.data);
     const ids = [
       ...new Set(
-        [...(payments ?? []), ...(refunds ?? [])].map(
+        [...(payments.data ?? []), ...(refunds.data ?? [])].map(
           (p: { sale_id: string }) => p.sale_id,
         ),
       ),
@@ -89,14 +86,15 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
     })) as Sale[];
     return {
       courts: inventory.courts,
-      products: products ?? [],
+      products: products.data ?? [],
       sales: normalized,
-      payments: payments ?? [],
-      refunds: refunds ?? [],
-      shifts: shifts ?? [],
-      movements: movements ?? [],
-      bookings: bookings ?? [],
-      role: role ?? "cashier",
+      payments: payments.data ?? [],
+      refunds: refunds.data ?? [],
+      shifts: shifts.data ?? [],
+      movements: movements.data ?? [],
+      bookings: bookings.data ?? [],
+      paymentReviews: reviews.error ? undefined : (reviews.data ?? []),
+      role: role.data ?? "cashier",
       ready: true,
     };
   } catch {

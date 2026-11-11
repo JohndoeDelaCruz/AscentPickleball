@@ -86,6 +86,10 @@ export type PosBooking = {
   payment_reference: string | null;
   payment_option: string;
 };
+export type PosPaymentReview = PosBooking & {
+  payment_submitted_at: string | null;
+  overdue: boolean;
+};
 export type PosData = {
   courts?: Court[];
   products: Product[];
@@ -95,6 +99,7 @@ export type PosData = {
   shifts: Shift[];
   movements: Movement[];
   bookings: PosBooking[];
+  paymentReviews?: PosPaymentReview[];
   role: string;
   ready: boolean;
   error?: string;

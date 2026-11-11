@@ -21,6 +21,7 @@ export function WorkspaceShell({ children, role, roleLoading = false, courtCount
   function selectTab(next: WorkspaceTab) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
+    url.searchParams.delete("review");
     window.history.replaceState(null, "", url);
     setMobile(false);
   }

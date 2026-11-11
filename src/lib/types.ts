@@ -104,6 +104,7 @@ export type Booking = {
   status: BookingStatus;
   hold_expires_at: string | null;
   payment_reference: string | null;
+  payment_rejected_at?: string | null;
   customer_name: string;
   customer_phone: string;
   notes: string | null;
@@ -138,3 +139,9 @@ export const statusLabels: Record<BookingStatus, string> = {
   expired: "Expired",
   blocked: "Court blocked",
 };
+
+export function bookingStatusLabel(booking: Pick<Booking, "status" | "payment_rejected_at">) {
+  return booking.status === "cancelled" && booking.payment_rejected_at
+    ? "Payment reference rejected"
+    : statusLabels[booking.status];
+}

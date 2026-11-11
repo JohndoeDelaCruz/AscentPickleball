@@ -11,7 +11,7 @@ import {
   money,
 } from "@/lib/booking";
 import { bookingPayments } from "@/lib/payment";
-import { statusLabels, type Booking } from "@/lib/types";
+import { bookingStatusLabel, type Booking } from "@/lib/types";
 import { courtName } from "@/lib/courts";
 export const metadata: Metadata = { title: "My bookings" };
 export default async function MyBookings() {
@@ -111,7 +111,7 @@ export default async function MyBookings() {
               </div>
               <div className="booking-list-side">
                 <span className={`status-badge status-${b.status}`}>
-                  {statusLabels[b.status]}
+                  {bookingStatusLabel(b)}
                 </span>
                 {b.status === "confirmed" && (
                   <small>

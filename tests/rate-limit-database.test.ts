@@ -89,7 +89,7 @@ test("customer request limits persist failures and protect every mutation entry 
     assert.deepEqual(
       (
         await db.query(
-          "select to_jsonb(b)-'equipment_quantity'-'equipment_unit_price' b from public.bookings b",
+          "select to_jsonb(b)-array['equipment_quantity','equipment_unit_price','payment_submitted_at','payment_rejected_at'] b from public.bookings b",
         )
       ).rows,
       original,

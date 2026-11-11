@@ -96,6 +96,8 @@ For rollout, pause staff cash processing while applying the migrations and deplo
 
 Apply `202611090016_paddle_stack.sql` and `202611090017_paddle_stack_rotation.sql` in order after 015 to enable **Paddle Stack** in the staff workspace. Staff open check-in for a scheduled open-play session, add display names, and can shuffle everyone waiting. Calling the next four keeps the remaining queue in order and splits recent teammates where possible. The Player board QR opens a live scoreboard and waiting queue. A scorekeeper link grants access to one court for that session, and staff can replace or revoke it. Players who finish a game can be requeued at the back. Keep any payments or reservations in the existing booking and POS flows.
 
+Apply `202611110018_gcash_payment_review.sql` after 017, then deploy the app. In **Staff → Reservations → GCash review**, unresolved references appear oldest first across all booking dates and are flagged after 30 minutes. Older submissions use their original hold deadline when the submission time is unknown. Staff must check the GCash account before rejecting a reference. Rejection cancels the unpaid booking, releases its availability, and records the reference and reason in the POS audit log. The queue does not automatically release reservations under review.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

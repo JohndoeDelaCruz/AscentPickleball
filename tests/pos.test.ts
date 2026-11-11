@@ -105,7 +105,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       schedule: await call<unknown>(player, "get_booking_schedule", [today]),
     });
     const previous = await readCurrentData();
-    for (const file of files.filter((f) => f >= "202611040013"))
+    for (const file of files.filter((f) => f >= "202611040013" && f < "202611110018"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
     await t.test("cutover preserves today's published schedule, bookings, staff access, and finance records", async () => {
       assert.deepEqual(await readCurrentData(), previous);
@@ -124,6 +124,85 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
     await db.exec("update public.venue_settings set schedule_config=null");
     await db.query("update public.staff_members set role='owner' where user_id=$1", [owner]);
     await db.query("insert into public.staff_members(user_id,role) values($1,'cashier')", [cashier]);
+    const legacyReview = randomUUID();
+    await db.query(
+      `insert into public.bookings(id,user_id,court_id,booking_date,start_hour,duration,total_amount,
+        status,customer_name,customer_phone,payment_reference,hold_expires_at)
+       values($1,$2,1,current_date-3,18,1,200,'awaiting_verification','Legacy Review','09171234567',
+        'OLD-REVIEW-123',now()-interval '2 hours')`,
+      [legacyReview, player],
+    );
+    for (const file of files.filter((f) => f >= "202611110018"))
+      await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
+
+    await t.test("GCash review finds overdue bookings across dates and safely releases rejected court time and open-play capacity", async () => {
+      const day = (await db.query<{ date: string }>(
+        "select ((now() at time zone 'Asia/Manila')::date + 2)::text date",
+      )).rows[0].date;
+      await db.query(
+        "update public.venue_settings set booking_enabled=true,gcash_name='Ascent',gcash_qr_url='https://example.com/qr.png',schedule_config=$1",
+        [JSON.stringify({ weekly: blocks, overrides: [] })],
+      );
+      const request = (action: string, input: object) =>
+        call<{ id?: string; success?: boolean; error?: string }>(player, "request_customer_booking_v2", [action, JSON.stringify(input)]);
+      const court = { booking_date: day, court_id: 1, start_hour: 17, duration: 1, customer_name: "Review Player", customer_phone: "09171234567" };
+      const reserved = await request("reserve_court", court);
+      assert.ok(reserved.id, reserved.error);
+      const reference = "REVIEW-123456";
+      assert.deepEqual(await request("payment", { booking_id: reserved.id, reference }), { success: true });
+
+      const queue = () => as(cashier, () => db.query<{
+        id: string; overdue: boolean; payment_submitted_at: string | null;
+      }>("select * from public.pos_payment_reviews()")).then((r) => r.rows);
+      const pending = await queue();
+      assert.deepEqual(pending.map(({ id, overdue }) => ({ id, overdue })), [
+        { id: legacyReview, overdue: true }, { id: reserved.id, overdue: false },
+      ]);
+      assert.equal(pending[0].payment_submitted_at, null);
+      assert.ok(pending[1].payment_submitted_at);
+      assert.equal(Object.hasOwn(pending[0], "customer_phone"), false);
+      await assert.rejects(() => call(player, "pos_payment_reviews"), /staff access/);
+      await assert.rejects(() => as("", () => db.query("select * from public.pos_payment_reviews()"), "anon"), /permission denied/);
+      await assert.rejects(() => call(player, "pos_reject_booking_payment", [reserved.id, "No matching payment"]), /staff access/);
+      await assert.rejects(() => call(cashier, "pos_reject_booking_payment", [reserved.id, " "]), /rejection reason/);
+
+      await db.query("update public.bookings set payment_submitted_at=now()-interval '31 minutes',hold_expires_at=now()-interval '30 minutes' where id=$1", [reserved.id]);
+      await call(cashier, "expire_unpaid_holds");
+      assert.equal((await queue()).find((b) => b.id === reserved.id)?.overdue, true);
+      assert.ok((await request("reserve_court", court)).error, "Overdue reviews still hold the court");
+
+      await call(cashier, "pos_reject_booking_payment", [reserved.id, "No matching incoming payment"]);
+      assert.equal((await queue()).some((b) => b.id === reserved.id), false);
+      await assert.rejects(() => call(cashier, "pos_verify_booking", [reserved.id]), /Only a submitted/);
+      assert.deepEqual((await db.query(
+        "select status,payment_reference,payment_rejected_at is not null as rejected,paid_amount::int from public.bookings where id=$1",
+        [reserved.id],
+      )).rows, [{ status: "cancelled", payment_reference: null, rejected: true, paid_amount: 0 }]);
+      assert.equal((await db.query("select 1 from public.pos_sales where booking_id=$1", [reserved.id])).rows.length, 0);
+      assert.deepEqual((await db.query(
+        "select actor_id,detail->>'reason' reason,detail->>'reference' reference from public.pos_audit where entity_id=$1 and action='booking.payment.reject'",
+        [reserved.id],
+      )).rows, [{ actor_id: cashier, reason: "No matching incoming payment", reference }]);
+      await call(cashier, "pos_reject_booking_payment", [legacyReview, "No matching incoming payment"]);
+
+      const replacement = await request("reserve_court", court);
+      assert.ok(replacement.id, replacement.error);
+      assert.deepEqual(await request("payment", { booking_id: replacement.id, reference }), { success: true });
+      await call(cashier, "pos_verify_booking", [replacement.id]);
+      await assert.rejects(() => call(cashier, "pos_reject_booking_payment", [replacement.id, "Stale rejection"]), /Only an unpaid booking/);
+
+      const remainingPasses = async () => (await db.query<{ remaining: number }>(
+        "select remaining from public.get_open_play_sessions($1) where start_hour=8", [day],
+      )).rows[0].remaining;
+      const openPlay = await request("reserve_open_play", { ...court, start_hour: 8, participant_count: 3 });
+      assert.ok(openPlay.id, openPlay.error);
+      assert.deepEqual(await request("payment", { booking_id: openPlay.id, reference: "OPEN-REVIEW-123" }), { success: true });
+      assert.equal(await remainingPasses(), 21);
+      await call(cashier, "pos_reject_booking_payment", [openPlay.id, "Reference could not be matched"]);
+      assert.equal(await remainingPasses(), 24);
+      await db.exec("update public.venue_settings set schedule_config=null");
+    });
+
     await t.test("cashier reservation view excludes private contact fields and rejects customers", async () => {
       await assert.rejects(() => call(player, "pos_reservations", [today]), /staff access/);
       const raw = await as(cashier, () => db.query("select id from public.bookings where id=$1", [savedBlock]));

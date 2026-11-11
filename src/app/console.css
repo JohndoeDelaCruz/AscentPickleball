@@ -647,6 +647,28 @@
   background: #efefed;
   color: #596951;
 }
+.payment-review-tabs {
+  padding: 0 20px 12px;
+}
+.payment-review-notice {
+  margin: 0 20px 14px;
+  padding: 10px 12px;
+  background: #f6efdb;
+  border-radius: 5px;
+  font-size: 14px;
+}
+.review-overdue,
+.attention-row .review-overdue {
+  color: #7d3b14;
+}
+.console-button.reject-payment-button {
+  background: #8e3030;
+  border-color: #8e3030;
+  color: #fff;
+}
+.console-button.reject-payment-button:hover {
+  background: #702323;
+}
 .row-actions {
   display: flex;
   align-items: center;
@@ -1299,7 +1321,8 @@
   margin: 16px 0;
 }
 .console-modal input:not([type="checkbox"]),
-.console-modal select {
+.console-modal select,
+.console-modal textarea {
   display: block;
   width: 100%;
   border: 1px solid #dce5d1;
@@ -1313,8 +1336,13 @@
   outline-offset: 2px;
 }
 .console-modal input:focus,
-.console-modal select:focus {
+.console-modal select:focus,
+.console-modal textarea:focus {
   outline: 2px solid #b5c99a;
+}
+.console-modal textarea {
+  font-family: inherit;
+  resize: vertical;
 }
 .console-modal p {
   font-size: 14px;

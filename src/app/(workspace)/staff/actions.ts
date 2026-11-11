@@ -22,6 +22,12 @@ const schema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("close"), id, amount: cents }),
   z.object({ op: z.literal("verify"), id, verified: z.literal(true) }),
   z.object({
+    op: z.literal("reject_payment"),
+    id,
+    reason: z.string().trim().min(3).max(200),
+    verified: z.literal(true),
+  }),
+  z.object({
     op: z.literal("balance"),
     id,
     method: z.enum(["cash", "gcash"]),
@@ -79,6 +85,10 @@ export async function posCommand(
         rpc = "pos_verify_booking";
         args = { p_booking: c.id };
         break;
+      case "reject_payment":
+        rpc = "pos_reject_booking_payment";
+        args = { p_booking: c.id, p_reason: c.reason };
+        break;
       case "balance":
         rpc = "pos_collect_balance";
         args = {
@@ -101,9 +111,9 @@ export async function posCommand(
     if (error) {
       const match = error.message.match(/(?:POS|Booking):\s*([\s\S]+)/);
       return {
-        error: match
-          ? match[1]
-          : "The operation could not be completed. Check database setup and your permissions. For a checkout retry, keep the same cart.",
+        error: match?.[1] ?? (c.op === "reject_payment"
+          ? "The reference could not be rejected. Refresh to check the booking status before retrying."
+          : "The operation could not be completed. Check database setup and your permissions. For a checkout retry, keep the same cart."),
       };
     }
     revalidatePath("/staff");
@@ -111,6 +121,7 @@ export async function posCommand(
     revalidatePath("/admin/finance");
     revalidatePath("/my-bookings");
     revalidatePath("/booking/[id]", "page");
+    if (c.op === "reject_payment") revalidatePath("/book");
     return {
       ok: true,
       ...(c.op === "checkout" ? { receipt: data as Sale } : {}),
@@ -118,7 +129,9 @@ export async function posCommand(
   } catch {
     return {
       error:
-        "Connection interrupted. Retry the same checkout to check its saved result before starting another sale.",
+        parsed.data.op === "reject_payment"
+          ? "Connection interrupted. Refresh to check the booking status before retrying."
+          : "Connection interrupted. Retry the same checkout to check its saved result before starting another sale.",
     };
   }
 }
