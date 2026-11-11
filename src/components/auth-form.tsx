@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authRedirect, safeRedirect } from "@/lib/redirect";
 import { authCallbackUrl } from "@/lib/site-url";
@@ -237,23 +236,20 @@ export function AuthForm({
                 ? "Send reset link"
                 : mode === "reset"
                   ? "Update password"
-                  : "Let’s play"}
-          <ArrowUpRight size={18} />
+                  : "Log in"}
         </button>
       </form>
-      <div className="auth-bottom">
-        <Link href="/book">
-          <ArrowLeft size={12} style={{ display: "inline", marginRight: 5 }} />
-          Browse courts
-        </Link>
-        {mode === "login" ? (
-          <button onClick={() => changeMode("forgot")}>Forgot password?</button>
-        ) : (
-          mode === "forgot" && (
-            <button onClick={() => changeMode("login")}>Back to log in</button>
-          )
-        )}
-      </div>
+      {(mode === "login" || mode === "forgot") && (
+        <div className="auth-bottom">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => changeMode(mode === "login" ? "forgot" : "login")}
+          >
+            {mode === "login" ? "Forgot password?" : "Back to log in"}
+          </button>
+        </div>
+      )}
       {mode === "signup" && (
         <p className="small-print auth-privacy">
           By creating an account, you agree to our{" "}

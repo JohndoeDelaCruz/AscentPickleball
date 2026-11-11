@@ -20,6 +20,21 @@ export function Header({
   const pathname = usePathname();
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   if (staff && isWorkspacePath(pathname)) return null;
+  if (pathname === "/login") {
+    return (
+      <header className="auth-header">
+        <div className="auth-bar">
+          <div className="auth-brand">
+            <Brand compact />
+            <span aria-hidden="true">Ascent Pickleball</span>
+          </div>
+          <Link href="/book" className="auth-browse">
+            Browse courts <ArrowUpRight size={15} aria-hidden="true" />
+          </Link>
+        </div>
+      </header>
+    );
+  }
   async function signOut() {
     await createClient().auth.signOut();
     setOpen(false);
