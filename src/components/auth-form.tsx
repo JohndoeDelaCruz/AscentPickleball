@@ -123,46 +123,41 @@ export function AuthForm({
   return (
     <div className="auth-form">
       <div className="auth-intro">
-        <span className="eyebrow">YOUR CREW IS WAITING</span>
         <h1>
           {mode === "signup"
-            ? "JOIN THE GAME."
+            ? "Create an account"
             : mode === "forgot"
-              ? "LET’S RESET."
+              ? "Reset your password"
               : mode === "reset"
-                ? "A FRESH START."
-                : "WELCOME BACK."}
+                ? "Choose a new password"
+                : "Log in"}
         </h1>
-        <p>
-          {mode === "signup"
-            ? "Create your account and make room for more court time."
-            : mode === "forgot"
-              ? "Enter your email and we’ll send a link to reset your password."
-              : mode === "reset"
-                ? "Choose a new password for your Ascent account."
-                : "Log in to reserve a court and keep track of your next game."}
-        </p>
-      </div>
-      <div className="auth-tabs">
-        {(mode === "login" || mode === "signup") && (
-          <>
-            <button
-              className={mode === "login" ? "active" : ""}
-              disabled={busy}
-              onClick={() => changeMode("login")}
-            >
-              Log in
-            </button>
-            <button
-              className={mode === "signup" ? "active" : ""}
-              disabled={busy}
-              onClick={() => changeMode("signup")}
-            >
-              Create account
-            </button>
-          </>
+        {mode === "forgot" && (
+          <p>Enter your email and we’ll send a link to reset your password.</p>
         )}
       </div>
+      {(mode === "login" || mode === "signup") && (
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={mode === "login" ? "active" : ""}
+            aria-pressed={mode === "login"}
+            disabled={busy}
+            onClick={() => changeMode("login")}
+          >
+            Log in
+          </button>
+          <button
+            type="button"
+            className={mode === "signup" ? "active" : ""}
+            aria-pressed={mode === "signup"}
+            disabled={busy}
+            onClick={() => changeMode("signup")}
+          >
+            Create account
+          </button>
+        </div>
+      )}
       <form className="auth-fields-form" onSubmit={submit}>
         <div className="auth-fields">
           {mode === "signup" && (
@@ -220,18 +215,16 @@ export function AuthForm({
             onToken={setCaptchaToken}
           />
         )}
-        <div className="auth-feedback">
-          {error && (
-            <div className="error-message" role="alert">
-              {error}
-            </div>
-          )}
-          {message && (
-            <div className="success-message" role="status">
-              {message}
-            </div>
-          )}
-        </div>
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="success-message" role="status">
+            {message}
+          </div>
+        )}
         <button
           className="button button-dark"
           disabled={busy || (needsCaptcha && !captchaToken)}
@@ -261,17 +254,15 @@ export function AuthForm({
           )
         )}
       </div>
-      <div className="auth-privacy">
-        {mode === "signup" && (
-          <p className="small-print">
-            By creating an account, you agree to our{" "}
-            <Link href="/privacy" style={{ textDecoration: "underline" }}>
-              privacy policy
-            </Link>
-            . We use your details to manage your reservations.
-          </p>
-        )}
-      </div>
+      {mode === "signup" && (
+        <p className="small-print auth-privacy">
+          By creating an account, you agree to our{" "}
+          <Link href="/privacy" style={{ textDecoration: "underline" }}>
+            privacy policy
+          </Link>
+          . We use your details to manage your reservations.
+        </p>
+      )}
     </div>
   );
 }

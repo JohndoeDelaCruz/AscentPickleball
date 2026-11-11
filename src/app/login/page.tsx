@@ -27,9 +27,7 @@ export default async function LoginPage({
           alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
           unoptimized
           fill
-          loading="eager"
-          fetchPriority="high"
-          sizes="(max-width: 850px) 100vw, 50vw"
+          sizes="50vw"
         />
         <div className="auth-art-copy">
           <span className="eyebrow">GOOD GAMES. GREAT COMPANY.</span>
