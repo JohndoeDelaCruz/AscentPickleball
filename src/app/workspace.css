@@ -810,6 +810,22 @@
     transition: none;
   }
 }
+@media (max-width: 650px) and (prefers-reduced-motion: no-preference) {
+  .management-sidebar.sidebar-open {
+    animation: management-sidebar-enter 240ms ease-out;
+  }
+  .management-backdrop {
+    animation: management-backdrop-enter 240ms ease-out;
+  }
+  @keyframes management-sidebar-enter {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes management-backdrop-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .management-sidebar,
   .club-app:has(.management-sidebar) .club-main {
