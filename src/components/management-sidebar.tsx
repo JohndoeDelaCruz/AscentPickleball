@@ -15,6 +15,7 @@ import { Brand } from "./brand";
 import { createClient } from "@/lib/supabase/client";
 
 const preferenceKey = "ascent:sidebar-collapsed";
+const mobileQuery = "(max-width: 650px)";
 
 export function ManagementSidebar({
   children,
@@ -45,8 +46,18 @@ export function ManagementSidebar({
   }, []);
 
   useEffect(() => {
+    const mobile = window.matchMedia(mobileQuery);
+    const updateInteractivity = () => {
+      if (sidebar.current) sidebar.current.inert = mobile.matches && !mobileOpen;
+    };
+    updateInteractivity();
+    mobile.addEventListener("change", updateInteractivity);
+    return () => mobile.removeEventListener("change", updateInteractivity);
+  }, [mobileOpen]);
+
+  useEffect(() => {
     if (!mobileOpen) return;
-    const mobile = window.matchMedia("(max-width: 650px)");
+    const mobile = window.matchMedia(mobileQuery);
     if (!mobile.matches) {
       closeMobile.current();
       return;
@@ -54,7 +65,7 @@ export function ManagementSidebar({
     const previous = document.activeElement as HTMLElement | null;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    closeButton.current?.focus();
+    closeButton.current?.focus({ preventScroll: true });
     const closeOnDesktop = () => {
       if (!mobile.matches) closeMobile.current();
     };
@@ -101,14 +112,11 @@ export function ManagementSidebar({
 
   return (
     <>
-      {mobileOpen && (
-        <button
-          className="management-backdrop"
-          aria-label="Close management menu"
-          tabIndex={-1}
-          onClick={onMobileClose}
-        />
-      )}
+      <div
+        className={`management-backdrop${mobileOpen ? " sidebar-open" : ""}`}
+        aria-hidden="true"
+        onClick={onMobileClose}
+      />
       <aside
         ref={sidebar}
         className={`club-sidebar management-sidebar${collapsed ? " is-collapsed" : ""}${mobileOpen ? " sidebar-open" : ""}`}

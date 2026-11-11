@@ -16,6 +16,7 @@ import {
   type StackSession,
 } from "@/lib/paddle-stack";
 import { Modal } from "./modal";
+import { useAnimatedModal } from "./use-animated-modal";
 import styles from "./paddle-stack.module.css";
 
 const boardUrl = (id: string) => `/paddle-stack/${id}`;
@@ -237,7 +238,7 @@ function CourtScore({
   );
 }
 
-function BoardShare({ path, scorekeeper, onClose }: { path: string; scorekeeper: boolean; onClose: () => void }) {
+function BoardShare({ path, scorekeeper, onClose, closing }: { path: string; scorekeeper: boolean; onClose: () => void; closing: boolean }) {
   const url = new URL(path, window.location.origin).href;
   const canvas = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
@@ -250,7 +251,7 @@ function BoardShare({ path, scorekeeper, onClose }: { path: string; scorekeeper:
     return () => { active = false; };
   }, [url]);
   return (
-    <Modal title={scorekeeper ? "Scorekeeper link" : "Player board QR code"} onClose={onClose}>
+    <Modal title={scorekeeper ? "Scorekeeper link" : "Player board QR code"} onClose={onClose} closing={closing}>
       <div className={styles.share}>
         <p>{scorekeeper ? "Share this link with the designated scorekeeper for this court." : "Players can scan this code to see scores and who’s up next."}</p>
         {qrFailed ? <p>Use the link below to open the board.</p> :
@@ -356,7 +357,7 @@ function StaffBoard({ session }: { session: string }) {
   const { board, busy, run, score } = state;
   const [name, setName] = useState("");
   const checkInId = useRef<string | null>(null);
-  const [share, setShare] = useState<{ path: string; scorekeeper: boolean } | null>(null);
+  const [share, setShare, shareClosing] = useAnimatedModal<{ path: string; scorekeeper: boolean }>();
   const [confirmClose, setConfirmClose] = useState(false);
   const manage = (action: string, args: Record<string, unknown> = {}) =>
     run("paddle_stack_manage", { p_action: action, ...args });
@@ -496,7 +497,7 @@ function StaffBoard({ session }: { session: string }) {
           </ul>
         </section>
       )}
-      {share && <BoardShare {...share} onClose={() => setShare(null)} />}
+      {share && <BoardShare {...share} onClose={() => setShare(null)} closing={shareClosing} />}
     </>
   );
 }

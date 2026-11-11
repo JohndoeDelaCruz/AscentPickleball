@@ -2512,6 +2512,38 @@ img {
   background: #152c2280;
   backdrop-filter: blur(4px);
 }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .modal,
+  .console-modal {
+    animation: modal-pop-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .modal[data-closing],
+  .console-modal[data-closing] {
+    animation: modal-pop-out 180ms ease-in both;
+  }
+  .modal::backdrop,
+  .console-modal-backdrop {
+    animation: modal-backdrop-in 240ms ease-out both;
+  }
+  .modal[data-closing]::backdrop,
+  .console-modal-backdrop[data-closing] {
+    animation: modal-backdrop-out 180ms ease-in both;
+  }
+  @keyframes modal-pop-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes modal-pop-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to { opacity: 0; transform: translateY(6px) scale(0.97); }
+  }
+  @keyframes modal-backdrop-in {
+    from { background-color: transparent; backdrop-filter: blur(0); }
+  }
+  @keyframes modal-backdrop-out {
+    to { background-color: transparent; backdrop-filter: blur(0); }
+  }
+}
 .modal-header {
   display: flex;
   justify-content: space-between;

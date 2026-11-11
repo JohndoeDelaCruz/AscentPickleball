@@ -26,6 +26,7 @@ import {
   reserveOpenPlay,
 } from "@/app/actions";
 import { Modal } from "./modal";
+import { useAnimatedModal } from "./use-animated-modal";
 import { paymentMethods } from "@/lib/finance";
 import { EquipmentRental } from "./equipment-rental";
 import { bookingPayments } from "@/lib/payment";
@@ -41,13 +42,13 @@ export function AdminCalendar({
   date: string;
   venue: VenueSettings;
 }) {
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen, createClosing] = useAnimatedModal<true>();
   const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
-  const [balanceBooking, setBalanceBooking] = useState<Booking | null>(null);
-  const [action, setAction] = useState<{
+  const [balanceBooking, setBalanceBooking, balanceClosing] = useAnimatedModal<Booking>();
+  const [action, setAction, actionClosing] = useAnimatedModal<{
     booking: Booking;
     status: "confirmed" | "cancelled";
-  } | null>(null);
+  }>();
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -369,17 +370,20 @@ export function AdminCalendar({
         <CreateBookingModal
           date={date}
           venue={venue}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => setCreateOpen(null)}
+          closing={createClosing}
         />
       )}
       {balanceBooking && (
         <BalancePaymentModal
           booking={balanceBooking}
           onClose={() => setBalanceBooking(null)}
+          closing={balanceClosing}
         />
       )}
       {action && (
         <Modal
+          closing={actionClosing}
           title={
             action.status === "confirmed"
               ? "Verify & confirm reservation"
@@ -454,10 +458,12 @@ function CreateBookingModal({
   date,
   venue,
   onClose,
+  closing,
 }: {
   date: string;
   venue: VenueSettings;
   onClose: () => void;
+  closing: boolean;
 }) {
   const courts = activeCourts(venue.courts);
   const [blocked, setBlocked] = useState(false);
@@ -526,7 +532,7 @@ function CreateBookingModal({
     });
   }
   return (
-    <Modal title="Add court time" onClose={() => !pending && onClose()}>
+    <Modal title="Add court time" closing={closing} onClose={() => !pending && onClose()}>
       <form onSubmit={submit} className="form-stack">
         <label className="field">
           <span>Reservation type</span>

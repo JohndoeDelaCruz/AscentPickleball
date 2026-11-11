@@ -12,9 +12,11 @@ import { Modal } from "./modal";
 export function BalancePaymentModal({
   booking,
   onClose,
+  closing,
 }: {
   booking: Booking;
   onClose: () => void;
+  closing: boolean;
 }) {
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [reference, setReference] = useState("");
@@ -23,7 +25,7 @@ export function BalancePaymentModal({
   const router = useRouter();
   const balance = bookingPayments(booking).balance;
   return (
-    <Modal title="Record balance payment" onClose={() => !pending && onClose()}>
+    <Modal title="Record balance payment" closing={closing} onClose={() => !pending && onClose()}>
       <p>
         {booking.customer_name} · {booking.reference}
       </p>

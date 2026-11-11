@@ -43,6 +43,7 @@ import {
 } from "@/lib/pos";
 import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
+import { useAnimatedModal } from "./use-animated-modal";
 type Modal =
   | "checkout"
   | "product"
@@ -53,8 +54,7 @@ type Modal =
   | "balance"
   | "verify"
   | "reject-payment"
-  | "receipt"
-  | null;
+  | "receipt";
 const dateLabel = (value: string) =>
   new Intl.DateTimeFormat("en-PH", {
     timeZone: "Asia/Manila",
@@ -92,7 +92,7 @@ export function ClubConsole({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All items");
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [modal, setModal] = useState<Modal>(null);
+  const [modal, setModal, modalClosing] = useAnimatedModal<Modal>();
   const [selected, setSelected] = useState<Product | Sale | PosBooking | null>(
     null,
   );
@@ -129,6 +129,10 @@ export function ClubConsole({
     first?.focus();
     const trap = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
+      if (dialog?.inert) {
+        event.preventDefault();
+        return;
+      }
       const list = controls();
       const a = list[0],
         b = list[list.length - 1];
@@ -278,6 +282,7 @@ export function ClubConsole({
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (modalClosing) return;
     const f = new FormData(event.currentTarget);
     const text = (key: string) => String(f.get(key) ?? "");
     const verified = f.get("verified") === "on";
@@ -1344,12 +1349,15 @@ export function ClubConsole({
       {modal && (
         <div
           className={`console-modal-backdrop ${modal === "receipt" ? "receipt-backdrop" : ""}`}
+          data-closing={modalClosing || undefined}
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget && !busy) setModal(null);
+            if (e.target === e.currentTarget && !busy && !modalClosing) setModal(null);
           }}
         >
           <div
             className={`console-modal ${modal === "receipt" ? "receipt-modal" : ""}`}
+            data-closing={modalClosing || undefined}
+            inert={modalClosing}
             role="dialog"
             aria-modal="true"
             aria-label={

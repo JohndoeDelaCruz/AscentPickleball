@@ -27,6 +27,7 @@ import { financePageSize } from "@/lib/finance";
 import { statusLabels } from "@/lib/types";
 import { saveBookingFinance, saveFinanceDay } from "@/app/actions";
 import { Modal } from "./modal";
+import { useAnimatedModal } from "./use-animated-modal";
 import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
 import { defaultCourts, type Court } from "@/lib/courts";
@@ -59,10 +60,8 @@ export function FinanceDashboard({
   const daily = days.find((d) => d.report_date === period.date)!;
   const paidMethods = (Object.keys(paymentMethods) as PaymentMethod[])
     .filter((method) => Number(daily[`${method}_sales`]) !== 0);
-  const [editing, setEditing] = useState<FinanceBooking | null>(null);
-  const [balanceBooking, setBalanceBooking] = useState<FinanceBooking | null>(
-    null,
-  );
+  const [editing, setEditing, editingClosing] = useAnimatedModal<FinanceBooking>();
+  const [balanceBooking, setBalanceBooking, balanceClosing] = useAnimatedModal<FinanceBooking>();
   const [worker, setWorker] = useState(notes.worker_on_duty);
   const [managerNotes, setManagerNotes] = useState(notes.manager_notes);
   const [error, setError] = useState("");
@@ -503,12 +502,14 @@ export function FinanceDashboard({
         <FinanceBookingEditor
           booking={editing}
           onClose={() => setEditing(null)}
+          closing={editingClosing}
         />
       )}
       {balanceBooking && (
         <BalancePaymentModal
           booking={balanceBooking}
           onClose={() => setBalanceBooking(null)}
+          closing={balanceClosing}
         />
       )}
     </>
@@ -518,9 +519,11 @@ export function FinanceDashboard({
 function FinanceBookingEditor({
   booking: b,
   onClose,
+  closing,
 }: {
   booking: FinanceBooking;
   onClose: () => void;
+  closing: boolean;
 }) {
   const [method, setMethod] = useState<PaymentMethod>(bookingPaymentMethod(b));
   const [notes, setNotes] = useState(b.booking_finance?.notes || "");
@@ -547,6 +550,7 @@ function FinanceBookingEditor({
     <Modal
       title="Payment method & staff notes"
       onClose={() => !pending && onClose()}
+      closing={closing}
     >
       <p className="small-print">
         {b.customer_name} · {b.reference} · {money(b.total_amount)}
