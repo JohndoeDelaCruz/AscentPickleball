@@ -2,12 +2,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Eye, EyeOff, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { authRedirect, safeRedirect } from "@/lib/redirect";
 import { authCallbackUrl } from "@/lib/site-url";
 import { captchaOptions, captchaTokenSchema } from "@/lib/captcha";
 import { TurnstileCheck } from "./turnstile-check";
 import { readStaffMembership } from "@/lib/session-access";
+import { Brand } from "./brand";
 
 export function AuthForm({
   next,
@@ -23,6 +25,7 @@ export function AuthForm({
   );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
@@ -114,6 +117,7 @@ export function AuthForm({
   }
   function changeMode(value: typeof mode) {
     setMode(value);
+    setPasswordVisible(false);
     setCaptchaToken("");
     setCaptchaRevision((revision) => revision + 1);
     setError("");
@@ -121,43 +125,38 @@ export function AuthForm({
   }
   return (
     <div className="auth-form">
-      <div className="auth-intro">
-        <h1>
-          {mode === "signup"
-            ? "Create an account"
-            : mode === "forgot"
-              ? "Reset your password"
-              : mode === "reset"
-                ? "Choose a new password"
-                : "Log in"}
-        </h1>
-        {mode === "forgot" && (
-          <p>Enter your email and we’ll send a link to reset your password.</p>
-        )}
-      </div>
-      {(mode === "login" || mode === "signup") && (
-        <div className="auth-tabs">
-          <button
-            type="button"
-            className={mode === "login" ? "active" : ""}
-            aria-pressed={mode === "login"}
-            disabled={busy}
-            onClick={() => changeMode("login")}
-          >
-            Log in
-          </button>
-          <button
-            type="button"
-            className={mode === "signup" ? "active" : ""}
-            aria-pressed={mode === "signup"}
-            disabled={busy}
-            onClick={() => changeMode("signup")}
-          >
-            Create account
-          </button>
+      <header className="auth-panel-header">
+        <div className="auth-brand">
+          <Brand compact />
+          <span aria-hidden="true">Ascent Pickleball</span>
         </div>
-      )}
+        {mode !== "reset" && (
+          <button
+            type="button"
+            className="auth-mode-switch"
+            disabled={busy}
+            onClick={() => changeMode(mode === "login" ? "signup" : "login")}
+          >
+            <UserRound size={16} aria-hidden="true" />
+            {mode === "login" ? "Create account" : "Log in"}
+          </button>
+        )}
+      </header>
       <form className="auth-fields-form" onSubmit={submit}>
+        <div className="auth-intro">
+          <h1>
+            {mode === "signup"
+              ? "Create an account"
+              : mode === "forgot"
+                ? "Reset your password"
+                : mode === "reset"
+                  ? "Choose a new password"
+                  : "Log in"}
+          </h1>
+          {mode === "forgot" && (
+            <p>Enter your email and we’ll send a link to reset your password.</p>
+          )}
+        </div>
         <div className="auth-fields">
           {mode === "signup" && (
             <label className="field">
@@ -187,25 +186,40 @@ export function AuthForm({
             </label>
           )}
           {mode !== "forgot" && (
-            <label className="field">
-              <span>{mode === "reset" ? "New password" : "Password"}</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                placeholder={
-                  mode === "signup" ? "At least 8 characters" : "Your password"
-                }
-                required
-                minLength={mode === "login" ? 1 : 8}
-                maxLength={128}
-              />
-            </label>
+            <div className="field">
+              <label htmlFor="auth-password">{mode === "reset" ? "New password" : "Password"}</label>
+              <div className="password-input">
+                <input
+                  id="auth-password"
+                  type={passwordVisible ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  placeholder={
+                    mode === "signup" ? "At least 8 characters" : "Your password"
+                  }
+                  required
+                  minLength={mode === "login" ? 1 : 8}
+                  maxLength={128}
+                />
+                <button
+                  type="button"
+                  aria-label={passwordVisible ? "Hide password" : "Show password"}
+                  onClick={() => setPasswordVisible((visible) => !visible)}
+                >
+                  {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
           )}
         </div>
+        {mode === "login" && (
+          <button type="button" className="auth-forgot" disabled={busy} onClick={() => changeMode("forgot")}>
+            Forgot password?
+          </button>
+        )}
         {needsCaptcha && (
           <TurnstileCheck
             key={mode}
@@ -238,27 +252,13 @@ export function AuthForm({
                   ? "Update password"
                   : "Log in"}
         </button>
+        {mode === "signup" && (
+          <p className="small-print auth-privacy">
+            By creating an account, you agree to our{" "}
+            <Link href="/privacy">privacy policy</Link>. We use your details to manage your reservations.
+          </p>
+        )}
       </form>
-      {(mode === "login" || mode === "forgot") && (
-        <div className="auth-bottom">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => changeMode(mode === "login" ? "forgot" : "login")}
-          >
-            {mode === "login" ? "Forgot password?" : "Back to log in"}
-          </button>
-        </div>
-      )}
-      {mode === "signup" && (
-        <p className="small-print auth-privacy">
-          By creating an account, you agree to our{" "}
-          <Link href="/privacy" style={{ textDecoration: "underline" }}>
-            privacy policy
-          </Link>
-          . We use your details to manage your reservations.
-        </p>
-      )}
     </div>
   );
 }

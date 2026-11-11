@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { getSession } from "@/lib/data";
@@ -22,13 +23,16 @@ export default async function LoginPage({
   return (
     <main id="main" className="auth-section">
       <div className="auth-layout">
-        <div className="auth-court-photo">
-          <Image
-            src="/ascent-courts-hero.png"
-            alt=""
-            fill
-            sizes="(min-width: 1012px) 504px, (min-width: 850px) 50vw, 0px"
-          />
+        <div className="auth-visual">
+          <div className="auth-visual-photo">
+            <Image
+              src="/pickleball-equipment.jpg"
+              alt=""
+              fill
+              sizes="(min-width: 1252px) 570px, (min-width: 850px) 45vw, 0px"
+            />
+          </div>
+          <p>Book your<br />next match.</p>
         </div>
         <div className="auth-card">
           <AuthForm
@@ -42,6 +46,13 @@ export default async function LoginPage({
                   : undefined
             }
           />
+          <footer className="auth-panel-footer">
+            <span>© {new Date().getFullYear()} Ascent Pickleball</span>
+            <div>
+              <Link href="/book">Browse courts</Link>
+              <Link href="/privacy">Privacy policy</Link>
+            </div>
+          </footer>
         </div>
       </div>
     </main>

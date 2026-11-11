@@ -8,17 +8,7 @@ import { Starburst } from "./starburst";
 import { isWorkspacePath } from "@/lib/workspace";
 export function Footer({ staff, year }: { staff: boolean; year: number }) {
   const path = usePathname();
-  if (staff && isWorkspacePath(path)) return null;
-  if (path === "/login") {
-    return (
-      <footer className="auth-footer">
-        <div className="auth-bar">
-          <span>© {year} Ascent Pickleball</span>
-          <Link href="/privacy">Privacy policy</Link>
-        </div>
-      </footer>
-    );
-  }
+  if (path === "/login" || (staff && isWorkspacePath(path))) return null;
   return (
     <footer className="site-footer">
       <div className="container footer-top">
