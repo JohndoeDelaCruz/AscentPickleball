@@ -130,17 +130,6 @@ export function AuthForm({
           <Brand compact />
           <span aria-hidden="true">Ascent Pickleball</span>
         </div>
-        {mode !== "reset" && (
-          <button
-            type="button"
-            className="auth-mode-switch"
-            disabled={busy}
-            onClick={() => changeMode(mode === "login" ? "signup" : "login")}
-          >
-            <UserRound size={16} aria-hidden="true" />
-            {mode === "login" ? "Create account" : "Log in"}
-          </button>
-        )}
       </header>
       <form className="auth-fields-form" onSubmit={submit}>
         <div className="auth-intro">
@@ -155,6 +144,21 @@ export function AuthForm({
           </h1>
           {mode === "forgot" && (
             <p>Enter your email and we’ll send a link to reset your password.</p>
+          )}
+          {mode !== "reset" && (
+            <div className="auth-mode-switch">
+              {mode !== "forgot" && (
+                <span>{mode === "login" ? "New to Ascent?" : "Already have an account?"}</span>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => changeMode(mode === "login" ? "signup" : "login")}
+              >
+                <UserRound size={16} aria-hidden="true" />
+                {mode === "login" ? "Create account" : "Log in"}
+              </button>
+            </div>
           )}
         </div>
         <div className="auth-fields">

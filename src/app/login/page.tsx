@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
+import { Brand } from "@/components/brand";
 import { getSession } from "@/lib/data";
 import { authRedirect } from "@/lib/redirect";
 export const metadata: Metadata = { title: "Your account" };
@@ -29,8 +30,13 @@ export default async function LoginPage({
               src="/pickleball-equipment.jpg"
               alt=""
               fill
-              sizes="(min-width: 1252px) 570px, (min-width: 850px) 45vw, 0px"
+              sizes="(min-width: 850px) 50vw, 100vw"
+              loading="eager"
             />
+          </div>
+          <div className="auth-visual-brand auth-brand">
+            <Brand compact />
+            <span aria-hidden="true">Ascent Pickleball</span>
           </div>
           <p>Book your<br />next match.</p>
         </div>
