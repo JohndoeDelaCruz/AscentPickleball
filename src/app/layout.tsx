@@ -23,7 +23,6 @@ export const metadata: Metadata = {
   },
   description:
     "Your next great game starts here. Explore Ascent Pickleball’s two courts, find your time, and get your crew together.",
-  icons: { icon: "/icon.svg" },
 };
 export default async function RootLayout({
   children,
