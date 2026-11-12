@@ -125,7 +125,7 @@ export async function posCommand(
     revalidatePath("/staff");
     revalidatePath("/admin");
     revalidatePath("/admin/finance");
-    revalidatePath("/my-bookings");
+    revalidatePath("/my-bookings/all");
     revalidatePath("/booking/[id]", "page");
     if (c.op === "reject_payment") revalidatePath("/book");
     return {

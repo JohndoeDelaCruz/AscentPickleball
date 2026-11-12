@@ -1850,6 +1850,13 @@ img {
   display: grid;
   gap: 15px;
 }
+.booking-list-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
 .booking-list-item {
   display: grid;
   grid-template-columns: 70px 1fr auto;
@@ -1873,7 +1880,7 @@ img {
   font-size: 35px;
   line-height: 1.2;
 }
-.booking-list-item h3 {
+.booking-list-item h2 {
   margin: 0 0 8px;
   font-size: 16px;
 }
@@ -3154,7 +3161,7 @@ img {
     justify-content: space-between;
     gap: 10px;
   }
-  .booking-list-item h3 {
+  .booking-list-item h2 {
     font-size: 14px;
   }
   .booking-list-item p {

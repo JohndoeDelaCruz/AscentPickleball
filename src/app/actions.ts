@@ -84,7 +84,7 @@ export async function reserveCourt(input: unknown) {
   );
   if (result.error) return result;
   revalidatePath("/book");
-  revalidatePath("/my-bookings");
+  revalidatePath("/my-bookings/all");
   revalidatePath("/admin/finance");
   return result;
 }
@@ -100,7 +100,7 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
     if (result.error) return result;
     revalidatePath("/book");
     revalidatePath("/admin");
-    revalidatePath("/my-bookings");
+    revalidatePath("/my-bookings/all");
     revalidatePath("/admin/finance");
     return result;
   }
@@ -133,7 +133,7 @@ export async function reserveOpenPlay(input: unknown, walkIn = false) {
     if (error) return { error: bookingError(error) };
     revalidatePath("/book");
     revalidatePath("/admin");
-    revalidatePath("/my-bookings");
+    revalidatePath("/my-bookings/all");
     revalidatePath("/admin/finance");
     return { id: data as string };
   } catch (error) {
@@ -161,7 +161,7 @@ export async function submitPayment(bookingId: string, reference: string) {
   );
   if (result.error) return result;
   revalidatePath(`/booking/${bookingId}`);
-  revalidatePath("/my-bookings");
+  revalidatePath("/my-bookings/all");
   revalidatePath("/admin/finance");
   return result;
 }
@@ -174,7 +174,7 @@ export async function cancelBooking(bookingId: string) {
     parsed.success ? undefined : "Choose a valid reservation.",
   );
   if (result.error) return result;
-  revalidatePath("/my-bookings");
+  revalidatePath("/my-bookings/all");
   revalidatePath(`/booking/${bookingId}`);
   revalidatePath("/admin/finance");
   return result;
@@ -288,7 +288,7 @@ export async function staffSetStatus(
     });
     if (error) return { error: bookingError(error) };
     revalidatePath("/admin");
-    revalidatePath("/my-bookings");
+    revalidatePath("/my-bookings/all");
     revalidatePath(`/booking/${id}`);
     revalidatePath("/admin/finance");
     return { success: true };
@@ -353,7 +353,7 @@ export async function staffRecordBalance(input: unknown) {
     if (error) return { error: bookingError(error) };
     revalidatePath("/admin");
     revalidatePath("/admin/finance");
-    revalidatePath("/my-bookings");
+    revalidatePath("/my-bookings/all");
     revalidatePath(`/booking/${p.booking_id}`);
     return { success: true };
   } catch (error) {
