@@ -1552,13 +1552,7 @@ export function ClubConsole({
                           defaultValue={
                             (selected as Product)?.category ?? "Drinks"
                           }
-                          list="categories"
                         />
-                        <datalist id="categories">
-                          {["Drinks", "Snacks", "Gear", "Merch"].map((c) => (
-                            <option key={c}>{c}</option>
-                          ))}
-                        </datalist>
                       </label>
                       <label>
                         SKU
