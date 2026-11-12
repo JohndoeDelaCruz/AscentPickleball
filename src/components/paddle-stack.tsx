@@ -7,6 +7,7 @@ import { z } from "zod";
 import { formatDate, formatHour, isPastSlot } from "@/lib/booking";
 import { createClient } from "@/lib/supabase/client";
 import {
+  playerBoardPath,
   stackError,
   type ScoreAction,
   type StackBoard,
@@ -16,10 +17,10 @@ import {
   type StackSession,
 } from "@/lib/paddle-stack";
 import { Modal } from "./modal";
+import { MatchTeams } from "./match-teams";
 import { useAnimatedModal } from "./use-animated-modal";
 import styles from "./paddle-stack.module.css";
 
-const boardUrl = (id: string) => `/paddle-stack/${id}`;
 const sessionHours = (session: Pick<StackSession, "start_hour" | "end_hour">) =>
   `${formatHour(session.start_hour)}–${formatHour(session.end_hour)}`;
 const sessionStatus: Record<StackBoard["status"], string> = {
@@ -192,25 +193,14 @@ function CourtScore({
       {game ? (
         <>
           <p className={styles.muted}>{live ? "Current game" : "Last final score"}</p>
-          <div className={styles.teams}>
-            {(["a", "b"] as const).map((side) => (
-              <div className={styles.team} key={side}>
-                <span>Team {side.toUpperCase()}</span>
-                <strong className={styles.score} aria-label={`Team ${side.toUpperCase()} score ${game[`team_${side}`]}`}>
-                  {game[`team_${side}`]}
-                </strong>
-                <p>{game.players.slice(side === "a" ? 0 : 2, side === "a" ? 2 : 4).join(" & ")}</p>
-                {scoring && (
-                  <button type="button" className="button button-dark"
-                    aria-label={`Add a point for Team ${side.toUpperCase()} on ${court.name}`}
-                    disabled={busy || confirmFinish}
-                    onClick={() => void onScore?.(game, `point_${side}`)}>
-                    +1 point
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <MatchTeams game={game} scoreAction={scoring ? (side) => (
+            <button type="button" className="button button-dark"
+              aria-label={`Add a point for Team ${side.toUpperCase()} on ${court.name}`}
+              disabled={busy || confirmFinish}
+              onClick={() => void onScore?.(game, `point_${side}`)}>
+              +1 point
+            </button>
+          ) : undefined} />
           {scoring && (
             <div className={styles.controls}>
               {confirmFinish ? (
@@ -400,10 +390,10 @@ function StaffBoard({ session }: { session: string }) {
       <BoardHeading board={board} />
       <StackFeedback {...state} />
       <div className={styles.controls}>
-        <button className="button button-dark button-small" onClick={() => setShare({ path: boardUrl(session), scorekeeper: false })}>
+        <button className="button button-dark button-small" onClick={() => setShare({ path: playerBoardPath(session), scorekeeper: false })}>
           <QrCode size={17} aria-hidden="true" /> Player board QR
         </button>
-        <Link className="button button-small" href={boardUrl(session)} target="_blank" rel="noreferrer">
+        <Link className="button button-small" href={playerBoardPath(session)} target="_blank" rel="noreferrer">
           Open player board <ExternalLink size={15} aria-hidden="true" />
         </Link>
         {!isClosed && <button className="button button-small" disabled={busy || liveGame} onClick={() => setConfirmClose(true)}>
@@ -453,7 +443,7 @@ function StaffBoard({ session }: { session: string }) {
                 <button className="button button-small" disabled={busy || !court.active} onClick={async () => {
                   const result = await manage("assign", { p_court: court.id });
                   if (typeof result?.data === "string")
-                    setShare({ path: `${boardUrl(session)}#score=${result.data}`, scorekeeper: true });
+                    setShare({ path: `${playerBoardPath(session)}#score=${result.data}`, scorekeeper: true });
                 }}>{court.has_scorekeeper ? "Replace scorer link" : "Assign scorekeeper"}</button>
                 {court.has_scorekeeper && <button className="button button-small" disabled={busy}
                   onClick={() => void manage("revoke", { p_court: court.id })}>Revoke scorer link</button>}

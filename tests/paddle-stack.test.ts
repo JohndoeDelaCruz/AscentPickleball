@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
-import type { StackBoard, StackSession } from "../src/lib/paddle-stack";
+import type { CurrentMatch, StackBoard, StackSession } from "../src/lib/paddle-stack";
 
 test("Paddle Stack keeps the queue, court permissions, and final scores consistent", async (t) => {
   const db = new PGlite({ extensions: { btree_gist } });
@@ -69,6 +69,9 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       call<string | null>(staff, "paddle_stack_manage", [session, action, ...args]);
     const board = (user = "", key: string | null = null, staffView = false) =>
       call<StackBoard>(user, "get_paddle_stack", [session, key, staffView]);
+    const currentMatches = (user: string = customer) => as(user, async () => (
+      await db.query<CurrentMatch>("select * from public.current_paddle_stack_matches()")
+    ).rows);
     const players = Array.from({ length: 10 }, (_, index) => ({
       id: randomUUID(),
       name: `Player ${index + 1}`,
@@ -77,6 +80,8 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       manage("check_in", [null, players[index].id, players[index].name]);
 
     await t.test("only staff check players in and the public board shows just the active queue", async () => {
+      assert.deepEqual(await currentMatches(), []);
+      await assert.rejects(() => currentMatches(""), /permission denied/);
       await assert.rejects(() => call(customer, "paddle_stack_manage", [session, "check_in", null, players[0].id, "Player 1"]), /staff access/);
       await assert.rejects(() => call("", "paddle_stack_manage", [session, "close"]), /permission denied/);
       await assert.rejects(() => as(customer, () => db.exec("select * from private.paddle_stack_courts")), /permission denied/);
@@ -125,6 +130,12 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
         new Set(shuffled.slice(4, 8).map((player) => player.name)),
       ]);
       assert.deepEqual(current.waiting, [lastWaiting]);
+      const matches = await currentMatches();
+      assert.deepEqual(matches, current.courts.map(({ name, game }) => ({
+        session_id: session,
+        court_name: name,
+        game: { id: game!.id, team_a: 0, team_b: 0, players: game!.players },
+      })));
       await assert.rejects(() => call(staff, "paddle_stack_shuffle", [session, [lastWaiting.id]]), /at least two/i);
     });
 
@@ -142,6 +153,7 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       await assert.rejects(() => score(otherGame.id, 0, "point_a"), /valid scorekeeper link/);
       await assert.rejects(() => score(game.id, 0, "point_a", null), /valid scorekeeper link/);
       await score(game.id, 0, "point_a");
+      assert.equal((await currentMatches())[0].game.team_a, 1);
       await assert.rejects(() => score(game.id, 0, "point_a"), /game changed/);
       await score(game.id, 1, "point_b");
       await score(game.id, 2, "undo");
@@ -153,6 +165,7 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       await assert.rejects(() => score(game.id, 3, "finish", replacement), /valid scorekeeper link/);
       await assert.rejects(() => manage("close"), /finish the games/i);
       await score(game.id, 3, "finish", null, staff);
+      assert.deepEqual((await currentMatches()).map(({ game }) => game.id), [otherGame.id]);
       await assert.rejects(() => score(game.id, 4, "point_a", null, staff), /game changed/);
       await score(otherGame.id, 0, "finish", null, staff);
       const finished = await board(staff, null, true);
@@ -200,6 +213,16 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       assert.equal((await db.query("select id from public.bookings")).rows.length, 0);
       const settings = await db.query<{ schedule_config: unknown }>("select schedule_config from public.venue_settings");
       assert.deepEqual(settings.rows[0].schedule_config, schedule);
+    });
+
+    await t.test("the match feed excludes closed and expired sessions even with unfinished games", async () => {
+      await db.query(`update private.paddle_stack_games set finished_at = null
+        where id = (select id from private.paddle_stack_games where session_id = $1 order by started_at desc limit 1)`, [session]);
+      assert.deepEqual(await currentMatches(), []);
+      await db.query(`update private.paddle_stack_sessions
+        set closed_at = null, play_date = (now() at time zone 'Asia/Manila')::date - 2
+        where id = $1`, [session]);
+      assert.deepEqual(await currentMatches(), []);
     });
   } finally {
     await db.close();

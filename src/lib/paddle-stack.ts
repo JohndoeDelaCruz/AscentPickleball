@@ -1,4 +1,5 @@
 export const paddleStackPath = "/staff/paddle-stack";
+export const playerBoardPath = (session: string) => `/paddle-stack/${session}`;
 
 export type StackSession = {
   id: string | null;
@@ -18,6 +19,14 @@ export type StackGame = {
   team_b: number;
   can_undo: boolean;
   players: [string, string, string, string];
+};
+
+export type MatchScore = Pick<StackGame, "id" | "team_a" | "team_b" | "players">;
+
+export type CurrentMatch = {
+  session_id: string;
+  court_name: string;
+  game: MatchScore;
 };
 
 export type StackCourt = {

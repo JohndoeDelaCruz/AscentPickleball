@@ -13,6 +13,31 @@
   font-size: clamp(2.15rem, 6vw, 3.6rem);
 }
 
+.currentMatches {
+  display: grid;
+  gap: 12px;
+  margin-block-end: 28px;
+}
+
+.currentMatches h2,
+.currentMatches h3,
+.currentMatches p {
+  margin: 0;
+}
+
+.currentMatches h2 {
+  font-size: 1.35rem;
+}
+
+.currentMatches h3 {
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.currentMatches .score {
+  font-size: clamp(2.5rem, 4vw, 3rem);
+}
+
 .toolbar,
 .boardHeading,
 .courtHeading,

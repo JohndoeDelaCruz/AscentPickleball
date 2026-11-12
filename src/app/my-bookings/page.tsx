@@ -13,6 +13,7 @@ import {
 import { bookingPayments } from "@/lib/payment";
 import { bookingStatusLabel, type Booking } from "@/lib/types";
 import { courtName } from "@/lib/courts";
+import { CurrentMatches } from "@/components/current-matches";
 export const metadata: Metadata = { title: "My bookings" };
 export default async function MyBookings() {
   const { user } = await getSession();
@@ -43,6 +44,7 @@ export default async function MyBookings() {
           Account settings / Change password <ArrowUpRight size={17} />
         </Link>
       </div>
+      <CurrentMatches />
       {error ? (
         <div className="error-message">
           We couldn’t load your bookings. Please refresh and try again.
