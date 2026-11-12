@@ -1,10 +1,15 @@
-import type { User } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type User } from "@supabase/supabase-js";
 
 export type WorkspaceRole = "owner" | "manager" | "cashier";
 type SessionClient = {
   auth: { getUser(): PromiseLike<{ data: { user: User | null }; error: unknown }> };
   rpc(name: "club_role" | "is_club_staff" | "is_staff"): PromiseLike<{ data: unknown; error: unknown }>;
 };
+
+export async function readVerifiedUser(auth: SessionClient["auth"]) {
+  const result = await auth.getUser();
+  return isAuthRetryableFetchError(result.error) ? auth.getUser() : result;
+}
 
 export async function readStaffMembership(client: Pick<SessionClient, "rpc">) {
   const membership = await client.rpc("is_club_staff");
@@ -17,8 +22,12 @@ export async function readStaffMembership(client: Pick<SessionClient, "rpc">) {
 // React's request-scoped cache in data.ts shares this result across layouts/pages.
 export async function readSessionAccess(client: SessionClient): Promise<{
   user: User | null; staff: boolean; role: WorkspaceRole | undefined;
+  verificationUnavailable?: true;
 }> {
-  const { data: { user }, error } = await client.auth.getUser();
+  const { data: { user }, error } = await readVerifiedUser(client.auth);
+  if (isAuthRetryableFetchError(error)) {
+    return { user: null, staff: false, role: undefined, verificationUnavailable: true };
+  }
   if (error || !user) return { user: null, staff: false, role: undefined };
   const role = await client.rpc("club_role");
   if (!role.error) {

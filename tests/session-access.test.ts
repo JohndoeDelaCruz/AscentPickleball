@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { User } from "@supabase/supabase-js";
+import { AuthRetryableFetchError, type User } from "@supabase/supabase-js";
 import { readSessionAccess } from "../src/lib/session-access";
 
 const user: User = {
@@ -64,6 +64,29 @@ test("an Auth error fails closed even if a user is returned", async () => {
   const { client, calls } = fixture({ authError: new Error("Invalid session") });
   assert.deepEqual(await readSessionAccess(client), { user: null, staff: false, role: undefined });
   assert.deepEqual(calls, ["getUser"]);
+});
+
+test("a transient Auth failure recovers staff access when verification succeeds on retry", async () => {
+  const unavailable = new AuthRetryableFetchError("Auth unavailable", 503);
+  const { client, calls } = fixture({ results: { club_role: { data: "cashier", error: null } } });
+  const getUser = client.auth.getUser;
+  client.auth.getUser = async () => {
+    if (calls.length) return getUser();
+    calls.push("getUser");
+    return { data: { user: null }, error: unavailable };
+  };
+
+  assert.deepEqual(await readSessionAccess(client), { user, staff: true, role: "cashier" });
+  assert.deepEqual(calls, ["getUser", "getUser", "club_role"]);
+});
+
+test("continued Auth failure reports an unavailable session check without granting staff access", async () => {
+  const { client, calls } = fixture({ authError: new AuthRetryableFetchError("Auth unavailable", 503) });
+
+  assert.deepEqual(await readSessionAccess(client), {
+    user: null, staff: false, role: undefined, verificationUnavailable: true,
+  });
+  assert.deepEqual(calls, ["getUser", "getUser"]);
 });
 
 test("older databases keep their membership check without inventing a role", async () => {

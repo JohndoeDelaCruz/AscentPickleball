@@ -15,7 +15,8 @@ export default async function StaffPage({
 }: {
   searchParams: Promise<{ date?: string; tab?: string }>;
 }) {
-  const { user, staff } = await getSession();
+  const { user, staff, verificationUnavailable } = await getSession();
+  if (verificationUnavailable) throw new Error("Unable to verify the staff session. Try again in a moment.");
   if (!user) redirect("/login?next=/staff");
   if (!staff) redirect("/my-bookings");
   const p = await searchParams;

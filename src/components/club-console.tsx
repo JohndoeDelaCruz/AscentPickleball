@@ -229,7 +229,6 @@ export function ClubConsole({
     try {
       const result = await posCommand(command);
       if ("error" in result) throw new Error(result.error);
-      startNavigation(() => router.refresh());
       if (command.op === "checkout") {
         setCart({});
         checkoutKey.current = null;

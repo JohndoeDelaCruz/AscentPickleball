@@ -1,8 +1,10 @@
 "use server";
 import { z } from "zod";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkoutSchema, productSchema, type Sale } from "@/lib/pos";
+import { readVerifiedUser } from "@/lib/session-access";
 const id = z.uuid();
 const cents = z.int().min(0).max(100000000);
 const schema = z.discriminatedUnion("op", [
@@ -53,8 +55,12 @@ export async function posCommand(
     const db = await createClient();
     const {
       data: { user },
-    } = await db.auth.getUser();
-    if (!user) return { error: "Please sign in again." };
+      error: authError,
+    } = await readVerifiedUser(db.auth);
+    if (isAuthRetryableFetchError(authError)) {
+      return { error: "Sign-in verification is temporarily unavailable. Try again in a moment." };
+    }
+    if (authError || !user) return { error: "Please sign in again." };
     const { data: allowed } = await db.rpc("is_club_staff");
     if (!allowed) return { error: "Authorized staff access is required." };
     const c = parsed.data;
