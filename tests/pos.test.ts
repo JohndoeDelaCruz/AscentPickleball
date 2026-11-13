@@ -132,7 +132,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         'OLD-REVIEW-123',now()-interval '2 hours')`,
       [legacyReview, player],
     );
-    for (const file of files.filter((f) => f >= "202611110018"))
+    for (const file of files.filter((f) => f >= "202611110018" && f < "202611130020"))
       await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
 
     await t.test("GCash review finds overdue bookings across dates and safely releases rejected court time and open-play capacity", async () => {
@@ -593,6 +593,67 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         );
       },
     );
+    await t.test("expense access, retries, monthly totals, and drawer reconciliation", async () => {
+      const date = dayKey();
+      const month = `${date.slice(0, 7)}-01`;
+      const record = async (user: string, args: unknown[]) =>
+        (await call<Date>(user, "pos_record_expense", args)).toISOString().slice(0, 10);
+      type Report = { row_count: number; total_cents: number; drawer_cents: number; rows: { id: string; void_reason: string | null }[] };
+      const report = (user: string, page = 1) => call<Report>(user, "pos_expense_report", [month, page]);
+      const drawerShift = await call<string>(cashier, "pos_open_shift", [10000]);
+      const drawer = [randomUUID(), null, "supplies", "Court supplies", 1225, "cash", drawerShift];
+      const anotherDrawer = [randomUUID(), null, "maintenance", "Court repair", 2000, "cash", drawerShift];
+      const bill = [randomUUID(), date, "utilities", "Electricity", 3500, "gcash", null];
+      const expected = async () => Number((await as(cashier, () =>
+        db.query<{ expected_cents: number }>("select expected_cents from public.pos_shift_summary() where id=$1", [drawerShift]),
+      )).rows[0].expected_cents);
+
+      const before = await readCurrentData();
+      for (const file of files.filter((f) => f >= "202611130020"))
+        await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
+      assert.deepEqual(await readCurrentData(), before);
+
+      await assert.rejects(() => report(player), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select * from public.pos_expenses"), "anon"), /permission denied/);
+      await assert.rejects(() => record(player, drawer), /Authorized staff/);
+      await assert.rejects(() => record(cashier, bill), /Manager authorization/);
+      await assert.rejects(() => record(owner, drawer), /Open your cashier shift/);
+      await assert.rejects(() => record(cashier, [...drawer.slice(0, 5), "gcash", drawerShift]), /valid expense/);
+      await assert.rejects(() => record(owner, [randomUUID(), "2100-12-31", ...bill.slice(2)]), /today or an earlier date/);
+      assert.equal(await record(cashier, drawer), date);
+      assert.equal(await record(cashier, drawer), date);
+      await assert.rejects(() => record(cashier, [...drawer.slice(0, 4), 100, ...drawer.slice(5)]), /different expense/);
+      assert.equal(await expected(), 8775);
+      assert.equal(await record(cashier, anotherDrawer), date);
+      await record(owner, bill);
+      assert.equal((await report(cashier)).row_count, 2);
+      assert.equal((await report(owner)).total_cents, 6725);
+      assert.equal((await report(owner)).drawer_cents, 3225);
+      assert.equal((await as(player, () => db.query("select id from public.pos_expenses"))).rows.length, 0);
+      await assert.rejects(() => as(owner, () => db.query("delete from public.pos_expenses")), /permission denied/);
+      await assert.rejects(() => call(cashier, "pos_void_expense", [drawer[0], "Correction"]), /Manager authorization/);
+
+      await call(owner, "pos_void_expense", [anotherDrawer[0], "Duplicate entry"]);
+      assert.equal(await expected(), 8775);
+      await call(cashier, "pos_close_shift", [drawerShift, 8775]);
+      assert.equal(await record(cashier, drawer), date);
+      await assert.rejects(() => record(cashier, [randomUUID(), ...drawer.slice(1)]), /Open your cashier shift/);
+      await call(owner, "pos_void_expense", [drawer[0], "Entered in error"]);
+      await call(owner, "pos_void_expense", [drawer[0], "Retry"]);
+      assert.equal(await expected(), 8775);
+      assert.equal((await report(owner)).total_cents, 3500);
+      assert.equal((await report(owner)).rows.find((row) => row.id === drawer[0])?.void_reason, "Entered in error");
+      const audit = await db.query<{ action: string }>("select action from public.pos_audit where entity_id=$1 order by created_at", [drawer[0]]);
+      assert.deepEqual(audit.rows.map((row) => row.action), ["expense.record", "expense.void"]);
+
+      for (let i = 0; i < 23; i++) await record(owner, [randomUUID(), ...bill.slice(1)]);
+      const firstPage = await report(owner);
+      const secondPage = await report(owner, 2);
+      assert.equal(firstPage.rows.length, 25);
+      assert.equal(secondPage.rows.length, 1);
+      assert.equal(secondPage.total_cents, 84000);
+      assert.ok(!firstPage.rows.some((row) => row.id === secondPage.rows[0].id));
+    });
   } finally {
     await db.close();
   }

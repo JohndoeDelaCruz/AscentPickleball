@@ -98,6 +98,8 @@ Apply `202611090016_paddle_stack.sql` and `202611090017_paddle_stack_rotation.sq
 
 Apply `202611110018_gcash_payment_review.sql` after 017, then deploy the app. In **Staff → Reservations → GCash review**, unresolved references appear oldest first across all booking dates and are flagged after 30 minutes. Older submissions use their original hold deadline when the submission time is unknown. Staff must check the GCash account before rejecting a reference. Rejection cancels the unpaid booking, releases its availability, and records the reference and reason in the POS audit log. The queue does not automatically release reservations under review.
 
+Apply `202611130020_expense_tracker.sql` after 019 before deploying **Staff → Finance → Expenses**. Managers and owners can record expenses and void entries with a reason. Cashiers can record and view expenses paid from their own register shift. Register expenses reduce expected cash at shift closing. Voids are excluded from expense totals, and closed shifts retain the cash reconciliation saved when they closed.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
@@ -111,6 +113,7 @@ Apply `202611110018_gcash_payment_review.sql` after 017, then deploy the app. In
 | `/my-bookings`    | Your reservations and statuses                                                      |
 | `/booking/[id]`   | Booking details, GCash QR, payment reference, unpaid cancellation                   |
 | `/staff`          | Overview, point of sale, reservations, inventory, transactions, collections report |
+| `/staff/expenses` | Monthly expense log, totals, and cash drawer expenses                               |
 | `/admin`          | Staff calendar, GCash reviews, confirmed walk-ins, maintenance blocks               |
 | `/admin/settings` | Editable venue details, rates/hours, QR upload, booking toggle                      |
 | `/admin/finance`  | Daily log, monthly sales/hours, payment methods, private staff notes, CSV downloads |

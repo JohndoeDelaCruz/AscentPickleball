@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBasket, CalendarDays, Package, ReceiptText,
-  ChartNoAxesCombined, Settings2, ListOrdered,
+  ChartNoAxesCombined, Settings2, ListOrdered, Wallet,
 } from "lucide-react";
 import { workspaceTabs, type WorkspaceTab } from "@/lib/workspace";
 import { paddleStackPath } from "@/lib/paddle-stack";
+import { expensesPath } from "@/lib/expenses";
 
 const icons = {
   overview: LayoutDashboard, pos: ShoppingBasket, bookings: CalendarDays,
@@ -67,6 +68,14 @@ export function WorkspaceNavigation({
             aria-current={path === paddleStackPath ? "page" : undefined} onNavigate={onNavigate}>
             <ListOrdered size={19} aria-hidden="true" />
             <span className="management-label">Paddle Stack</span>
+          </Link>
+        )}
+        {group.label === "Finance" && (
+          <Link href={expensesPath} title="Expenses" aria-label="Expenses"
+            className={path === expensesPath ? "selected" : ""}
+            aria-current={path === expensesPath ? "page" : undefined} onNavigate={onNavigate}>
+            <Wallet size={19} aria-hidden="true" />
+            <span className="management-label">Expenses</span>
           </Link>
         )}
         {showPage && <Link href={group.page.href} title={group.page.label} aria-label={group.page.label}

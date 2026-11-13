@@ -5,6 +5,7 @@ import styles from "./workspace-skeleton.module.css";
 const labels: Record<WorkspaceView, string> = {
   overview: "club overview", pos: "point of sale", bookings: "reservations",
   inventory: "inventory", transactions: "transactions", reports: "sales reports",
+  expenses: "expenses",
   calendar: "court calendar", finance: "booking finance", settings: "venue settings", account: "account settings",
 };
 const tones = ["lime", "lavender", "peach", "blue"];
@@ -102,6 +103,7 @@ export function WorkspaceSkeleton({ view, heading = true, courtCount, financeVie
         : view === "settings" ? <Settings />
         : view === "account" ? <Account />
         : view === "reports" ? <Reports />
+        : view === "expenses" ? <><div className={styles.toolbar}><Block className={styles.action} /></div><Table /></>
         : <>{view === "inventory" && <div className={styles.summary}><Block /><Block /><Block /></div>}<Toolbar /><Table columns={view === "inventory" ? 6 : 5} /></>}
     </div>
   </section></>;
