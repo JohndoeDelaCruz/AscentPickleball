@@ -164,47 +164,54 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       await manage("revoke", [1]);
       await assert.rejects(() => score(game.id, 3, "finish", replacement), /valid scorekeeper link/);
       await assert.rejects(() => manage("close"), /finish the games/i);
-      await score(game.id, 3, "finish", null, staff);
+      const activeKey = await manage("assign", [1]);
+      await score(game.id, 3, "finish", activeKey);
       assert.deepEqual((await currentMatches()).map(({ game }) => game.id), [otherGame.id]);
-      await assert.rejects(() => score(game.id, 4, "point_a", null, staff), /game changed/);
+      const afterFinish = [lastWaiting.id, ...firstFour];
+      assert.deepEqual((await board()).waiting.map(({ id }) => id), afterFinish);
+      await assert.rejects(() => score(game.id, 3, "finish", activeKey), /game changed/);
+      assert.deepEqual((await board()).waiting.map(({ id }) => id), afterFinish);
       await score(otherGame.id, 0, "finish", null, staff);
       const finished = await board(staff, null, true);
       assert.equal(finished.results.length, 2);
       assert.deepEqual(finished.results.find((result) => result.id === game.id)?.team_a, 1);
       assert.deepEqual(finished.results.find((result) => result.id === game.id)?.team_b, 0);
-      assert.equal(finished.resting.length, 8);
+      assert.deepEqual(finished.waiting.map(({ id }) => id), [...afterFinish, ...secondFour]);
+      assert.deepEqual(finished.resting, []);
     });
 
     await t.test("the next matchup splits winners and losers, even when only some players return", async () => {
       const finished = await board();
       const winners = finished.courts[0].game!.players.slice(0, 2);
-      const requeue = (id: string) => manage("rejoin", [null, id]);
       await manage("pause", [null, lastWaiting.id]);
-      for (const id of firstFour) await requeue(id);
       await manage("call", [1, null, null, firstFour]);
       const rematch = (await board()).courts[0].game!;
       assert.equal(rematch.players.slice(0, 2).filter((name) => winners.includes(name)).length, 1);
       assert.equal(rematch.players.slice(2).filter((name) => winners.includes(name)).length, 1);
       await call(staff, "paddle_stack_score", [session, rematch.id, 0, "finish"]);
 
-      // Join in pairs that just played together, including two players from a tied game.
+      // Sit out the others so pairs from two previous games are up next.
       const firstPair = rematch.players.slice(0, 2);
       const secondPair = finished.courts[1].game!.players.slice(0, 2);
-      const mixedFour = [...firstPair, ...secondPair].map((name) => players.find((player) => player.name === name)!.id);
-      for (const id of mixedFour) await requeue(id);
+      const mixedFour = [];
+      for (const player of (await board()).waiting) {
+        if (firstPair.includes(player.name) || secondPair.includes(player.name)) mixedFour.push(player.id);
+        else await manage("pause", [null, player.id]);
+      }
       await manage("call", [2, null, null, mixedFour]);
       const mixedGame = (await board()).courts[1].game!;
       assert.equal(mixedGame.players.slice(0, 2).filter((name) => firstPair.includes(name)).length, 1);
       assert.equal(mixedGame.players.slice(0, 2).filter((name) => secondPair.includes(name)).length, 1);
       await call(staff, "paddle_stack_score", [session, mixedGame.id, 0, "finish"]);
-      await requeue(lastWaiting.id);
+      assert.deepEqual((await board()).waiting.map(({ id }) => id), mixedFour);
+      assert.ok((await board(staff, null, true)).resting.some(({ id }) => id === lastWaiting.id));
     });
 
     await t.test("players can requeue at the back, and closing retires the queue", async () => {
-      await manage("rejoin", [null, shuffled[0].id]);
-      await manage("rejoin", [null, shuffled[1].id]);
-      await manage("rejoin", [null, shuffled[0].id]);
-      assert.deepEqual((await board()).waiting, [lastWaiting, shuffled[0], shuffled[1]]);
+      const waiting = (await board()).waiting;
+      await manage("rejoin", [null, lastWaiting.id]);
+      await manage("rejoin", [null, lastWaiting.id]);
+      assert.deepEqual((await board()).waiting, [...waiting, lastWaiting]);
       await manage("close");
       assert.equal((await board()).status, "closed");
       assert.deepEqual((await board()).waiting, []);
@@ -279,7 +286,6 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       // With one beginner, their partner is the strongest of the other three.
       await setSkill(2, "intermediate");
       for (const player of queued.slice(4)) await manage("pause", [null, player.id]);
-      for (const player of queued.slice(0, 4)) await manage("rejoin", [null, player.id]);
       await manage("call", [1, null, null, fifoIds]);
       game = (await board()).courts[0].game!;
       assert.deepEqual(game.players.slice(0, 2), [queued[0].name, queued[1].name]);
@@ -288,7 +294,7 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       await setSkill(2, "beginner");
       await setSkill(4, "beginner");
       await setSkill(5, "beginner");
-      for (const player of queued) await manage("rejoin", [null, player.id]);
+      for (const player of queued.slice(4)) await manage("rejoin", [null, player.id]);
       assert.deepEqual((await board()).next_players, beginnerIds);
       await manage("call", [1, null, null, beginnerIds]);
       const next = await board();

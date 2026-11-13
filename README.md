@@ -102,6 +102,8 @@ Apply `202611130020_expense_tracker.sql` after 019 before deploying **Staff → 
 
 Apply `202611140021_paddle_stack_skill_levels.sql` after 020 before deploying skill levels. At check-in, staff can choose Beginner, Intermediate, Advanced, or Unrated. The first player in line always plays next. If three more players share their skill level, the system calls the earliest three of that level. Otherwise it calls the first four in line. It balances the two teams by skill and uses recent teammates and results to break ties. Players without a saved level are unrated.
 
+Apply `202611140022_paddle_stack_auto_requeue.sql` after 021 to return all four players to the back of the queue when staff or a scorekeeper saves the final score. Use **Sit out** and **Requeue** to manage breaks.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

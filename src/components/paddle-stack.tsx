@@ -501,7 +501,7 @@ function StaffBoard({ session }: { session: string }) {
               <ul className={styles.players}>
                 {board.resting.map((player) => <li key={player.id}><strong>{player.name}</strong>{playerActions(player, false)}</li>)}
               </ul>
-            ) : <p className={styles.muted}>Players can rejoin the queue here after a game or a break.</p>}
+            ) : <p className={styles.muted}>Use Sit out to give a player a break. Select Requeue when they’re ready.</p>}
           </section>
         </div>
       )}
