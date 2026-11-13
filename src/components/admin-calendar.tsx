@@ -2,7 +2,7 @@
 import { WorkspacePageHeading } from "./workspace-page-heading";
 import type { CSSProperties } from "react";
 import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
@@ -32,8 +32,7 @@ import { EquipmentRental } from "./equipment-rental";
 import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
 import { resolveSchedule, scheduleHours } from "@/lib/schedule";
-
-const reservationPageSize = 10;
+import { TablePagination, useTablePage } from "./table-pagination";
 
 export function AdminCalendar({
   bookings,
@@ -53,13 +52,8 @@ export function AdminCalendar({
   }>();
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-  const [reservationPage, setReservationPage] = useState(1);
-  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const reservations = useTablePage(bookings.length, date);
   const router = useRouter();
-  const pageCount = Math.ceil(bookings.length / reservationPageSize);
-  const page = Math.min(reservationPage, Math.max(1, pageCount));
-  const firstRow = (page - 1) * reservationPageSize;
-  const endRow = Math.min(firstRow + reservationPageSize, bookings.length);
   const active = bookings.filter(
     (b) => !["cancelled", "expired"].includes(b.status),
   );
@@ -75,11 +69,7 @@ export function AdminCalendar({
       ),
     ]),
   ].sort((a, b) => a - b);
-  function changeReservationPage(nextPage: number) {
-    setReservationPage(nextPage);
-    reviewHeading.current?.focus({ preventScroll: true });
-    reviewHeading.current?.scrollIntoView({ block: "start", behavior: "instant" });
-  }
+  const courtHours = useTablePage(hours.length, date);
 
   function update() {
     if (!action) return;
@@ -163,12 +153,14 @@ export function AdminCalendar({
           No scheduled court time on this date.
         </div>
       )}
-      <div className="availability-grid dynamic-court-grid" style={{ marginBottom: 28, "--court-columns": Math.max(1, courts.length) } as CSSProperties}>
+      <div style={{ marginBottom: 28 }}>
+      <div id="calendar-court-slots" tabIndex={-1} role="region" aria-label="Court calendar time slots"
+        className="availability-grid dynamic-court-grid" style={{ "--court-columns": Math.max(1, courts.length) } as CSSProperties}>
         <div className="availability-header">
           <div>PHT / UTC+8</div>
           {courts.map((court) => <div key={court.id}>{court.name}{!court.active && " · Inactive"}</div>)}
         </div>
-        {hours.map((hour) => (
+        {hours.slice(courtHours.start, courtHours.end).map((hour) => (
           <div className="availability-row" key={hour}>
             <div className="time-label">{formatHour(hour)}</div>
             {courts.map(({ id: court }) => {
@@ -215,6 +207,8 @@ export function AdminCalendar({
           </div>
         ))}
       </div>
+        <TablePagination {...courtHours} label="Court calendar time slot pages" anchorId="calendar-court-slots" />
+      </div>
       {sessions.map((session) => (
         <div className="notice" style={{ marginBottom: 24 }} key={session.id}>
           <span>
@@ -237,7 +231,7 @@ export function AdminCalendar({
       ))}
       <section className="panel" aria-labelledby="calendar-reservation-review" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "22px 24px" }}>
-          <h3 id="calendar-reservation-review" ref={reviewHeading} tabIndex={-1} style={{ fontSize: 17, margin: 0 }}>
+          <h3 id="calendar-reservation-review" tabIndex={-1} style={{ fontSize: 17, margin: 0 }}>
             Reservations & payment review
           </h3>
           <p className="small-print">
@@ -265,7 +259,7 @@ export function AdminCalendar({
                 </tr>
               </thead>
               <tbody>
-                {bookings.slice(firstRow, endRow).map((b) => (
+                {bookings.slice(reservations.start, reservations.end).map((b) => (
                   <tr key={b.id}>
                     <td>
                       <strong>{b.customer_name}</strong>
@@ -379,18 +373,7 @@ export function AdminCalendar({
             </table>
           </div>
         )}
-        {pageCount > 1 && (
-          <nav className="finance-log-footer" aria-label="Reservation pages">
-            <span role="status">Showing {firstRow + 1}–{endRow} of {bookings.length} entries</span>
-            <div className="finance-actions">
-              <button type="button" className="button button-small" disabled={page === 1}
-                onClick={() => changeReservationPage(page - 1)}>Previous</button>
-              <span>Page {page} of {pageCount}</span>
-              <button type="button" className="button button-small" disabled={page === pageCount}
-                onClick={() => changeReservationPage(page + 1)}>Next</button>
-            </div>
-          </nav>
-        )}
+        <TablePagination {...reservations} label="Reservation pages" anchorId="calendar-reservation-review" />
       </section>
       {createOpen && (
         <CreateBookingModal

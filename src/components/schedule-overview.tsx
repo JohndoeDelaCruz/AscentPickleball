@@ -1,70 +1,7 @@
 import Link from "next/link";
-import {
-  addDays,
-  formatDate,
-  formatHour,
-  localDate,
-  money,
-  openPlayCapacityLabel,
-} from "@/lib/booking";
-import {
-  daysLabel,
-  type ScheduleBlock,
-  type ScheduleConfig,
-} from "@/lib/schedule";
-
-function ScheduleRows({ blocks, courtCount }: { blocks: ScheduleBlock[]; courtCount: number }) {
-  return blocks.length ? (
-    <div className="table-scroll">
-      <table className="admin-table public-schedule-table">
-        <caption className="sr-only">
-          Court hours and open-play session rates, Philippine Time
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Days</th>
-            <th scope="col">Time</th>
-            <th scope="col">Type</th>
-            <th scope="col">Rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...blocks]
-            .sort(
-              (a, b) =>
-                Math.min(...a.days) - Math.min(...b.days) || a.start - b.start,
-            )
-            .map((block) => (
-              <tr key={block.id}>
-                <td>{daysLabel(block.days)}</td>
-                <td>
-                  {formatHour(block.start)}–{formatHour(block.end)}
-                </td>
-                <td>
-                  {block.kind === "court" ? "Private booking" : "Open play"}
-                  <small>
-                    {block.kind === "open_play"
-                      ? openPlayCapacityLabel(block.capacity, courtCount)
-                      : `${block.capacity} players per court`}
-                  </small>
-                </td>
-                <td>
-                  <strong>{money(block.rate)}</strong>
-                  <small>
-                    {block.kind === "court"
-                      ? "per court / hour"
-                      : "per person / session"}
-                  </small>
-                </td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
-    </div>
-  ) : (
-    <p>No court time is scheduled.</p>
-  );
-}
+import { addDays, formatDate, localDate } from "@/lib/booking";
+import type { ScheduleConfig } from "@/lib/schedule";
+import { ScheduleRows } from "./schedule-rows";
 
 export function ScheduleOverview({ config, courtCount }: { config: ScheduleConfig; courtCount: number }) {
   const today = localDate();
@@ -95,17 +32,17 @@ export function ScheduleOverview({ config, courtCount }: { config: ScheduleConfi
             <strong>{active.name}</strong> · {formatDate(active.start_date)}–
             {formatDate(active.end_date)}
           </p>
-          <ScheduleRows blocks={active.blocks} courtCount={courtCount} />
+          <ScheduleRows blocks={active.blocks} courtCount={courtCount} label={active.name} />
           <p className="small-print">
             Regular hours resume {formatDate(addDays(active.end_date, 1))}.
           </p>
           <details>
             <summary>Regular weekly schedule</summary>
-            <ScheduleRows blocks={config.weekly} courtCount={courtCount} />
+            <ScheduleRows blocks={config.weekly} courtCount={courtCount} label="Regular weekly schedule" />
           </details>
         </>
       ) : (
-        <ScheduleRows blocks={config.weekly} courtCount={courtCount} />
+        <ScheduleRows blocks={config.weekly} courtCount={courtCount} label="Regular weekly schedule" />
       )}
       {upcoming && (
         <details>
@@ -113,7 +50,7 @@ export function ScheduleOverview({ config, courtCount }: { config: ScheduleConfi
             {upcoming.name} · {formatDate(upcoming.start_date)}–
             {formatDate(upcoming.end_date)}
           </summary>
-          <ScheduleRows blocks={upcoming.blocks} courtCount={courtCount} />
+          <ScheduleRows blocks={upcoming.blocks} courtCount={courtCount} label={upcoming.name} />
         </details>
       )}
       <p className="small-print">

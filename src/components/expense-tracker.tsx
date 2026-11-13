@@ -11,6 +11,7 @@ import { peso } from "@/lib/pos";
 import { Modal } from "./modal";
 import { useAnimatedModal } from "./use-animated-modal";
 import { WorkspacePageHeading } from "./workspace-page-heading";
+import { TablePagination } from "./table-pagination";
 import styles from "./expense-tracker.module.css";
 
 const reportHref = (month: string, page = 1) =>
@@ -28,7 +29,6 @@ export function ExpenseTracker({ report, month, page, today, manager }: {
     { kind: "record"; id: string; shift: string | null } | { kind: "void"; expense: Expense }
   >();
   const [status, setStatus] = useState("");
-  const totalPages = Math.ceil(report.row_count / expensesPageSize);
   const close = () => setDialog(null);
 
   return <>
@@ -100,11 +100,8 @@ export function ExpenseTracker({ report, month, page, today, manager }: {
           </table>
         </div>
       ) : <p className="panel-empty-note">No expenses recorded for this month.</p>}
-      {totalPages > 1 && <nav className={styles.pagination} aria-label="Expense pages">
-        {page > 1 && <Link href={reportHref(month, page - 1)} className="button button-small">Previous</Link>}
-        <span>Page {page} of {totalPages}</span>
-        {page < totalPages && <Link href={reportHref(month, page + 1)} className="button button-small">Next</Link>}
-      </nav>}
+      <TablePagination count={report.row_count} page={page} pageSize={expensesPageSize} label="Expense pages"
+        href={(nextPage) => `${reportHref(month, nextPage)}#expense-log`} />
     </section>
     {dialog?.kind === "record" && <RecordExpenseDialog key={dialog.id} id={dialog.id} shift={dialog.shift}
       today={today} manager={manager} closing={closing} onClose={close} onSaved={(date) => {
@@ -141,8 +138,8 @@ function RecordExpenseDialog({ id, shift, today, manager, closing, onClose, onSa
           description: fields.get("description"), amount: fields.get("amount"),
           method: drawer ? "cash" : payment, shift: drawer ? shift : null,
         });
-        if (result.error) setError(result.error);
-        else if (result.date) onSaved(result.date);
+        if ("date" in result && result.date) onSaved(result.date);
+        else if ("error" in result && result.error) setError(result.error);
       } catch {
         setError("Connection interrupted. Retry the same expense to confirm it was saved.");
       }

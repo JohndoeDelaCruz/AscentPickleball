@@ -44,6 +44,7 @@ import {
 import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
+import { TablePagination, useTablePage } from "./table-pagination";
 type Modal =
   | "checkout"
   | "product"
@@ -165,6 +166,18 @@ export function ClubConsole({
   const reservationRows = (reviewOnly ? pending : data.bookings).filter((b) =>
     `${b.customer_name} ${b.reference}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const products = data.products.filter((p) =>
+    `${p.name} ${p.sku} ${p.barcode}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  const transactionRows = data.sales.filter((s) =>
+    `${s.number} ${s.customer_name}`.toLowerCase().includes(search.toLowerCase()),
+  );
+  const dailySales = data.sales.filter((s) => dayKey(s.created_at) === date);
+  const reservations = useTablePage(reservationRows.length, `${initialDate}:${tab}:${reviewOnly}:${search}`);
+  const inventory = useTablePage(products.length, `${tab}:${search}`);
+  const transactions = useTablePage(transactionRows.length, `${initialDate}:${tab}:${search}`);
+  const recentTransactions = useTablePage(data.sales.length, `${initialDate}:${tab}`, 5);
+  const collections = useTablePage(dailySales.length, `${initialDate}:${tab}`);
   const paymentReviews = new Map(data.paymentReviews?.map((b) => [b.id, b]));
   useEffect(() => {
     if ((tab !== "overview" && tab !== "bookings") || modal || isNavigating || !data.ready) return;
@@ -410,8 +423,8 @@ export function ClubConsole({
       setError(e instanceof Error ? e.message : "Please check the form.");
     }
   }
-  const tableSales = (list: Sale[]) => (
-    <div className="console-table-wrap">
+  const tableSales = (list: Sale[], anchorId: string, label: string) => (
+    <div id={anchorId} className="console-table-wrap" tabIndex={-1} role="region" aria-label={label}>
       <table className="console-table">
         <thead>
           <tr>
@@ -730,7 +743,8 @@ export function ClubConsole({
                     View all <ArrowUpRight size={15} />
                   </button>
                 </div>
-                {tableSales(data.sales.slice(0, 5))}
+                {tableSales(data.sales.slice(recentTransactions.start, recentTransactions.end), "recent-transactions", "Recent transactions")}
+                <TablePagination {...recentTransactions} label="Recent transaction pages" anchorId="recent-transactions" />
               </section>
             </>
           )}
@@ -958,7 +972,7 @@ export function ClubConsole({
                   {overdue === 1 ? "1 payment review is overdue." : `${overdue} payment reviews are overdue.`} Check your GCash account to verify or reject the references.
                 </p>
               )}
-              <div className="console-table-wrap">
+              <div id="staff-reservation-table" className="console-table-wrap" tabIndex={-1} role="region" aria-label="Reservations">
                 <table className="console-table">
                   <thead>
                     <tr>
@@ -970,7 +984,7 @@ export function ClubConsole({
                     </tr>
                   </thead>
                   <tbody>
-                    {reservationRows.map((b) => {
+                    {reservationRows.slice(reservations.start, reservations.end).map((b) => {
                       const review = paymentReviews.get(b.id);
                       return (
                         <tr key={b.id}>
@@ -1042,6 +1056,8 @@ export function ClubConsole({
                   />
                 )}
               </div>
+              <TablePagination {...reservations} label={reviewOnly ? "GCash review pages" : "Staff reservation pages"}
+                anchorId="staff-reservation-table" />
             </section>
           )}
           {tab === "inventory" && (
@@ -1079,7 +1095,7 @@ export function ClubConsole({
                     />
                   </div>
                 </div>
-                <div className="console-table-wrap">
+                <div id="inventory-table" className="console-table-wrap" tabIndex={-1} role="region" aria-label="Inventory">
                   <table className="console-table">
                     <thead>
                       <tr>
@@ -1092,12 +1108,8 @@ export function ClubConsole({
                       </tr>
                     </thead>
                     <tbody>
-                      {data.products
-                        .filter((p) =>
-                          `${p.name} ${p.sku} ${p.barcode}`
-                            .toLowerCase()
-                            .includes(search.toLowerCase()),
-                        )
+                      {products
+                        .slice(inventory.start, inventory.end)
                         .map((p) => (
                           <tr key={p.id}>
                             <td>
@@ -1145,13 +1157,14 @@ export function ClubConsole({
                         ))}
                     </tbody>
                   </table>
-                  {!data.products.length && (
+                  {!products.length && (
                     <Empty
-                      title="No products"
-                      text="Add a product to start tracking stock."
+                      title={search ? "No matching products" : "No products"}
+                      text={search ? "Try a different product name, SKU, or barcode." : "Add a product to start tracking stock."}
                     />
                   )}
                 </div>
+                <TablePagination {...inventory} label="Inventory pages" anchorId="inventory-table" />
               </section>
               <section className="console-panel movement-panel">
                 <div className="panel-heading">
@@ -1195,13 +1208,8 @@ export function ClubConsole({
                 </div>
                 <span className="subtle-pill">{data.sales.length} records</span>
               </div>
-              {tableSales(
-                data.sales.filter((s) =>
-                  `${s.number} ${s.customer_name}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-                ),
-              )}
+              {tableSales(transactionRows.slice(transactions.start, transactions.end), "transaction-table", "Transactions")}
+              <TablePagination {...transactions} label="Transaction pages" anchorId="transaction-table" />
             </section>
           )}
           {tab === "reports" && (
@@ -1325,9 +1333,8 @@ export function ClubConsole({
                     Export
                   </button>
                 </div>
-                {tableSales(
-                  data.sales.filter((s) => dayKey(s.created_at) === date),
-                )}
+                {tableSales(dailySales.slice(collections.start, collections.end), "collection-sales-table", "Sales for the selected date")}
+                <TablePagination {...collections} label="Collection sales pages" anchorId="collection-sales-table" />
               </section>
             </>
           )}

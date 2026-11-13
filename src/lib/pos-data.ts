@@ -1,6 +1,22 @@
+import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "./supabase/server";
-import { dayKey, type PosData, type Sale, type SaleItem } from "./pos";
+import { dayKey, type PosBooking, type PosData, type PosPaymentReview, type Sale, type SaleItem } from "./pos";
 import { getCourtInventory } from "./data";
+
+async function readPosRows<Row>(read: (start: number, end: number) => PromiseLike<{
+  data: Row[] | null;
+  error: PostgrestError | null;
+}>) {
+  const batchSize = 500;
+  const rows: Row[] = [];
+  for (let start = 0; ; start += batchSize) {
+    const { data, error } = await read(start, start + batchSize - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data ?? []));
+    if (!data || data.length < batchSize) return { data: rows, error: null };
+  }
+}
+
 export async function getPosData(day = dayKey()): Promise<PosData> {
   const inventory = await getCourtInventory();
   const empty: PosData = {
@@ -21,7 +37,7 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
     const start = `${day}T00:00:00+08:00`;
     const end = new Date(new Date(start).getTime() + 86400000).toISOString();
     const [products, payments, refunds, shifts, movements, bookings, role, reviews] = await Promise.all([
-      db.from("pos_products").select("*").order("name").limit(1000),
+      readPosRows((start, end) => db.from("pos_products").select("*").order("name").order("id").range(start, end)),
       db
         .from("pos_payments")
         .select("*")
@@ -41,9 +57,9 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50),
-      db.rpc("pos_reservations", { p_date: day }).limit(1000),
+      readPosRows<PosBooking>((start, end) => db.rpc("pos_reservations", { p_date: day }).range(start, end)),
       db.rpc("club_role"),
-      db.rpc("pos_payment_reviews").limit(1000),
+      readPosRows<PosPaymentReview>((start, end) => db.rpc("pos_payment_reviews").range(start, end)),
     ]);
     if ([products, payments, refunds, shifts, movements, bookings, role].some((r) => r.error))
       return {
@@ -67,12 +83,13 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
       ),
     ];
     const filter = `and(created_at.gte.${start},created_at.lt.${end})${ids.length ? `,id.in.(${ids.join(",")})` : ""}`;
-    const { data: sales, error } = await db
+    const { data: sales, error } = await readPosRows((start, end) => db
       .from("pos_sales")
       .select("*,items:pos_sale_items(*)")
       .or(filter)
       .order("created_at", { ascending: false })
-      .limit(1000);
+      .order("id")
+      .range(start, end));
     if (error)
       return {
         ...empty,

@@ -2201,6 +2201,20 @@ img {
 .table-scroll {
   overflow-x: auto;
 }
+.table-pagination,
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.table-pagination {
+  justify-content: space-between;
+  padding: 14px clamp(12px, 2vw, 22px);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
 .admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -2329,6 +2343,9 @@ img {
   padding: 16px 8px;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
+}
+.schedule-table tr[hidden] {
+  display: none !important;
 }
 .schedule-table .field input,
 .schedule-table .field select {
@@ -3526,8 +3543,7 @@ img {
   overflow: hidden;
 }
 .finance-month-panel .table-scroll {
-  max-height: 370px;
-  overflow: auto;
+  overflow-x: auto;
 }
 .finance-month-table {
   min-width: 780px;

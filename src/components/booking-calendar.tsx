@@ -36,6 +36,7 @@ import {
   scheduleHours,
   type DaySchedule,
 } from "@/lib/schedule";
+import { TablePagination, useTablePage } from "./table-pagination";
 
 export function BookingCalendar({
   venue: initialVenue,
@@ -126,6 +127,7 @@ export function BookingCalendar({
         { length: (venue.closing_hour ?? 22) - (venue.opening_hour ?? 6) },
         (_, i) => i + (venue.opening_hour ?? 6),
       );
+  const courtHours = useTablePage(hours.length, date);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30000);
@@ -417,7 +419,8 @@ export function BookingCalendar({
               {loading && <span>Updating…</span>}
             </div>
             {!courts.length && <div className="notice">No active courts are available. Please contact the venue.</div>}
-            <div className="availability-grid dynamic-court-grid" aria-busy={loading} hidden={!courts.length}
+            <div id="booking-court-slots" tabIndex={-1} role="region" aria-label="Court availability time slots"
+              className="availability-grid dynamic-court-grid" aria-busy={loading} hidden={!courts.length}
               style={{ "--court-columns": courts.length } as CSSProperties}>
               <div className="availability-header booking-court-header">
                 <div>PHT / UTC+8</div>
@@ -435,7 +438,7 @@ export function BookingCalendar({
                   </div>
                 ))}
               </div>
-              {hours.map((hour) => (
+              {hours.slice(courtHours.start, courtHours.end).map((hour) => (
                 <div className="availability-row" key={hour}>
                   <div className="time-label">{formatHour(hour)}</div>
                   {openSessions.some((s) => hour >= s.start && hour < s.end)
@@ -460,7 +463,7 @@ export function BookingCalendar({
                               }}
                             >
                               Open play · Join session{" "}
-                              {hour === session.start && (
+                              {(hour === session.start || hour === hours[courtHours.start]) && (
                                 <small>
                                   {formatHour(session.start)}–
                                   {formatHour(session.end)} ·{" "}
@@ -533,6 +536,9 @@ export function BookingCalendar({
                 </div>
               )}
             </div>
+            {courts.length > 0 && (
+              <TablePagination {...courtHours} label="Court availability time slot pages" anchorId="booking-court-slots" />
+            )}
           </>
         )}
       </div>
