@@ -2,7 +2,7 @@
 import { WorkspacePageHeading } from "./workspace-page-heading";
 import type { CSSProperties } from "react";
 import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
@@ -33,6 +33,8 @@ import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
 import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 
+const reservationPageSize = 10;
+
 export function AdminCalendar({
   bookings,
   date,
@@ -51,7 +53,13 @@ export function AdminCalendar({
   }>();
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const [reservationPage, setReservationPage] = useState(1);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
+  const pageCount = Math.ceil(bookings.length / reservationPageSize);
+  const page = Math.min(reservationPage, Math.max(1, pageCount));
+  const firstRow = (page - 1) * reservationPageSize;
+  const endRow = Math.min(firstRow + reservationPageSize, bookings.length);
   const active = bookings.filter(
     (b) => !["cancelled", "expired"].includes(b.status),
   );
@@ -67,6 +75,12 @@ export function AdminCalendar({
       ),
     ]),
   ].sort((a, b) => a - b);
+  function changeReservationPage(nextPage: number) {
+    setReservationPage(nextPage);
+    reviewHeading.current?.focus({ preventScroll: true });
+    reviewHeading.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }
+
   function update() {
     if (!action) return;
     setError("");
@@ -221,9 +235,9 @@ export function AdminCalendar({
           </span>
         </div>
       ))}
-      <section className="panel" style={{ padding: 0, overflow: "hidden" }}>
+      <section className="panel" aria-labelledby="calendar-reservation-review" style={{ padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "22px 24px" }}>
-          <h3 style={{ fontSize: 17, margin: 0 }}>
+          <h3 id="calendar-reservation-review" ref={reviewHeading} tabIndex={-1} style={{ fontSize: 17, margin: 0 }}>
             Reservations & payment review
           </h3>
           <p className="small-print">
@@ -251,7 +265,7 @@ export function AdminCalendar({
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((b) => (
+                {bookings.slice(firstRow, endRow).map((b) => (
                   <tr key={b.id}>
                     <td>
                       <strong>{b.customer_name}</strong>
@@ -364,6 +378,18 @@ export function AdminCalendar({
               </tbody>
             </table>
           </div>
+        )}
+        {pageCount > 1 && (
+          <nav className="finance-log-footer" aria-label="Reservation pages">
+            <span role="status">Showing {firstRow + 1}–{endRow} of {bookings.length} entries</span>
+            <div className="finance-actions">
+              <button type="button" className="button button-small" disabled={page === 1}
+                onClick={() => changeReservationPage(page - 1)}>Previous</button>
+              <span>Page {page} of {pageCount}</span>
+              <button type="button" className="button button-small" disabled={page === pageCount}
+                onClick={() => changeReservationPage(page + 1)}>Next</button>
+            </div>
+          </nav>
         )}
       </section>
       {createOpen && (

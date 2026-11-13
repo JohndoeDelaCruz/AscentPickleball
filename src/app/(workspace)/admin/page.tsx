@@ -31,15 +31,11 @@ async function CalendarData({ date }: { date: string }) {
   const venueRequest = getVenue();
   const supabase = await createClient();
   await supabase.rpc("expire_unpaid_holds");
-  const [{ data, error }, { venue }] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("*")
-      .eq("booking_date", date)
-      .order("start_hour"),
+  const [result, { venue }] = await Promise.all([
+    readCalendarBookings(supabase, date),
     venueRequest,
   ]);
-  if (error)
+  if (!result)
     return (
       <div className="error-message">
         We couldn’t load the calendar. Please refresh and try again.
@@ -47,9 +43,25 @@ async function CalendarData({ date }: { date: string }) {
     );
   return (
     <AdminCalendar
-      bookings={(data || []) as Booking[]}
+      bookings={result}
       date={date}
       venue={venue}
     />
   );
+}
+
+async function readCalendarBookings(supabase: Awaited<ReturnType<typeof createClient>>, date: string) {
+  const batchSize = 500;
+  const bookings: Booking[] = [];
+  let lastId: string | undefined;
+
+  // The grid, totals, and review table all need the full day, even past the API row limit.
+  for (;;) {
+    const query = supabase.from("bookings").select("*").eq("booking_date", date).order("id").limit(batchSize);
+    const { data, error } = await (lastId ? query.gt("id", lastId) : query);
+    if (error) return null;
+    bookings.push(...(data as Booking[]));
+    if (data.length < batchSize) return bookings.sort((a, b) => a.start_hour - b.start_hour);
+    lastId = data[data.length - 1].id;
+  }
 }
