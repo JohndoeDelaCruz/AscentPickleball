@@ -9,7 +9,14 @@ export type StackSession = {
   closed_at: string | null;
 };
 
-export type StackPlayer = { id: string; name: string };
+export const stackSkillLabels = {
+  beginner: "Beginner",
+  intermediate: "Intermediate",
+  advanced: "Advanced",
+} as const;
+
+export type StackSkill = keyof typeof stackSkillLabels;
+export type StackPlayer = { id: string; name: string; skill_level?: StackSkill };
 
 export type StackGame = {
   id: string;
@@ -46,6 +53,7 @@ export type StackBoard = {
   status: "check_in" | "playing" | "ending" | "closed";
   score_court: number | null;
   checked_in: number;
+  next_players?: string[];
   waiting: StackPlayer[];
   resting: StackPlayer[];
   courts: StackCourt[];

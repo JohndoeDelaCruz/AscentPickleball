@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
-import type { CurrentMatch, StackBoard, StackSession } from "../src/lib/paddle-stack";
+import type { CurrentMatch, StackBoard, StackSession, StackSkill } from "../src/lib/paddle-stack";
 
 test("Paddle Stack keeps the queue, court permissions, and final scores consistent", async (t) => {
   const db = new PGlite({ extensions: { btree_gist } });
@@ -223,6 +223,77 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
         set closed_at = null, play_date = (now() at time zone 'Asia/Manila')::date - 2
         where id = $1`, [session]);
       assert.deepEqual(await currentMatches(), []);
+    });
+
+    await t.test("skill matching keeps the queue leader in the game and balances mixed teams", async () => {
+      const session = await call<string>(staff, "paddle_stack_open", [0, 24]);
+      const manage = (action: string, args: unknown[]) =>
+        call(staff, "paddle_stack_manage", [session, action, ...args]);
+      const board = (user: string = staff) => call<StackBoard>(user, "get_paddle_stack", [session, null, true]);
+      const levels: (StackSkill | null)[] = [
+        "beginner", "advanced", "beginner", "intermediate", "beginner", "beginner", null, null,
+      ];
+      const queued = levels.map((skill, index) => ({ id: randomUUID(), name: `Skill player ${index + 1}`, skill }));
+      const checkIn = ({ id, name, skill }: typeof queued[number]) =>
+        manage("check_in", [null, id, name, null, skill]);
+      const setSkill = (index: number, skill: StackSkill | null) =>
+        manage("set_skill", [null, queued[index].id, null, null, skill]);
+
+      await assert.rejects(
+        () => manage("check_in", [null, randomUUID(), "Invalid player", null, "expert"]),
+        /valid skill level/,
+      );
+      for (const player of queued) await checkIn(player);
+      await checkIn(queued[0]);
+      assert.equal((await board()).checked_in, 8);
+      assert.equal((await board()).waiting[0].skill_level, "beginner");
+      assert.ok((await board(customer)).waiting.every((player) => !("skill_level" in player)));
+      assert.ok((await board("")).waiting.every((player) => !("skill_level" in player)));
+      await assert.rejects(
+        () => call(customer, "paddle_stack_manage", [session, "set_skill", null, queued[0].id, null, null, "advanced"]),
+        /staff access/,
+      );
+      await assert.rejects(
+        () => call("", "paddle_stack_manage", [session, "set_skill", null, queued[0].id, null, null, "advanced"]),
+        /permission denied/,
+      );
+
+      const beginnerIds = [0, 2, 4, 5].map((i) => queued[i].id);
+      const fifoIds = queued.slice(0, 4).map((player) => player.id);
+      assert.deepEqual((await board()).next_players, beginnerIds);
+      assert.deepEqual((await board("")).next_players, beginnerIds);
+      await assert.rejects(() => manage("call", [1, null, null, fifoIds]), /queue changed/);
+
+      // There are only two beginners now. The first four play and split them.
+      await setSkill(4, null);
+      await setSkill(5, "advanced");
+      assert.deepEqual((await board()).next_players, fifoIds);
+      await assert.rejects(() => manage("call", [1, null, null, beginnerIds]), /queue changed/);
+      await manage("call", [1, null, null, fifoIds]);
+      let game = (await board()).courts[0].game!;
+      assert.ok(game.players.slice(2).includes(queued[2].name));
+      await assert.rejects(() => setSkill(0, "advanced"), /waiting or resting/);
+      assert.deepEqual((await board()).waiting.map(({ id }) => id), queued.slice(4).map(({ id }) => id));
+      await call(staff, "paddle_stack_score", [session, game.id, 0, "finish"]);
+
+      // With one beginner, their partner is the strongest of the other three.
+      await setSkill(2, "intermediate");
+      for (const player of queued.slice(4)) await manage("pause", [null, player.id]);
+      for (const player of queued.slice(0, 4)) await manage("rejoin", [null, player.id]);
+      await manage("call", [1, null, null, fifoIds]);
+      game = (await board()).courts[0].game!;
+      assert.deepEqual(game.players.slice(0, 2), [queued[0].name, queued[1].name]);
+      await call(staff, "paddle_stack_score", [session, game.id, 0, "finish"]);
+
+      await setSkill(2, "beginner");
+      await setSkill(4, "beginner");
+      await setSkill(5, "beginner");
+      for (const player of queued) await manage("rejoin", [null, player.id]);
+      assert.deepEqual((await board()).next_players, beginnerIds);
+      await manage("call", [1, null, null, beginnerIds]);
+      const next = await board();
+      assert.deepEqual(new Set(next.courts[0].game!.players), new Set([0, 2, 4, 5].map((i) => queued[i].name)));
+      assert.deepEqual(next.waiting.map(({ id }) => id), [1, 3, 6, 7].map((i) => queued[i].id));
     });
   } finally {
     await db.close();

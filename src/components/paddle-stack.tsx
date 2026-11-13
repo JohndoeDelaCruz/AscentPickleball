@@ -9,12 +9,14 @@ import { createClient } from "@/lib/supabase/client";
 import {
   playerBoardPath,
   stackError,
+  stackSkillLabels,
   type ScoreAction,
   type StackBoard,
   type StackCourt,
   type StackGame,
   type StackPlayer,
   type StackSession,
+  type StackSkill,
 } from "@/lib/paddle-stack";
 import { Modal } from "./modal";
 import { MatchTeams } from "./match-teams";
@@ -140,13 +142,16 @@ function BoardHeading({ board }: { board: StackBoard }) {
 
 function PlayerOrder({
   waiting,
+  nextPlayers,
   queueControl,
   actions,
 }: {
   waiting: StackPlayer[];
+  nextPlayers?: string[];
   queueControl?: React.ReactNode;
   actions?: (player: StackPlayer) => React.ReactNode;
 }) {
+  const next = new Set(nextPlayers ?? waiting.slice(0, 4).map((player) => player.id));
   return (
     <section className={`panel ${styles.panel}`} aria-label="Waiting queue">
       <div className={styles.queueHeading}>
@@ -156,9 +161,10 @@ function PlayerOrder({
       {waiting.length ? (
         <ol className={styles.players}>
           {waiting.map((player, index) => (
-            <li key={player.id} className={index < 4 ? styles.nextPlayer : undefined}>
+            <li key={player.id} className={next.has(player.id) ? styles.nextPlayer : undefined}>
               <span className={styles.position}>{index + 1}</span>
               <strong>{player.name}</strong>
+              {next.has(player.id) && <span className="sr-only">Next match</span>}
               {actions?.(player)}
             </li>
           ))}
@@ -166,6 +172,13 @@ function PlayerOrder({
       ) : <p className={styles.muted}>No players are waiting.</p>}
     </section>
   );
+}
+
+function SkillOptions() {
+  return <>
+    <option value="">Unrated</option>
+    {Object.entries(stackSkillLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+  </>;
 }
 
 function CourtScore({
@@ -346,6 +359,7 @@ function StaffBoard({ session }: { session: string }) {
   const state = useStackBoard(session, true);
   const { board, busy, run, score } = state;
   const [name, setName] = useState("");
+  const [skill, setSkill] = useState<StackSkill | "">("");
   const checkInId = useRef<string | null>(null);
   const [share, setShare, shareClosing] = useAnimatedModal<{ path: string; scorekeeper: boolean }>();
   const [confirmClose, setConfirmClose] = useState(false);
@@ -355,8 +369,11 @@ function StaffBoard({ session }: { session: string }) {
   async function checkIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     checkInId.current ??= crypto.randomUUID();
-    if (await manage("check_in", { p_player: checkInId.current, p_name: name.trim() })) {
+    if (await manage("check_in", {
+      p_player: checkInId.current, p_name: name.trim(), ...(skill ? { p_skill: skill } : {}),
+    })) {
       setName("");
+      setSkill("");
       checkInId.current = null;
     }
   }
@@ -369,10 +386,17 @@ function StaffBoard({ session }: { session: string }) {
   const canCheckIn = board.status === "check_in" || board.status === "playing";
   const isClosed = board.status === "closed";
   const full = board.capacity !== null && board.checked_in >= board.capacity;
-  const nextFour = board.waiting.slice(0, 4).map((player) => player.id);
+  const nextFour = board.next_players ?? board.waiting.slice(0, 4).map((player) => player.id);
   const liveGame = board.courts.some((court) => court.game && !court.game.finished_at);
   const playerActions = (player: StackPlayer, waiting: boolean) => (
     <div className={styles.playerActions}>
+      {canCheckIn && board.next_players && (
+        <select className={styles.skillSelect} aria-label={`Skill level for ${player.name}`}
+          value={player.skill_level ?? ""} disabled={busy || state.connectionLost}
+          onChange={(event) => void manage("set_skill", { p_player: player.id, p_skill: event.target.value || null })}>
+          <SkillOptions />
+        </select>
+      )}
       {(waiting || canCheckIn) && <button className="button button-small" disabled={busy}
         aria-label={`${waiting ? "Sit out" : "Requeue"} ${player.name}`}
         onClick={() => void manage(waiting ? "pause" : "rejoin", { p_player: player.id })}>
@@ -424,6 +448,15 @@ function StaffBoard({ session }: { session: string }) {
                 checkInId.current = null;
               }} />
           </label>
+          {board.next_players && <label className="field">
+            <span>Skill level</span>
+            <select value={skill} disabled={busy || full} onChange={(event) => {
+              setSkill(event.target.value as StackSkill | "");
+              checkInId.current = null;
+            }}>
+              <SkillOptions />
+            </select>
+          </label>}
           <button className="button button-dark" disabled={busy || full || name.trim().length < 2}>
             <UserPlus size={17} aria-hidden="true" /> Add to queue
           </button>
@@ -454,7 +487,7 @@ function StaffBoard({ session }: { session: string }) {
       </div>
       {!isClosed && (
         <div className={styles.queues}>
-          <PlayerOrder waiting={board.waiting} actions={(player) => playerActions(player, true)}
+          <PlayerOrder waiting={board.waiting} nextPlayers={nextFour} actions={(player) => playerActions(player, true)}
             queueControl={canCheckIn && (
               <button type="button" className="button button-small"
                 disabled={busy || state.connectionLost || board.waiting.length < 2}
@@ -535,7 +568,7 @@ function LiveBoard({ session, scorer, scorerRequested }: {
                 onScore={court.id === board.score_court ? score : undefined} />
             ))}
           </div>
-          {(board.status === "check_in" || board.status === "playing") && <PlayerOrder waiting={board.waiting} />}
+          {(board.status === "check_in" || board.status === "playing") && <PlayerOrder waiting={board.waiting} nextPlayers={board.next_players} />}
         </>
       )}
     </div>

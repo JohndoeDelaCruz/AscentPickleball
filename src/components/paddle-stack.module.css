@@ -111,12 +111,23 @@
 }
 
 .checkIn {
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 1.2fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 1.2fr) minmax(135px, auto) auto;
   align-items: end;
 }
 
 .checkIn > div {
   align-self: center;
+}
+
+.skillSelect {
+  max-width: 100%;
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
 }
 
 .court {
@@ -218,7 +229,13 @@
   margin-inline: auto;
 }
 
-@media (max-width: 650px) {
+@media (max-width: 900px) {
+  .checkIn {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
   .checkIn {
     grid-template-columns: minmax(0, 1fr);
   }

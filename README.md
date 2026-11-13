@@ -100,6 +100,8 @@ Apply `202611110018_gcash_payment_review.sql` after 017, then deploy the app. In
 
 Apply `202611130020_expense_tracker.sql` after 019 before deploying **Staff → Finance → Expenses**. Managers and owners can record expenses and void entries with a reason. Cashiers can record and view expenses paid from their own register shift. Register expenses reduce expected cash at shift closing. Voids are excluded from expense totals, and closed shifts retain the cash reconciliation saved when they closed.
 
+Apply `202611140021_paddle_stack_skill_levels.sql` after 020 before deploying skill levels. At check-in, staff can choose Beginner, Intermediate, Advanced, or Unrated. The first player in line always plays next. If three more players share their skill level, the system calls the earliest three of that level. Otherwise it calls the first four in line. It balances the two teams by skill and uses recent teammates and results to break ties. Players without a saved level are unrated.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
