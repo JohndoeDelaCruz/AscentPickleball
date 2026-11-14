@@ -7,6 +7,7 @@ import { WorkspaceNavigation } from "./workspace-navigation";
 import { WorkspaceMenuButton } from "./workspace-menu-button";
 import { WorkspaceContext } from "./workspace-context";
 import { workspaceTab, type WorkspaceTab } from "@/lib/workspace";
+import { CashierAccessCheck } from "./cashier-access-check";
 
 export function WorkspaceShell({ children, role, roleLoading = false, courtCount, totalCourtCount }: {
   children: ReactNode; role?: string; roleLoading?: boolean; courtCount?: number; totalCourtCount?: number;
@@ -28,6 +29,7 @@ export function WorkspaceShell({ children, role, roleLoading = false, courtCount
   return (
     <WorkspaceContext.Provider value={context}>
     <main id="main" className="club-app workspace-app">
+      {role === "cashier" && <CashierAccessCheck />}
       <ManagementSidebar mobileOpen={mobile} onMobileClose={() => setMobile(false)} role={role}>
         <WorkspaceNavigation manager={!roleLoading && role !== "cashier"} onNavigate={() => setMobile(false)}
           canManageAccess={role === "owner" || role === "manager"}

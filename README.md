@@ -118,6 +118,8 @@ Apply `202611140028_account_names.sql` after 027 to show saved full names in **A
 
 Apply `202611140029_cashier_display_names.sql` after 028 to show saved cashier names in the assignment controls and Overview’s **On duty** card. The card follows the selected report date. Opening Overview without a report date follows the current Philippine date.
 
+Apply `202611150030_cashier_duty_access.sql` after 029. A cashier assignment for the current Philippine date gives that cashier exclusive access among cashier accounts. Managers and owners retain access, and all cashiers can access staff tools when the date is unassigned. Off-duty cashiers use **My bookings** and can record the closing count for their own open drawer during a handover.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

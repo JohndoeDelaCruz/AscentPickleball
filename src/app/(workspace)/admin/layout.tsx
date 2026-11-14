@@ -12,8 +12,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, staff } = await getSession();
+  const { user, staff, offDuty } = await getSession();
   if (!user) redirect("/login?next=/admin");
+  if (offDuty) redirect("/my-bookings");
   if (!staff)
     return (
       <main

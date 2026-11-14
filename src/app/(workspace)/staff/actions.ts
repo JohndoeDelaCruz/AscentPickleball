@@ -115,9 +115,12 @@ export async function posCommand(
       return { error: "Sign-in verification is temporarily unavailable. Try again in a moment." };
     }
     if (authError || !user) return { error: "Please sign in again." };
-    const { data: allowed } = await db.rpc("is_club_staff");
-    if (!allowed) return { error: "Authorized staff access is required." };
     const c = parsed.data;
+    // The close RPC verifies ownership even during a change of cashier duty.
+    if (c.op !== "close") {
+      const { data: allowed } = await db.rpc("is_club_staff");
+      if (!allowed) return { error: "Staff tools are available to the cashier assigned for today." };
+    }
     let rpc: string;
     let args: Record<string, unknown>;
     switch (c.op) {
@@ -182,6 +185,7 @@ export async function posCommand(
     revalidatePath("/admin");
     revalidatePath("/admin/finance");
     revalidatePath("/my-bookings/all");
+    if (c.op === "close") revalidatePath("/my-bookings");
     revalidatePath("/booking/[id]", "page");
     if (c.op === "reject_payment") revalidatePath("/book");
     return {

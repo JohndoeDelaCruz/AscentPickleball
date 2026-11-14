@@ -23,6 +23,7 @@ export async function readStaffMembership(client: Pick<SessionClient, "rpc">) {
 export async function readSessionAccess(client: SessionClient): Promise<{
   user: User | null; staff: boolean; role: WorkspaceRole | undefined;
   verificationUnavailable?: true;
+  offDuty?: true;
 }> {
   const { data: { user }, error } = await readVerifiedUser(client.auth);
   if (isAuthRetryableFetchError(error)) {
@@ -33,6 +34,12 @@ export async function readSessionAccess(client: SessionClient): Promise<{
   if (!role.error) {
     const value = role.data === "owner" || role.data === "manager" || role.data === "cashier"
       ? role.data : undefined;
+    if (value === "cashier") {
+      const access = await client.rpc("is_club_staff");
+      if (access.error || typeof access.data !== "boolean")
+        return { user, staff: false, role: value, verificationUnavailable: true };
+      if (!access.data) return { user, staff: false, role: value, offDuty: true };
+    }
     return { user, staff: value !== undefined, role: value };
   }
   // Preserve access for databases that have not yet received the POS role RPC.

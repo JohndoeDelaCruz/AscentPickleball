@@ -795,8 +795,31 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => as("", () => db.query("select public.pos_register_day(current_date)"), "anon"), /permission denied/);
       assert.deepEqual((await read(owner)).cashiers.find((row) => row.id === substitute),
         { id: substitute, label: "relief@test.example", name: "Pat Reyes" });
+      const shift = await call<string>(substitute, "pos_open_shift", [10000]);
+      const expense = [randomUUID(), null, "supplies", "Shift supplies", 1200, "cash", shift];
+      await call(substitute, "pos_record_expense", expense);
       await assign(owner, cashier);
       await assign(owner, cashier);
+      assert.equal(await call(cashier, "is_club_staff"), true);
+      assert.equal(await call(substitute, "is_club_staff"), false);
+      assert.equal(await call(substitute, "club_role"), "cashier");
+      assert.equal(await call(owner, "is_club_staff"), true);
+      await assert.rejects(() => read(substitute), /Authorized staff/);
+      await assert.rejects(() => call(substitute, "pos_open_shift", [0]), /Another cashier/);
+      await assert.rejects(() => call(substitute, "pos_calendar_reservations", [date]), /Authorized staff/);
+      await assert.rejects(() => call(substitute, "pos_reservations", [tomorrow]), /Authorized staff/);
+      await assert.rejects(() => call(substitute, "paddle_stack_sessions"), /Authorized staff/);
+      assert.deepEqual((await as(substitute, () => db.query("select id from public.pos_shifts"))).rows, []);
+      assert.deepEqual((await as(substitute, () => db.query("select id from public.pos_expenses"))).rows, []);
+      type Closeout = { id: string; expected_cents: number };
+      const drawer = (actor: string) => as(actor, () => db.query<Closeout>("select id, expected_cents from public.pos_own_open_shift()"));
+      assert.deepEqual((await drawer(substitute)).rows, [{ id: shift, expected_cents: 8800 }]);
+      assert.deepEqual((await drawer(cashier)).rows, []);
+      await assert.rejects(() => call(cashier, "pos_close_shift", [shift, 8800]), /Only your active shift/);
+      await call(substitute, "pos_close_shift", [shift, 8700]);
+      assert.deepEqual((await drawer(substitute)).rows, []);
+      const replacement = await call<string>(cashier, "pos_open_shift", [0]);
+      await call(cashier, "pos_close_shift", [replacement, 0]);
       assert.deepEqual((await read(cashier)).assignment, { id: cashier, label: "cashier", name: null, eligible: true });
       assert.deepEqual((await read(cashier)).cashiers, []);
       assert.equal((await read(owner, tomorrow)).assignment, null);
@@ -806,23 +829,18 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal((await read(owner)).assignment?.id, cashier);
       await assert.rejects(() => assign(owner, substitute), /assignment changed/);
 
-      const shift = await call<string>(substitute, "pos_open_shift", [10000]);
-      await call(substitute, "pos_record_expense", [randomUUID(), null, "supplies", "Shift supplies", 1200, "cash", shift]);
-      const own = await read(substitute);
-      assert.equal(own.assignment?.id, cashier);
-      assert.equal(own.active?.own_shift?.expected_cents, 8800);
-      assert.equal((await read(owner)).active?.own_shift, null);
       assert.ok((await read(owner)).operators.includes("relief@test.example"));
       assert.deepEqual((await read(owner, tomorrow)).operators, []);
       await assign(owner, substitute, cashier);
-      await assert.rejects(() => call(owner, "pos_close_shift", [shift, 8800]), /Only your active shift/);
-      await call(substitute, "pos_close_shift", [shift, 8700]);
+      assert.equal(await call(cashier, "is_club_staff"), false);
+      assert.equal(await call(substitute, "is_club_staff"), true);
       assert.equal((await read(owner)).active, null);
       assert.ok((await read(owner)).operators.includes("relief@test.example"));
       await call(owner, "admin_set_account_role", [substitute, "cashier", "player"]);
       assert.equal((await read(owner)).assignment?.eligible, false);
       await assign(owner, null, substitute);
       assert.equal((await read(owner)).assignment, null);
+      assert.equal(await call(cashier, "is_club_staff"), true);
       assert.equal((await db.query("select id from public.pos_audit where action='shift.assignment' and detail->>'date'=$1", [date])).rows.length, 3);
     });
 

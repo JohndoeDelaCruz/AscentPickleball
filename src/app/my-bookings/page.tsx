@@ -4,12 +4,21 @@ import { redirect } from "next/navigation";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { CurrentMatches } from "@/components/current-matches";
 import { getSession } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
+import { OffDutyCloseout } from "@/components/off-duty-closeout";
+import type { Shift } from "@/lib/pos";
 
 export const metadata: Metadata = { title: "My bookings" };
 
 export default async function MyBookings() {
-  const { user } = await getSession();
+  const { user, offDuty } = await getSession();
   if (!user) redirect("/login?next=/my-bookings");
+  let openShift: Shift | null = null;
+  if (offDuty) {
+    const db = await createClient();
+    const { data } = await db.rpc("pos_own_open_shift").maybeSingle();
+    openShift = data as Shift | null;
+  }
 
   return (
     <main id="main" className="container content-page">
@@ -19,6 +28,12 @@ export default async function MyBookings() {
           Account settings / Change password <ArrowUpRight size={17} aria-hidden="true" />
         </Link>
       </div>
+      {offDuty && (
+        <div className="notice" role="status">
+          <span>Another cashier is on duty today. You can still use My bookings. If you’re covering the shift, ask a manager to update today’s assignment.</span>
+        </div>
+      )}
+      {openShift && <OffDutyCloseout shift={openShift} operator={user.email ?? "Signed-in cashier"} />}
       <CurrentMatches />
       <Link href="/my-bookings/all" prefetch={false} className="button button-outline button-small">
         See all bookings <ArrowRight size={17} aria-hidden="true" />
