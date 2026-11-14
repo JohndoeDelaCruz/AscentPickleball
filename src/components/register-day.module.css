@@ -1,7 +1,8 @@
 .register { margin-bottom: 14px; container-type: inline-size; }
-.overview { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px; margin-bottom: 14px; }
-.overview > section { display: flex; min-width: 0; }
-.overview .row { flex: 1; }
+.dutyTable { table-layout: fixed; }
+.dutyTable :is(th, td):first-child { width: 60%; overflow-wrap: anywhere; }
+.dutyTable td { vertical-align: top; }
+.dutyNote { margin: 0; padding: 12px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .rows { display: grid; }
 .row, .context { display: flex; gap: 12px; align-items: center; }
 .row { min-width: 0; padding: 10px clamp(12px, 2vw, 16px); }
@@ -32,9 +33,6 @@
 @media (max-width: 450px) {
   .row { gap: 8px; }
   .actions > button { flex: 1 1 auto; }
-}
-@media (max-width: 900px) {
-  .overview { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 }
 @container (min-width: 680px) {
   .rows[data-has-assignment="true"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }

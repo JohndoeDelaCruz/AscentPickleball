@@ -45,9 +45,10 @@ function Fields({ count = 4 }: { count?: number }) {
   return <div className={`field-grid ${styles.fields}`}>{Array.from({ length: count }, (_, index) => <div className={styles.field} key={index}><Block className={styles.label} /><Block className={styles.input} /></div>)}</div>;
 }
 function Overview({ courtCount = 2 }: { courtCount?: number }) {
-  return <><Stats /><div className="overview-grid">
+  return <><Stats /><div className="overview-grid overview-operations">
     <Panel>{Array.from({ length: Math.min(4, courtCount) }, (_, index) => <div className={styles.timeline} key={index}><Block className={styles.square} /><Block className={styles.label} /><Block className={styles.session} /></div>)}</Panel>
     <Panel><Block className={styles.line} /><Block className={styles.line} /><Block className={styles.line} /></Panel>
+    <Panel><Block className={styles.line} /><Block className={styles.line} /></Panel>
   </div><Table rows={3} /></>;
 }
 function PointOfSale() {

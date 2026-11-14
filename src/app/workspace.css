@@ -1060,6 +1060,7 @@
 .club-app .panel-heading h2 { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
 .club-app .panel-heading > button { font-size: 13px; }
 .club-app .overview-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; }
+.club-app .overview-operations { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr) minmax(0, 1.3fr); }
 .club-app .attention-row { padding-block: 24px; }
 .club-app .attention-row strong { font-size: 14px; font-weight: 500; }
 .club-app .timeline-empty { color: #6f7b73; font-size: 13px; }
@@ -1138,6 +1139,10 @@
   .club-app .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .club-app .overview-grid { grid-template-columns: minmax(0, 1fr); }
   .club-app .workspace-account-grid { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+}
+@media (min-width: 1101px) and (max-width: 1299px) {
+  .club-app .overview-operations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .club-app .overview-operations > :last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 650px) {
   .club-app .management-sidebar { padding-top: 22px; }

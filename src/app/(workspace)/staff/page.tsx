@@ -21,12 +21,9 @@ export default async function StaffPage({
   if (!user) redirect("/login?next=/staff");
   if (!staff) redirect("/my-bookings");
   const p = await searchParams;
-  const today = dayKey();
-  const date =
-    isValidDate(p.date) && p.date >= "2000-01-01" && p.date <= "2100-12-31"
-      ? p.date
-      : today;
-  const [data, register] = await Promise.all([getPosData(date), getRegisterDay(today)]);
-  return <ClubConsole initial={data} initialDate={date} initialTab={workspaceTab(p.tab)} register={register} today={today}
+  const reportDate = isValidDate(p.date) && p.date >= "2000-01-01" && p.date <= "2100-12-31" ? p.date : null;
+  const date = reportDate ?? dayKey();
+  const [data, register] = await Promise.all([getPosData(date), getRegisterDay(date)]);
+  return <ClubConsole initial={data} initialDate={date} initialTab={workspaceTab(p.tab)} register={register} followToday={!reportDate}
     operator={user.email ?? "Signed-in staff"} canAssign={role === "owner" || role === "manager"} />;
 }

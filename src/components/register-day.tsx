@@ -23,18 +23,28 @@ export function RegisterPanel({ data, date, manager, shift, operator, ready }: {
   </section>;
 }
 
-export function OverviewRegister({ data, today, manager, shift, operator, ready }: {
-  data: RegisterData | null; today: string; manager: boolean; shift?: Shift; operator: string; ready: boolean;
+export function RegisterStatusCard({ data, shift, operator, ready }: {
+  data: RegisterData | null; shift?: Shift; operator: string; ready: boolean;
+}) {
+  return <section className={`console-panel ${styles.register}`} aria-label="Register status">
+    <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
+  </section>;
+}
+
+export function OnDutyCard({ data, date, manager, followToday }: {
+  data: RegisterData | null; date: string; manager: boolean; followToday: boolean;
 }) {
   const router = useRouter();
-  const [expiredDate, setExpiredDate] = useState<string>();
-  const expired = expiredDate === today;
+  const [expired, setExpired] = useState(false);
+  const [editing, setEditing, editClosing] = useAnimatedModal<true>();
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
-    const midnight = Date.parse(`${addDays(today, 1)}T00:00:00+08:00`);
+    if (!followToday) return;
+    const midnight = Date.parse(`${addDays(date, 1)}T00:00:00+08:00`);
     function refreshAfterMidnight() {
       if (Date.now() < midnight) return;
-      setExpiredDate(today);
+      setExpired(true);
       router.refresh();
     }
     const timer = window.setTimeout(refreshAfterMidnight, Math.max(0, midnight - Date.now()));
@@ -46,34 +56,47 @@ export function OverviewRegister({ data, today, manager, shift, operator, ready 
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [router, today]);
+  }, [router, date, followToday]);
 
-  return <div className={styles.overview}>
-    <section className="console-panel" aria-label="Register status">
-      <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
-    </section>
-    <section className="console-panel" aria-label="Today’s cashier">
-      {data && !expired ? <CashierAssignment key={today} data={data} date={today} manager={manager} currentDay /> : (
-        <div className={styles.row}>
-          <div className={styles.identity}><h2>Cashier on duty today</h2>
-            <p role="status">{expired ? "Checking today’s assignment…" : "Cashier assignment unavailable"}</p>
-          </div>
-        </div>
-      )}
-    </section>
-  </div>;
+  const waiting = followToday && expired;
+  const assignment = data?.assignment;
+  return <section className="console-panel" aria-label="On duty">
+    <div className="panel-heading">
+      <h2>On duty</h2>
+      {data && manager && !waiting && <button type="button" onClick={() => { setStatus(""); setEditing(true); }}>
+        {assignment ? "Edit assignment" : "Assign cashier"}
+      </button>}
+    </div>
+    {data && !waiting ? <>
+      <table className={`console-table ${styles.dutyTable}`} aria-label="Cashier assignment for selected date">
+        <thead><tr><th scope="col">Name</th><th scope="col">Date</th></tr></thead>
+        <tbody><tr>
+          <td>
+            <strong>{assignment?.name || assignment?.label || "Unassigned"}</strong>
+            {assignment?.name && assignment.name !== assignment.label && <small>{assignment.label}</small>}
+            {assignment && !assignment.eligible && <small>No longer eligible</small>}
+          </td>
+          <td><time dateTime={date}>{formatDate(date, { month: "short", day: "numeric", year: "numeric" })}</time></td>
+        </tr></tbody>
+      </table>
+      {data.operators.length > 0 && <p className={styles.dutyNote}>Opened register: {data.operators.join(", ")}</p>}
+      {status && <p className={styles.dutyNote} role="status">{status}</p>}
+    </> : <p className="panel-empty-note" role="status">{waiting ? "Checking the new day’s assignment…" : "Cashier assignment unavailable"}</p>}
+    {data && !waiting && editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
+      onSaved={(message) => { setStatus(message); setEditing(null); }} />}
+  </section>;
 }
 
-function CashierAssignment({ data, date, manager, currentDay = false }: {
-  data: RegisterData; date: string; manager: boolean; currentDay?: boolean;
+function CashierAssignment({ data, date, manager }: {
+  data: RegisterData; date: string; manager: boolean;
 }) {
   const [editing, setEditing, editClosing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const assignment = data.assignment;
   return <div className={styles.row} role="group" aria-label="Cashier assignment">
     <div className={styles.identity}>
-      <h2>{currentDay ? "Cashier on duty today" : "Cashier on duty"}</h2>
-      <p>{assignment?.label ?? "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
+      <h2>Cashier on duty</h2>
+      <p>{assignment?.name || assignment?.label || "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
       <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
       {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
@@ -119,7 +142,9 @@ function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
           {original && !data.cashiers.some((cashier) => cashier.id === original.id) && (
             <option value={original.id} disabled>{original.label} · Ineligible</option>
           )}
-          {data.cashiers.map((cashier) => <option key={cashier.id} value={cashier.id}>{cashier.label}</option>)}
+          {data.cashiers.map((cashier) => <option key={cashier.id} value={cashier.id}>
+            {cashier.name ? `${cashier.name} (${cashier.label})` : cashier.label}
+          </option>)}
         </select>
         {data.cashiers.length === 0 && <small>Give a confirmed account the Cashier role under Access first.</small>}
       </label>

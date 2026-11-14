@@ -1,6 +1,6 @@
 import type { Shift } from "./pos";
 
-type Cashier = { id: string; label: string };
+type Cashier = { id: string; label: string; name?: string | null };
 
 export type RegisterDay = {
   assignment: (Cashier & { eligible: boolean }) | null;

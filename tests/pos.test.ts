@@ -775,12 +775,13 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
 
     await t.test("daily cashier assignments preserve actual register operators and drawer totals", async () => {
       const substitute = randomUUID();
-      await db.query("insert into auth.users (id,email) values($1,'relief@test.example')", [substitute]);
+      await db.query("insert into auth.users (id,email,raw_user_meta_data) values($1,'relief@test.example',$2)",
+        [substitute, JSON.stringify({ full_name: "  Pat  Reyes ", private_note: "hidden" })]);
       await call(owner, "admin_set_account_role", [substitute, "player", "cashier"]);
       const date = dayKey();
       const tomorrow = dayKey(new Date(Date.now() + 86400000));
-      type RegisterDay = { assignment: { id: string; label: string; eligible: boolean } | null;
-        cashiers: { id: string; label: string }[]; operators: string[];
+      type RegisterDay = { assignment: { id: string; label: string; eligible: boolean; name: string | null } | null;
+        cashiers: { id: string; label: string; name: string | null }[]; operators: string[];
         active: { own_shift: { expected_cents: number } | null } | null };
       const read = (actor: string, day = date) => call<RegisterDay>(actor, "pos_register_day", [day]);
       const assign = (actor: string, id: string | null, expected: string | null = null, day = date) =>
@@ -792,14 +793,16 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => assign(owner, player), /confirmed account with the Cashier role/);
       await assert.rejects(() => assign(owner, owner), /confirmed account with the Cashier role/);
       await assert.rejects(() => as("", () => db.query("select public.pos_register_day(current_date)"), "anon"), /permission denied/);
-      assert.ok((await read(owner)).cashiers.some((row) => row.id === substitute));
+      assert.deepEqual((await read(owner)).cashiers.find((row) => row.id === substitute),
+        { id: substitute, label: "relief@test.example", name: "Pat Reyes" });
       await assign(owner, cashier);
       await assign(owner, cashier);
-      assert.deepEqual((await read(cashier)).assignment, { id: cashier, label: "cashier", eligible: true });
+      assert.deepEqual((await read(cashier)).assignment, { id: cashier, label: "cashier", name: null, eligible: true });
       assert.deepEqual((await read(cashier)).cashiers, []);
       assert.equal((await read(owner, tomorrow)).assignment, null);
       await assign(owner, substitute, null, tomorrow);
-      assert.equal((await read(owner, tomorrow)).assignment?.id, substitute);
+      assert.deepEqual((await read(cashier, tomorrow)).assignment,
+        { id: substitute, label: "relief", name: "Pat Reyes", eligible: true });
       assert.equal((await read(owner)).assignment?.id, cashier);
       await assert.rejects(() => assign(owner, substitute), /assignment changed/);
 

@@ -116,6 +116,8 @@ Apply `202611140027_overview_trends.sql` after 026 to enable the **Overview** me
 
 Apply `202611140028_account_names.sql` after 027 to show saved full names in **Access** and search by name or email. Accounts without a saved name use their email address.
 
+Apply `202611140029_cashier_display_names.sql` after 028 to show saved cashier names in the assignment controls and Overview’s **On duty** card. The card follows the selected report date. Opening Overview without a report date follows the current Philippine date.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

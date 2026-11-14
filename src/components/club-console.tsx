@@ -45,7 +45,7 @@ import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
-import { OverviewRegister, RegisterShiftDialog } from "./register-day";
+import { OnDutyCard, RegisterStatusCard, RegisterShiftDialog } from "./register-day";
 import { OverviewMetricValue } from "./overview-metric-value";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 type Modal =
@@ -82,7 +82,7 @@ export function ClubConsole({
   initialDate,
   initialTab = "overview",
   register,
-  today,
+  followToday,
   operator,
   canAssign,
 }: {
@@ -90,7 +90,7 @@ export function ClubConsole({
   initialDate: string;
   initialTab?: Tab;
   register: RegisterData | null;
-  today: string;
+  followToday: boolean;
   operator: string;
   canAssign: boolean;
 }) {
@@ -575,7 +575,7 @@ export function ClubConsole({
           <div hidden={isNavigating}>
           {tab === "overview" && (
             <>
-              <OverviewRegister data={register} today={today} manager={canAssign} shift={shift} operator={operator} ready={data.ready} />
+              <RegisterStatusCard data={register} shift={shift} operator={operator} ready={data.ready} />
               <div className="metrics-grid">
                 <Metric
                   label="NET COLLECTIONS"
@@ -610,7 +610,7 @@ export function ClubConsole({
                   tone="blue"
                 />
               </div>
-              <div className="overview-grid">
+              <div className="overview-grid overview-operations">
                 <section className="console-panel">
                   <div className="panel-heading">
                     <h2>
@@ -724,6 +724,7 @@ export function ClubConsole({
                     <ChevronRight size={15} />
                   </button>
                 </section>
+                <OnDutyCard key={initialDate} data={register} date={initialDate} manager={canAssign} followToday={followToday} />
               </div>
               <section className="console-panel">
                 <div className="panel-heading">
