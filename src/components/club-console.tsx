@@ -45,7 +45,7 @@ import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
-import { RegisterControl, RegisterDay, RegisterShiftDialog } from "./register-day";
+import { RegisterPanel, RegisterShiftDialog } from "./register-day";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 type Modal =
   | "checkout"
@@ -572,8 +572,7 @@ export function ClubConsole({
           <div hidden={isNavigating}>
           {tab === "overview" && (
             <>
-              <RegisterControl data={register} shift={shift} operator={operator} ready={data.ready} />
-              {register && <RegisterDay key={initialDate} data={register} date={initialDate} manager={canAssign} />}
+              <RegisterPanel data={register} date={initialDate} manager={canAssign} shift={shift} operator={operator} ready={data.ready} />
               <div className="metrics-grid">
                 <Metric
                   label="NET COLLECTIONS"

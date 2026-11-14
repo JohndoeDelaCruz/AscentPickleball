@@ -25,7 +25,7 @@ import { BalancePaymentModal } from "./balance-payment-modal";
 import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 import { TablePagination, useTablePage } from "./table-pagination";
 import { CreateBookingModal } from "./create-booking-modal";
-import { RegisterControl, RegisterDay } from "./register-day";
+import { RegisterPanel } from "./register-day";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 
 export function AdminCalendar({
@@ -100,7 +100,6 @@ export function AdminCalendar({
           {manager ? "Add booking or block" : "Add walk-in"}
         </button>
       } />
-      {register && <RegisterControl data={register} shift={register.active?.own_shift ?? undefined} operator={operator} ready />}
       {walkInSaved && <p className="success-message" role="status">Walk-in booking saved.</p>}
       <div className="admin-stats">
         <div className="panel stat-card">
@@ -149,7 +148,7 @@ export function AdminCalendar({
           />
         </label>
       </div>
-      {register && <RegisterDay key={date} data={register} date={date} manager={canAssign} />}
+      {register && <RegisterPanel data={register} date={date} manager={canAssign} shift={register.active?.own_shift ?? undefined} operator={operator} ready />}
       {schedule.override && (
         <div className="notice" style={{ marginBottom: 20 }}>
           {schedule.override.name} · through{" "}

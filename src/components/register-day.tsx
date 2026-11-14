@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { ArrowRight, Banknote, Check, ClipboardList, UserRound } from "lucide-react";
+import { Banknote, Check, ClipboardList } from "lucide-react";
 import { assignCashier } from "@/app/(workspace)/staff/register-actions";
 import { posCommand } from "@/app/(workspace)/staff/actions";
 import { formatDate, localDate } from "@/lib/booking";
@@ -11,26 +11,34 @@ import { Modal } from "./modal";
 import { useAnimatedModal } from "./use-animated-modal";
 import styles from "./register-day.module.css";
 
-export function RegisterDay({ data, date, manager }: { data: RegisterData; date: string; manager: boolean }) {
+export function RegisterPanel({ data, date, manager, shift, operator, ready }: {
+  data: RegisterData | null; date: string; manager: boolean; shift?: Shift; operator: string; ready: boolean;
+}) {
+  return <section className={`console-panel ${styles.register}`} aria-label="Register and cashier assignment">
+    <div className={styles.rows} data-has-assignment={Boolean(data)}>
+      <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
+      {data && <CashierAssignment key={date} data={data} date={date} manager={manager} />}
+    </div>
+  </section>;
+}
+
+function CashierAssignment({ data, date, manager }: { data: RegisterData; date: string; manager: boolean }) {
   const [editing, setEditing, editClosing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const assignment = data.assignment;
-  return <section className={`console-panel ${styles.register}`} aria-label="Daily register">
-    <div className={styles.assignment}>
-      <span className={styles.icon}><UserRound size={19} aria-hidden="true" /></span>
-      <div className={styles.identity}>
-        <h2>Cashier on duty</h2>
-        <p>{assignment?.label ?? "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
-        <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
-        {status && <small className={styles.saved} role="status">{status}</small>}
-      </div>
-      {manager && <button type="button" className="button button-outline button-small" onClick={() => { setStatus(""); setEditing(true); }}>
-        {assignment ? "Edit assignment" : "Assign cashier"}
-      </button>}
+  return <div className={styles.row} role="group" aria-label="Cashier assignment">
+    <div className={styles.identity}>
+      <h2>Cashier on duty</h2>
+      <p>{assignment?.label ?? "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
+      <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
+      {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
+    {manager && <button type="button" className="button button-outline button-small" onClick={() => { setStatus(""); setEditing(true); }}>
+      {assignment ? "Edit assignment" : "Assign cashier"}
+    </button>}
     {editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
       onSaved={(message) => { setStatus(message); setEditing(null); }} />}
-  </section>;
+  </div>;
 }
 
 function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
@@ -80,29 +88,26 @@ function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
   </Modal>;
 }
 
-export function RegisterControl({ data, shift, operator, ready }: {
+function RegisterControl({ data, shift, operator, ready }: {
   data: RegisterData | null; shift?: Shift; operator: string; ready: boolean;
 }) {
   const [dialog, setDialog, closing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const someoneElse = shift ? null : data?.active;
-  return <section className={`console-panel ${styles.register}`} aria-label="Front desk register">
-    <div className={styles.assignment}>
-      <span className={styles.icon}><Banknote size={20} aria-hidden="true" /></span>
-      <div className={styles.identity}>
-        <h2>Front desk register</h2>
-        <p><span className={`${styles.dot} ${shift || someoneElse ? styles.active : ""}`} />
-          {shift ? "Shift open" : someoneElse ? `Open · ${someoneElse.label}` : "Shift closed"}</p>
-        {status && <small className={styles.saved} role="status">{status}</small>}
-      </div>
-      {!someoneElse && <button type="button" className="button button-dark button-small" disabled={!ready}
-        onClick={() => { setStatus(""); setDialog(true); }}>
-        {shift ? "Close shift" : "Open shift"} <ArrowRight size={16} aria-hidden="true" />
-      </button>}
+  return <div className={styles.row} role="group" aria-label="Front desk register">
+    <div className={styles.identity}>
+      <h2>Front desk register</h2>
+      <p><span className={`${styles.dot} ${shift || someoneElse ? styles.active : ""}`} />
+        {shift ? "Shift open" : someoneElse ? `Open · ${someoneElse.label}` : "Shift closed"}</p>
+      {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
+    {!someoneElse && <button type="button" className="button button-dark button-small" disabled={!ready}
+      onClick={() => { setStatus(""); setDialog(true); }}>
+      {shift ? "Close shift" : "Open shift"}
+    </button>}
     {dialog && <RegisterShiftDialog shift={shift} operator={operator} closing={closing} onClose={() => setDialog(null)}
       onSaved={(message) => { setStatus(message); setDialog(null); }} />}
-  </section>;
+  </div>;
 }
 
 export function RegisterShiftDialog({ shift, operator, closing, onClose, onSaved }: {

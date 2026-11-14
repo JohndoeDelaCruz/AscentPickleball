@@ -1,6 +1,9 @@
-.register { margin-bottom: 18px; }
-.assignment, .context { display: flex; gap: 12px; align-items: center; }
-.assignment { padding: 14px 18px; flex-wrap: wrap; }
+.register { margin-bottom: 14px; container-type: inline-size; }
+.rows { display: grid; }
+.row, .context { display: flex; gap: 12px; align-items: center; }
+.row { min-width: 0; padding: 10px clamp(12px, 2vw, 16px); }
+.row + .row { border-top: 1px solid var(--line); }
+.row > button { flex: none; }
 .icon { display: grid; place-items: center; width: 42px; height: 42px; flex: none; color: var(--green); background: #e9f0df; border: 1px solid #dce6d4; border-radius: 10px; }
 .identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .identity h2 { font: 600 15px/1.35 var(--font-body), sans-serif; margin: 0 0 3px; }
@@ -24,7 +27,10 @@
 .actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
 .shiftModal { max-height: calc(100dvh - 24px); }
 @media (max-width: 450px) {
-  .assignment { display: grid; grid-template-columns: auto minmax(0, 1fr); }
-  .assignment > button { grid-column: 2; justify-self: start; }
+  .row { gap: 8px; }
   .actions > button { flex: 1 1 auto; }
+}
+@container (min-width: 680px) {
+  .rows[data-has-assignment="true"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+  .row + .row { border-top: 0; border-inline-start: 1px solid var(--line); }
 }
