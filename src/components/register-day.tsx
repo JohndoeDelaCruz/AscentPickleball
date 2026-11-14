@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Banknote, Check, ClipboardList } from "lucide-react";
 import { assignCashier } from "@/app/(workspace)/staff/register-actions";
 import { posCommand } from "@/app/(workspace)/staff/actions";
-import { formatDate, localDate } from "@/lib/booking";
+import { addDays, formatDate, localDate } from "@/lib/booking";
 import { centavos, peso, type Shift } from "@/lib/pos";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 import { Modal } from "./modal";
@@ -22,13 +23,56 @@ export function RegisterPanel({ data, date, manager, shift, operator, ready }: {
   </section>;
 }
 
-function CashierAssignment({ data, date, manager }: { data: RegisterData; date: string; manager: boolean }) {
+export function OverviewRegister({ data, today, manager, shift, operator, ready }: {
+  data: RegisterData | null; today: string; manager: boolean; shift?: Shift; operator: string; ready: boolean;
+}) {
+  const router = useRouter();
+  const [expiredDate, setExpiredDate] = useState<string>();
+  const expired = expiredDate === today;
+
+  useEffect(() => {
+    const midnight = Date.parse(`${addDays(today, 1)}T00:00:00+08:00`);
+    function refreshAfterMidnight() {
+      if (Date.now() < midnight) return;
+      setExpiredDate(today);
+      router.refresh();
+    }
+    const timer = window.setTimeout(refreshAfterMidnight, Math.max(0, midnight - Date.now()));
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") refreshAfterMidnight();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [router, today]);
+
+  return <div className={styles.overview}>
+    <section className="console-panel" aria-label="Register status">
+      <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
+    </section>
+    <section className="console-panel" aria-label="Today’s cashier">
+      {data && !expired ? <CashierAssignment key={today} data={data} date={today} manager={manager} currentDay /> : (
+        <div className={styles.row}>
+          <div className={styles.identity}><h2>Cashier on duty today</h2>
+            <p role="status">{expired ? "Checking today’s assignment…" : "Cashier assignment unavailable"}</p>
+          </div>
+        </div>
+      )}
+    </section>
+  </div>;
+}
+
+function CashierAssignment({ data, date, manager, currentDay = false }: {
+  data: RegisterData; date: string; manager: boolean; currentDay?: boolean;
+}) {
   const [editing, setEditing, editClosing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const assignment = data.assignment;
   return <div className={styles.row} role="group" aria-label="Cashier assignment">
     <div className={styles.identity}>
-      <h2>Cashier on duty</h2>
+      <h2>{currentDay ? "Cashier on duty today" : "Cashier on duty"}</h2>
       <p>{assignment?.label ?? "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
       <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
       {status && <small className={styles.saved} role="status">{status}</small>}

@@ -798,6 +798,9 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.deepEqual((await read(cashier)).assignment, { id: cashier, label: "cashier", eligible: true });
       assert.deepEqual((await read(cashier)).cashiers, []);
       assert.equal((await read(owner, tomorrow)).assignment, null);
+      await assign(owner, substitute, null, tomorrow);
+      assert.equal((await read(owner, tomorrow)).assignment?.id, substitute);
+      assert.equal((await read(owner)).assignment?.id, cashier);
       await assert.rejects(() => assign(owner, substitute), /assignment changed/);
 
       const shift = await call<string>(substitute, "pos_open_shift", [10000]);
