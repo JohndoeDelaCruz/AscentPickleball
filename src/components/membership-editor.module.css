@@ -1,0 +1,29 @@
+.fields {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.fields > button {
+  justify-self: start;
+}
+.benefitsHeader {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.benefits.benefits {
+  gap: 8px;
+}
+.benefit {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+}
+.benefit > summary {
+  padding: 10px 14px;
+}
+.benefit > fieldset {
+  padding: 8px 14px 16px;
+}

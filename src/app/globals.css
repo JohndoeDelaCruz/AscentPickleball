@@ -2602,6 +2602,7 @@ img {
   font-size: clamp(24px, 3vw, 34px);
   line-height: 1.25;
   margin: 12px 0;
+  overflow-wrap: anywhere;
 }
 .membership-home p {
   max-width: 650px;
@@ -2614,6 +2615,12 @@ img {
 .membership-page,
 .rules-page {
   padding-bottom: 72px;
+}
+.membership-page {
+  overflow-wrap: anywhere;
+}
+.membership-page .page-heading > .text-link {
+  margin-top: 12px;
 }
 .membership-layout {
   display: grid;
@@ -2649,6 +2656,13 @@ img {
   top: calc(var(--header-height) + 24px);
   background: var(--green);
   color: var(--cream);
+}
+.membership-join:only-child {
+  grid-column: 1 / -1;
+  width: min(100%, 460px);
+}
+.membership-join > .eyebrow {
+  text-transform: uppercase;
 }
 .membership-price {
   margin: 16px 0;

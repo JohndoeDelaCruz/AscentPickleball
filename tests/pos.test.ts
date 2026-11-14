@@ -5,6 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { centavos, cartTotal, collectionsCsv, dayKey, reportFor, type PosData } from "../src/lib/pos";
+import { defaultMembership, membershipDetailsSchema } from "../src/lib/membership";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -656,6 +657,37 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.ok(!firstPage.rows.some((row) => row.id === secondPage.rows[0].id));
     });
 
+    await t.test("membership details are public, with revision-checked manager and owner writes", async () => {
+      const manager = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'membership-manager@example.test')", [manager]);
+      await db.query("insert into public.staff_members(user_id,role) values($1,'manager')", [manager]);
+      const publicRead = () => as("", () => db.query("select details,revision from public.membership_settings"), "anon")
+        .then((result) => result.rows[0]);
+      const save = (user: string, details: unknown, revision: number | null = 0) =>
+        call<number>(user, "save_membership_details", [JSON.stringify(details), revision]);
+      const revision = { ...defaultMembership, price_cents: 35025, benefits: defaultMembership.benefits.slice(0, 2) };
+      const before = await readCurrentData();
+
+      assert.deepEqual(await publicRead(), { details: null, revision: 0 });
+      assert.equal(membershipDetailsSchema.safeParse(defaultMembership).success, true);
+      await assert.rejects(() => save(cashier, revision), /Manager or owner access/);
+      await assert.rejects(() => save(player, revision), /Manager or owner access/);
+      await assert.rejects(() => as("", () => db.query("select public.save_membership_details('{}', 0)"), "anon"), /permission denied/);
+      await assert.rejects(() => as(owner, () => db.query("update public.membership_settings set details = '{}'")), /permission denied/);
+      await assert.rejects(() => save(owner, { ...revision, price_cents: -1 }), /valid membership details/);
+      await assert.rejects(() => save(owner, { ...revision, benefits: {} }), /valid membership details/);
+      await assert.rejects(() => save(owner, { ...revision, benefits: [{ icon: "unknown", title: "A perk", description: "A benefit" }] }), /valid membership benefits/);
+      assert.deepEqual(await publicRead(), { details: null, revision: 0 });
+      assert.equal(await save(manager, revision), 1);
+      assert.equal(await save(manager, revision), 1);
+      assert.deepEqual(await publicRead(), { details: revision, revision: 1 });
+
+      const secondRevision = { ...revision, price_cents: 40000, benefits: [] };
+      await assert.rejects(() => save(owner, secondRevision), /Someone updated the membership details/);
+      assert.equal(await save(owner, secondRevision, 1), 2);
+      assert.deepEqual(await publicRead(), { details: secondRevision, revision: 2 });
+      assert.deepEqual(await readCurrentData(), before);
+    });
     await t.test("cashier calendar and walk-ins reuse booking and register protections", async () => {
       const date = (await db.query<{ date: string }>(
         "select ((now() at time zone 'Asia/Manila')::date + 5)::text date",

@@ -10,7 +10,7 @@ import {
   QrCode,
   CalendarDays,
 } from "lucide-react";
-import { getVenue } from "@/lib/data";
+import { getMembershipSettings, getVenue } from "@/lib/data";
 import { activeCourts, courtPhoto } from "@/lib/courts";
 import { Starburst } from "@/components/starburst";
 import { LandingMotion } from "@/components/landing-motion";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/booking";
 
 export default async function Home() {
-  const { venue } = await getVenue();
+  const [{ venue }, { details: membership }] = await Promise.all([getVenue(), getMembershipSettings()]);
   const courts = activeCourts(venue.courts);
   const open = canBook(venue);
   const ratePeriods = getRatePeriods(venue);
@@ -239,11 +239,8 @@ export default async function Home() {
       >
         <div>
           <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
-          <h2 id="membership-home-title">Annual Membership — ₱300/year</h2>
-          <p>
-            Free use of paddles and balls, member rates, social play, and a
-            birthday perk. Enjoy a full year of Ascent benefits.
-          </p>
+          <h2 id="membership-home-title">{membership.plan_name} — {money(membership.price_cents / 100)}/{membership.price_period}</h2>
+          <p>{membership.home_summary}</p>
         </div>
         <Link href="/membership" className="button button-lime">
           View membership benefits <ArrowUpRight size={18} />

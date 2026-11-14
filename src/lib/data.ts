@@ -3,6 +3,7 @@ import { createClient } from "./supabase/server";
 import { defaultVenue, type VenueResult } from "./types";
 import { defaultCourts, type Court } from "./courts";
 import { readSessionAccess } from "./session-access";
+import { defaultMembership, membershipDetailsSchema, type MembershipDetails } from "./membership";
 
 export const getCourtInventory = cache(async () => {
   try {
@@ -24,6 +25,20 @@ export const getVenueSettings = cache(async () => {
     return error ? null : data;
   } catch {
     return null;
+  }
+});
+
+export const getMembershipSettings = cache(async (): Promise<{ details: MembershipDetails; revision: number | null }> => {
+  const fallback = { details: defaultMembership, revision: null };
+  try {
+    const db = await createClient();
+    const { data, error } = await db.from("membership_settings").select("details, revision").eq("id", true).single();
+    if (error || !data || !Number.isInteger(data.revision)) return fallback;
+    if (data.details === null) return { details: defaultMembership, revision: data.revision };
+    const parsed = membershipDetailsSchema.safeParse(data.details);
+    return parsed.success ? { details: parsed.data, revision: data.revision } : fallback;
+  } catch {
+    return fallback;
   }
 });
 

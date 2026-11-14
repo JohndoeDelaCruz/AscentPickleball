@@ -11,113 +11,73 @@ import {
   Heart,
   GraduationCap,
 } from "lucide-react";
-import { getVenue } from "@/lib/data";
+import { getMembershipSettings, getSession, getVenueSettings } from "@/lib/data";
+import { money } from "@/lib/booking";
+import type { MembershipDetails } from "@/lib/membership";
 
-export const metadata: Metadata = {
-  title: "Annual membership",
-  description:
-    "Join Ascent Pickleball for ₱300 a year and enjoy free equipment use, member rates, social play, and birthday benefits.",
-};
+const benefitIcons = {
+  trophy: Trophy, wallet: Wallet, users: Users, calendar: CalendarDays,
+  check: Check, heart: Heart, gift: Gift, coaching: GraduationCap,
+} satisfies Record<MembershipDetails["benefits"][number]["icon"], typeof Trophy>;
 
-const benefits = [
-  {
-    icon: Trophy,
-    title: "Free equipment use",
-    text: "Use pickleball paddles and balls for free as an Ascent member.",
-  },
-  {
-    icon: Wallet,
-    title: "₱30 off longer court bookings",
-    text: "Get ₱30 off the court rental total when your booking is longer than one hour. The discount applies once per booking, rather than to each additional hour.",
-  },
-  {
-    icon: Users,
-    title: "Discounted open play",
-    text: "Enjoy member rates for open-play sessions. Ask the team for the current member rate.",
-  },
-  {
-    icon: CalendarDays,
-    title: "Priority court reservations",
-    text: "Contact the Ascent team to arrange priority court reservations.",
-  },
-  {
-    icon: Check,
-    title: "Exclusive court-rental discounts",
-    text: "Access exclusive member offers and discounts on court rentals. Check with staff for current offers.",
-  },
-  {
-    icon: Heart,
-    title: "Free monthly social play",
-    text: "Participate in monthly social play events for free and get to know the Ascent community.",
-  },
-  {
-    icon: Gift,
-    title: "A birthday-month perk",
-    text: "Choose one free court hour or one free guest pass during your birthday month. Arrange your birthday perk with staff.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Coaching discounts",
-    text: "Receive exclusive member discounts on coaching sessions. Ask staff about available coaching and member pricing.",
-  },
-];
+export async function generateMetadata(): Promise<Metadata> {
+  const { details } = await getMembershipSettings();
+  return { title: details.plan_name, description: details.home_summary };
+}
 
 export default async function MembershipPage() {
-  const { venue } = await getVenue();
+  const [{ details }, venue, { role }] = await Promise.all([getMembershipSettings(), getVenueSettings(), getSession()]);
+  const facebook = venue?.facebook_url;
   return (
     <main id="main" className="container membership-page">
       <div className="page-heading">
         <span className="eyebrow">YOUR ASCENT COMMUNITY</span>
-        <h1>A YEAR OF GOOD GAMES.</h1>
-        <p>
-          Become an Ascent Pickleball member for a full year of more play,
-          bigger savings, and member privileges.
-        </p>
+        <h1>{details.heading}</h1>
+        <p>{details.introduction}</p>
+        {(role === "owner" || role === "manager") && (
+          <Link href="/admin/settings#venue-membership" className="text-link">
+            Edit membership details <ArrowUpRight size={16} />
+          </Link>
+        )}
       </div>
       <div className="membership-layout">
-        <section aria-labelledby="membership-benefits-title">
-          <h2
-            className="membership-section-title"
-            id="membership-benefits-title"
-          >
-            Your membership benefits
-          </h2>
-          <div className="membership-benefits">
-            {benefits.map(({ icon: Icon, title, text }) => (
-              <article key={title} className="panel membership-benefit">
-                <Icon size={24} aria-hidden="true" />
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        {details.benefits.length > 0 && (
+          <section aria-labelledby="membership-benefits-title">
+            <h2 className="membership-section-title" id="membership-benefits-title">
+              Your membership benefits
+            </h2>
+            <div className="membership-benefits">
+              {details.benefits.map(({ icon, title, description }, index) => {
+                const Icon = benefitIcons[icon];
+                return <article key={index} className="panel membership-benefit">
+                  <Icon size={24} aria-hidden="true" />
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </article>;
+              })}
+            </div>
+          </section>
+        )}
         <aside className="membership-join panel">
-          <span className="eyebrow">ANNUAL MEMBERSHIP</span>
+          <span className="eyebrow">{details.plan_name}</span>
           <p className="membership-price">
-            ₱300<span>/ year</span>
+            {money(details.price_cents / 100)}<span>/ {details.price_period}</span>
           </p>
-          <p>
-            Valid for one full year from activation. Staff will confirm your
-            membership start and expiry dates when you join.
-          </p>
+          <p>{details.validity}</p>
           <a
-            href={venue.facebook_url || "/#visit"}
-            target={venue.facebook_url ? "_blank" : undefined}
-            rel={venue.facebook_url ? "noopener noreferrer" : undefined}
+            href={facebook || "/#visit"}
+            target={facebook ? "_blank" : undefined}
+            rel={facebook ? "noopener noreferrer" : undefined}
             className="button button-lime"
           >
             Join membership <ArrowUpRight size={18} />
           </a>
           <p className="membership-contact-note">
-            {venue.facebook_url
+            {facebook
               ? "Message the Ascent team on Facebook to enroll and arrange payment."
               : "Contact the Ascent team to enroll and arrange payment."}
           </p>
-          <p className="membership-contact-note">
-            Member rates and perks are arranged with staff. Contact the team
-            before booking to redeem your benefits.
-          </p>
+          <p className="membership-contact-note">{details.redemption}</p>
           <Link href="/court-rules" className="text-link">
             Read the court rules <ArrowUpRight size={16} />
           </Link>
