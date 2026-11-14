@@ -37,7 +37,7 @@ export function WorkspaceNavigation({
     <>
       {groups.map((group) => {
         const tabs = group.tabs.map((id) => workspaceTabs.find((tab) => tab.id === id)!);
-        const showPage = manager;
+        const showPage = manager || group.page.href === "/admin";
         if (!tabs.length && !showPage) return null;
         const PageIcon = group.page.icon;
         return <div className={`management-nav-group${group.label === "Settings" ? " management-settings-group" : ""}`} key={group.label}>

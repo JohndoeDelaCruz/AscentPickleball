@@ -654,6 +654,58 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(secondPage.total_cents, 84000);
       assert.ok(!firstPage.rows.some((row) => row.id === secondPage.rows[0].id));
     });
+
+    await t.test("cashier calendar and walk-ins reuse booking and register protections", async () => {
+      const date = (await db.query<{ date: string }>(
+        "select ((now() at time zone 'Asia/Manila')::date + 5)::text date",
+      )).rows[0].date;
+      await db.query("update public.venue_settings set booking_enabled=false,schedule_config=$1,equipment_rental_price=30",
+        [JSON.stringify({ weekly: blocks, overrides: [] })]);
+      const court = [randomUUID(), "court", date, "Cash walk-in", "09171234567", 1, 6, 1, 1, 2, "reservation_fee", "cash", "", true, 8000];
+      const openPlay = [randomUUID(), "open_play", date, "GCash walk-in", "09171234567", null, 8, 1, 2, 0, "full", "gcash", "WALK-123456", true, 10000];
+      const book = (args: unknown[], user = cashier) => call<string>(user, "pos_book_walk_in", args);
+      const calendar = (user: string) => as(user, () => db.query<{ id: string; status: string }>(
+        "select * from public.pos_calendar_reservations($1)", [date],
+      )).then((r) => r.rows);
+      const ledger = (id: string) => db.query(
+        "select s.total_cents,p.amount_cents,p.method,p.reference,p.shift_id from public.pos_sales s join public.pos_payments p on p.sale_id=s.id where s.booking_id=$1",
+        [id],
+      ).then((r) => r.rows);
+
+      await assert.rejects(() => calendar(player), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select * from public.pos_calendar_reservations($1)", [date]), "anon"), /permission denied/);
+      await assert.rejects(() => book(court, player), /Authorized staff/);
+      await assert.rejects(() => call(cashier, "reserve_staff_equipment_booking",
+        ["court", date, "Unauthorized block", "", 1, 6, 1, 1, false, true, "unspecified", "", "full", 0]), /staff authorization|staff access|manager/i);
+      await assert.rejects(() => call(cashier, "save_booking_schedule", [JSON.stringify(schedule), null]), /staff authorization|staff access|manager/i);
+      await assert.rejects(() => book(court), /Open your cashier shift/);
+      assert.deepEqual(await calendar(cashier), []);
+
+      const drawer = await call<string>(cashier, "pos_open_shift", [0]);
+      await assert.rejects(() => book([...court.slice(0, 14), 7500]), /payment amount changed/);
+      const courtId = await book(court);
+      assert.equal(await book(court), courtId);
+      await assert.rejects(() => book([...court.slice(0, 3), "Changed name", ...court.slice(4)]), /already recorded a different booking/);
+      await assert.rejects(() => book([randomUUID(), ...court.slice(1)]), /conflicting key|already reserved/);
+      assert.deepEqual(await ledger(courtId), [{ total_cents: 16000, amount_cents: 8000, method: "cash", reference: null, shift_id: drawer }]);
+
+      await assert.rejects(() => book([...openPlay.slice(0, 13), false, 10000]), /confirm the received payment/);
+      await assert.rejects(() => book([...openPlay.slice(0, 12), "", true, 10000]), /verified GCash transaction reference/);
+      const openPlayId = await book(openPlay);
+      assert.deepEqual(await ledger(openPlayId), [{ total_cents: 10000, amount_cents: 10000, method: "gcash", reference: "WALK-123456", shift_id: null }]);
+      await assert.rejects(() => book([randomUUID(), ...openPlay.slice(1, 6), 12, ...openPlay.slice(7, 12), "walk123456", true, 10000]), /reference is already/);
+      const rows = await calendar(cashier);
+      assert.deepEqual(rows.map((row) => row.id).sort(), [courtId, openPlayId].sort());
+      assert.ok(rows.every((row) => row.status === "confirmed"));
+      for (const field of ["customer_phone", "user_id", "notes", "finance_notes"]) {
+        assert.ok(rows.every((row) => !Object.hasOwn(row, field)));
+      }
+      assert.equal((await as(cashier, () => db.query("select id from public.bookings where id=$1", [courtId]))).rows.length, 0);
+      const group = (people: number) => [randomUUID(), ...openPlay.slice(1, 8), people, ...openPlay.slice(9, 12), `WALK-GROUP-${people}`, true, people * 5000];
+      await book(group(20));
+      await assert.rejects(() => book(group(3)), /places|spots|capacity/i);
+      await call(cashier, "pos_close_shift", [drawer, 8000]);
+    });
   } finally {
     await db.close();
   }

@@ -114,6 +114,12 @@ export type Availability = Pick<
   Booking,
   "court_id" | "start_hour" | "duration" | "status"
 >;
+export type CalendarBooking = Pick<Booking,
+  "id" | "reference" | "customer_name" | "start_hour" | "duration" | "court_id"
+  | "booking_type" | "participant_count" | "status" | "total_amount" | "paid_amount"
+  | "initial_payment_amount" | "payment_option" | "payment_reference" | "payment_rejected_at"
+  | "equipment_rental" | "equipment_quantity" | "equipment_amount" | "equipment_ball_count"
+> & Partial<Pick<Booking, "customer_phone">>;
 export type VenueResult = {
   courtsReady?: boolean;
   venue: VenueSettings;

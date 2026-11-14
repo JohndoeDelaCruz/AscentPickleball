@@ -14,7 +14,8 @@ export function BalancePaymentModal({
   onClose,
   closing,
 }: {
-  booking: Booking;
+  booking: Pick<Booking, "id" | "customer_name" | "reference" | "total_amount" | "status"
+    | "payment_option" | "initial_payment_amount" | "paid_amount">;
   onClose: () => void;
   closing: boolean;
 }) {

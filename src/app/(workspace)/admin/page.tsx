@@ -4,7 +4,7 @@ import { localDate, addDays, isValidDate } from "@/lib/booking";
 import { createClient } from "@/lib/supabase/server";
 import { AdminCalendar } from "@/components/admin-calendar";
 import { WorkspaceRouteLoading } from "@/components/workspace-route-loading";
-import type { Booking } from "@/lib/types";
+import type { CalendarBooking } from "@/lib/types";
 export default async function AdminPage({
   searchParams,
 }: {
@@ -27,12 +27,13 @@ export default async function AdminPage({
 
 async function CalendarData({ date }: { date: string }) {
   const { staff, role } = await getSession();
-  if (!staff || role === "cashier") return null;
+  if (!staff) return null;
+  const manager = role !== "cashier";
   const venueRequest = getVenue();
   const supabase = await createClient();
   await supabase.rpc("expire_unpaid_holds");
   const [result, { venue }] = await Promise.all([
-    readCalendarBookings(supabase, date),
+    readCalendarBookings(supabase, date, manager),
     venueRequest,
   ]);
   if (!result)
@@ -46,21 +47,29 @@ async function CalendarData({ date }: { date: string }) {
       bookings={result}
       date={date}
       venue={venue}
+      manager={manager}
     />
   );
 }
 
-async function readCalendarBookings(supabase: Awaited<ReturnType<typeof createClient>>, date: string) {
+async function readCalendarBookings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  date: string,
+  manager: boolean,
+) {
   const batchSize = 500;
-  const bookings: Booking[] = [];
+  const bookings: CalendarBooking[] = [];
   let lastId: string | undefined;
 
   // The grid, totals, and review table all need the full day, even past the API row limit.
   for (;;) {
-    const query = supabase.from("bookings").select("*").eq("booking_date", date).order("id").limit(batchSize);
+    const base = manager
+      ? supabase.from("bookings").select("*").eq("booking_date", date)
+      : supabase.rpc("pos_calendar_reservations", { p_date: date });
+    const query = base.order("id").limit(batchSize);
     const { data, error } = await (lastId ? query.gt("id", lastId) : query);
     if (error) return null;
-    bookings.push(...(data as Booking[]));
+    bookings.push(...(data as CalendarBooking[]));
     if (data.length < batchSize) return bookings.sort((a, b) => a.start_hour - b.start_hour);
     lastId = data[data.length - 1].id;
   }

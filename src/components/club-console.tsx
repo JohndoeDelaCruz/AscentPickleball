@@ -559,8 +559,8 @@ export function ClubConsole({
                   Add product
                 </button>
               )}
-              {tab === "bookings" && manager && (
-                <Link className="console-button primary" href="/admin">
+              {tab === "bookings" && (
+                <Link className="console-button primary" href={`/admin?date=${date}`}>
                   Court calendar <ArrowUpRight size={16} />
                 </Link>
               )}

@@ -104,6 +104,8 @@ Apply `202611140021_paddle_stack_skill_levels.sql` after 020 before deploying sk
 
 Apply `202611140022_paddle_stack_auto_requeue.sql` after 021 to return all four players to the back of the queue when staff or a scorekeeper saves the final score. Use **Sit out** and **Requeue** to manage breaks.
 
+Apply `202611140023_cashier_walk_ins.sql` after 022 before deploying cashier access to **Court calendar**. Give the worker’s account the `cashier` role in `public.staff_members`. Cashiers can record private walk-ins and open-play passes with cash on their open register shift or with a manually verified GCash reference. For online payment reviews and remaining balances, use **Reservations**. Court blocks, venue settings, inventory edits, and Booking Finance require a manager or owner.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

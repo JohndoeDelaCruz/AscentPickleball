@@ -6,11 +6,13 @@ export function Modal({
   onClose,
   children,
   closing = false,
+  className,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   closing?: boolean;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -29,7 +31,7 @@ export function Modal({
   return (
     <dialog
       ref={dialog}
-      className="panel modal"
+      className={className ? `panel modal ${className}` : "panel modal"}
       data-closing={closing || undefined}
       inert={closing}
       onCancel={(e) => {

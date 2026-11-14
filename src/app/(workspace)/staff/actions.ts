@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkoutSchema, productSchema, type Sale } from "@/lib/pos";
 import { readVerifiedUser } from "@/lib/session-access";
+import { bookingSchema, openPlaySchema } from "@/lib/booking";
+import { bookingError } from "@/lib/customer-request";
 const id = z.uuid();
 const cents = z.int().min(0).max(100000000);
 const schema = z.discriminatedUnion("op", [
@@ -46,6 +48,58 @@ const schema = z.discriminatedUnion("op", [
   }),
 ]);
 export type PosCommand = z.infer<typeof schema>;
+
+const walkInPayment = z.discriminatedUnion("method", [
+  z.object({ method: z.literal("cash"), reference: z.literal("") }),
+  z.object({
+    method: z.literal("gcash"),
+    reference: z.string().trim().regex(/^[a-zA-Z0-9 -]{6,40}$/, "Enter a valid GCash transaction reference."),
+  }),
+]).and(z.object({
+  key: id,
+  verified: z.literal(true, "Confirm that you received the payment."),
+  collectedCents: z.int().min(0).max(2147483647),
+}));
+
+export async function bookWalkIn(input: unknown, openPlay: boolean): Promise<{ id?: string; error?: string }> {
+  const payment = walkInPayment.safeParse(input);
+  if (!payment.success) return { error: payment.error.issues[0].message };
+  const booking = openPlay ? openPlaySchema.safeParse(input) : bookingSchema.safeParse(input);
+  if (!booking.success) return { error: booking.error.issues[0].message };
+  const p = booking.data;
+  const counter = payment.data;
+
+  try {
+    const db = await createClient();
+    const { data: { user }, error: authError } = await readVerifiedUser(db.auth);
+    if (isAuthRetryableFetchError(authError))
+      return { error: "Sign-in verification is temporarily unavailable. Try again in a moment." };
+    if (authError || !user) return { error: "Please sign in again." };
+
+    const { data, error } = await db.rpc("pos_book_walk_in", {
+      p_key: counter.key, p_kind: openPlay ? "open_play" : "court", p_date: p.booking_date,
+      p_name: p.customer_name, p_phone: p.customer_phone, p_start: p.start_hour ?? null,
+      p_court: "court_id" in p ? p.court_id : null, p_duration: "duration" in p ? p.duration : 1,
+      p_people: "participant_count" in p ? p.participant_count : 1,
+      p_quantity: p.equipment_quantity ?? Number(p.equipment_rental), p_payment_option: p.payment_option,
+      p_method: counter.method, p_reference: counter.reference, p_verified: counter.verified,
+      p_collected_cents: counter.collectedCents,
+    });
+    if (error) return { error: error.code === "PGRST202"
+      ? "Walk-in booking needs database migration 023. Ask a manager to apply it."
+      : bookingError(error) };
+    const saved = id.safeParse(data);
+    if (!saved.success) return { error: "Couldn’t confirm the walk-in. Check Reservations before starting another booking." };
+    revalidatePath("/staff");
+    revalidatePath("/admin");
+    revalidatePath("/book");
+    revalidatePath("/admin/finance");
+    return { id: saved.data };
+  } catch {
+    return { error: "Connection interrupted. Retry the same walk-in before starting another booking." };
+  }
+}
+
 export async function posCommand(
   input: unknown,
 ): Promise<{ ok: true; receipt?: Sale } | { error: string }> {

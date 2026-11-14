@@ -15,42 +15,37 @@ import {
   courtScheduleLabel,
   openPlayCapacityLabel,
   equipmentBookingLabel,
-  calculateCourtTotal,
-  calculateReservationTotal,
-  privateEquipmentLimit,
 } from "@/lib/booking";
-import { bookingStatusLabel, type Booking, type VenueSettings } from "@/lib/types";
-import {
-  staffCreateBooking,
-  staffSetStatus,
-  reserveOpenPlay,
-} from "@/app/actions";
+import { bookingStatusLabel, type CalendarBooking, type VenueSettings } from "@/lib/types";
+import { staffSetStatus } from "@/app/actions";
 import { Modal } from "./modal";
 import { useAnimatedModal } from "./use-animated-modal";
-import { paymentMethods } from "@/lib/finance";
-import { EquipmentRental } from "./equipment-rental";
 import { bookingPayments } from "@/lib/payment";
 import { BalancePaymentModal } from "./balance-payment-modal";
 import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 import { TablePagination, useTablePage } from "./table-pagination";
+import { CreateBookingModal } from "./create-booking-modal";
 
 export function AdminCalendar({
   bookings,
   date,
   venue,
+  manager,
 }: {
-  bookings: Booking[];
+  bookings: CalendarBooking[];
   date: string;
   venue: VenueSettings;
+  manager: boolean;
 }) {
   const [createOpen, setCreateOpen, createClosing] = useAnimatedModal<true>();
   const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
-  const [balanceBooking, setBalanceBooking, balanceClosing] = useAnimatedModal<Booking>();
+  const [balanceBooking, setBalanceBooking, balanceClosing] = useAnimatedModal<CalendarBooking>();
   const [action, setAction, actionClosing] = useAnimatedModal<{
-    booking: Booking;
+    booking: CalendarBooking;
     status: "confirmed" | "cancelled";
   }>();
   const [error, setError] = useState("");
+  const [walkInSaved, setWalkInSaved] = useState(false);
   const [pending, startTransition] = useTransition();
   const reservations = useTablePage(bookings.length, date);
   const router = useRouter();
@@ -88,12 +83,16 @@ export function AdminCalendar({
       <WorkspacePageHeading title="Court calendar" actions={
         <button
           className="button button-dark button-small"
-          onClick={() => setCreateOpen(true)}
+          onClick={() => {
+            setWalkInSaved(false);
+            setCreateOpen(true);
+          }}
         >
           <Plus size={16} />
-          Add booking or block
+          {manager ? "Add booking or block" : "Add walk-in"}
         </button>
       } />
+      {walkInSaved && <p className="success-message" role="status">Walk-in booking saved.</p>}
       <div className="admin-stats">
         <div className="panel stat-card">
           <span>Active reservations</span>
@@ -235,8 +234,9 @@ export function AdminCalendar({
             Reservations & payment review
           </h3>
           <p className="small-print">
-            Check incoming transactions in GCash before confirming. Cancelling a
-            paid booking does not issue a refund.
+            {manager
+              ? "Check incoming transactions in GCash before confirming. Cancelling a paid booking does not issue a refund."
+              : <Link className="text-link" href={`/staff?tab=bookings&date=${date}`}>Review payments and collect balances in Reservations</Link>}
           </p>
         </div>
         {!bookings.length ? (
@@ -255,7 +255,7 @@ export function AdminCalendar({
                   <th>Amount</th>
                   <th>GCash reference</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  {manager && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -326,7 +326,7 @@ export function AdminCalendar({
                         {bookingStatusLabel(b)}
                       </span>
                     </td>
-                    <td>
+                    {manager && <td>
                       <div className="table-actions">
                         {b.status === "confirmed" &&
                           bookingPayments(b).balance > 0 && (
@@ -366,7 +366,7 @@ export function AdminCalendar({
                           </button>
                         )}
                       </div>
-                    </td>
+                    </td>}
                   </tr>
                 ))}
               </tbody>
@@ -379,7 +379,9 @@ export function AdminCalendar({
         <CreateBookingModal
           date={date}
           venue={venue}
+          manager={manager}
           onClose={() => setCreateOpen(null)}
+          onWalkInSaved={() => setWalkInSaved(true)}
           closing={createClosing}
         />
       )}
@@ -460,316 +462,5 @@ export function AdminCalendar({
         </Modal>
       )}
     </>
-  );
-}
-
-function CreateBookingModal({
-  date,
-  venue,
-  onClose,
-  closing,
-}: {
-  date: string;
-  venue: VenueSettings;
-  onClose: () => void;
-  closing: boolean;
-}) {
-  const courts = activeCourts(venue.courts);
-  const [blocked, setBlocked] = useState(false);
-  const [openPlay, setOpenPlay] = useState(false);
-  const [bookingDate, setBookingDate] = useState(
-    date < localDate() ? localDate() : date,
-  );
-  const [startHour, setStartHour] = useState(6);
-  const [sessionStart, setSessionStart] = useState<number | null>(null);
-  const [duration, setDuration] = useState(1);
-  const [people, setPeople] = useState(1);
-  const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
-  const [error, setError] = useState("");
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-  const blocks = resolveSchedule(venue, bookingDate).blocks;
-  const sessions = blocks.filter((block) => block.kind === "open_play");
-  const startHours = blocked
-    ? Array.from({ length: 24 }, (_, i) => i)
-    : scheduleHours(blocks).filter((hour) =>
-        blocks.some(
-          (block) =>
-            block.kind === "court" && hour >= block.start && hour < block.end,
-        ),
-      );
-  const selectedHour = startHours.includes(startHour)
-    ? startHour
-    : startHours[0];
-  const selectedSession =
-    sessions.find((session) => session.start === sessionStart) ?? sessions[0];
-  const base = blocked
-    ? selectedHour !== undefined && selectedHour + duration <= 24
-      ? 0
-      : null
-    : openPlay
-      ? selectedSession
-        ? selectedSession.rate * people
-        : null
-      : selectedHour === undefined
-        ? null
-        : calculateCourtTotal(venue, selectedHour, duration, bookingDate);
-  const equipmentLimit = openPlay
-    ? Math.max(0, Math.min(20, Math.floor(people) || 0))
-    : privateEquipmentLimit(venue, bookingDate, selectedHour, duration);
-  const equipmentQuantity = blocked
-    ? 0
-    : Math.min(requestedEquipmentQuantity, equipmentLimit);
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    const form = new FormData(event.currentTarget);
-    const input = {
-      ...Object.fromEntries(form.entries()),
-      equipment_rental: equipmentQuantity > 0,
-      equipment_quantity: equipmentQuantity,
-    };
-    startTransition(async () => {
-      const result = openPlay
-        ? await reserveOpenPlay(input, true)
-        : await staffCreateBooking(input, blocked);
-      if (result.error) setError(result.error);
-      else {
-        router.refresh();
-        onClose();
-      }
-    });
-  }
-  return (
-    <Modal title="Add court time" closing={closing} onClose={() => !pending && onClose()}>
-      <form onSubmit={submit} className="form-stack">
-        <label className="field">
-          <span>Reservation type</span>
-          <select
-            value={openPlay ? "open_play" : "court"}
-            onChange={(e) => {
-              setOpenPlay(e.target.value === "open_play");
-              setBlocked(false);
-            }}
-          >
-            <option value="court">Court booking / block</option>
-            <option value="open_play">Confirmed open-play passes</option>
-          </select>
-        </label>
-        {!openPlay && (
-          <label className="toggle-field">
-            <input
-              type="checkbox"
-              checked={blocked}
-              onChange={(e) => setBlocked(e.target.checked)}
-            />
-            <span>
-              <strong>Block court for maintenance or an event</strong>
-              <small>Leave off for a confirmed walk-in reservation.</small>
-            </span>
-          </label>
-        )}
-        <div className="field-grid">
-          <label className="field">
-            <span>Date</span>
-            <input
-              type="date"
-              name="booking_date"
-              value={bookingDate}
-              onChange={(event) => setBookingDate(event.target.value)}
-              min={localDate()}
-              max={addDays(localDate(), 30)}
-              required
-            />
-          </label>
-          {!openPlay && (
-            <label className="field">
-              <span>Court</span>
-              <select name="court_id">
-                {courts.map((court) => <option key={court.id} value={court.id}>{court.name}</option>)}
-              </select>
-            </label>
-          )}
-          {openPlay ? (
-            <label className="field">
-              <span>Number of players</span>
-              <input
-                type="number"
-                name="participant_count"
-                min="1"
-                max="20"
-                value={people}
-                onChange={(event) => setPeople(Number(event.target.value))}
-                required
-              />
-            </label>
-          ) : (
-            <>
-              <label className="field">
-                <span>Start time</span>
-                <select
-                  name="start_hour"
-                  value={selectedHour ?? ""}
-                  onChange={(event) => setStartHour(Number(event.target.value))}
-                  required
-                  disabled={!startHours.length}
-                >
-                  {!startHours.length && (
-                    <option value="">No private hours</option>
-                  )}
-                  {startHours.map((h) => (
-                    <option value={h} key={h}>
-                      {formatHour(h)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Duration</span>
-                <select
-                  name="duration"
-                  value={duration}
-                  onChange={(event) => setDuration(Number(event.target.value))}
-                >
-                  {[1, 2, 3, 4].map((d) => (
-                    <option value={d} key={d}>
-                      {d} {d === 1 ? "hour" : "hours"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
-        </div>
-        {openPlay && (
-          <label className="field">
-            <span>Open-play session</span>
-            <select
-              name="start_hour"
-              value={selectedSession?.start ?? ""}
-              onChange={(event) => setSessionStart(Number(event.target.value))}
-              required
-              disabled={!sessions.length}
-            >
-              {!sessions.length && (
-                <option value="">No sessions on this date</option>
-              )}
-              {sessions.map((session) => (
-                <option value={session.start} key={session.id}>
-                  {formatHour(session.start)}–{formatHour(session.end)} ·{" "}
-                  {money(session.rate)} / person
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="field">
-          <span>{blocked ? "Block reason" : "Customer name"}</span>
-          <input
-            name="customer_name"
-            required
-            minLength={2}
-            maxLength={100}
-            placeholder={blocked ? "e.g. Court maintenance" : "Full name"}
-          />
-        </label>
-        {!blocked && (
-          <label className="field">
-            <span>Customer mobile</span>
-            <input
-              name="customer_phone"
-              type="tel"
-              required
-              placeholder="09171234567"
-            />
-          </label>
-        )}
-        {!blocked && (
-          <>
-            <EquipmentRental
-              price={venue.equipment_rental_price}
-              ballCount={venue.equipment_ball_count}
-              quantity={equipmentQuantity}
-              maxQuantity={equipmentLimit}
-              onChange={setEquipmentQuantity}
-              disabled={pending}
-            />
-            <label className="field">
-              <span>Payment collected</span>
-              <select name="payment_option" defaultValue="full">
-                <option value="full">Full payment</option>
-                <option value="reservation_fee">50% reservation fee</option>
-              </select>
-              <small>
-                Choose the amount already collected. Any remaining balance is
-                due before play.
-              </small>
-            </label>
-            <label className="field">
-              <span>Payment received via</span>
-              <select name="payment_method" defaultValue="cash">
-                {Object.entries(paymentMethods)
-                  .filter(([key]) => key !== "unspecified" && key !== "gcash")
-                  .map(([key, label]) => (
-                    <option value={key} key={key}>
-                      {label}
-                    </option>
-                  ))}
-              </select>
-              <small>Cash requires an open cashier shift. Verify GCash reservations from the Reservations tab.</small>
-            </label>
-            <label className="field">
-              <span>Staff notes (optional)</span>
-              <textarea name="finance_notes" rows={2} maxLength={2000} />
-            </label>
-          </>
-        )}
-        {base === null ? (
-          <div className="notice notice-warning">
-            Choose a time and duration within available private-booking hours,
-            or select a scheduled open-play session.
-          </div>
-        ) : (
-          !blocked && (
-            <div className="summary-total">
-              <span>Booking total</span>
-              <strong>
-                {money(
-                  calculateReservationTotal(
-                    base,
-                    venue.equipment_rental_price,
-                    equipmentQuantity,
-                  ),
-                )}
-              </strong>
-            </div>
-          )
-        )}
-        {!blocked && (
-          <p className="small-print">
-            Walk-ins are saved as confirmed reservations. Record these only
-            after collecting the selected payment amount. Open play uses both
-            courts; places are checked when saving.
-          </p>
-        )}
-        {error && (
-          <div className="error-message" role="alert">
-            {error}
-          </div>
-        )}
-        <button
-          className="button button-dark"
-          disabled={pending || base === null}
-        >
-          {pending
-            ? "Saving…"
-            : blocked
-              ? "Block court time"
-              : openPlay
-                ? "Add confirmed open-play passes"
-                : "Add confirmed walk-in"}
-        </button>
-      </form>
-    </Modal>
   );
 }

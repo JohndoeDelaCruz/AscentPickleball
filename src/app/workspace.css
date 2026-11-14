@@ -463,6 +463,109 @@
   font-size: 20px;
   font-weight: 500;
 }
+.workspace-app .court-time-modal {
+  width: min(550px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  overflow: hidden;
+}
+.court-time-modal[open],
+.court-time-form {
+  display: flex;
+  flex-direction: column;
+}
+.court-time-modal .modal-header,
+.court-time-scroll,
+.court-time-footer {
+  padding-inline: clamp(16px, 4vw, 26px);
+}
+.court-time-modal .modal-header {
+  flex: none;
+  margin: 0;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.court-time-form,
+.court-time-scroll {
+  min-height: 0;
+}
+.court-time-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: 14px;
+}
+.court-time-step {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.court-time-step span {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.court-time-fields {
+  display: grid;
+  gap: 12px;
+  min-inline-size: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.court-time-fields > p,
+.court-time-totals,
+.court-time-totals dd {
+  margin: 0;
+}
+.court-time-summary {
+  color: var(--muted);
+  font-size: 14px;
+}
+.workspace-app .court-time-modal .field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.court-time-fields .field {
+  min-width: 0;
+  gap: 5px;
+}
+.court-time-fields .field :is(input, select, textarea) {
+  min-width: 0;
+}
+.court-time-modal .field textarea {
+  min-height: 62px;
+}
+.court-time-totals {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 14px;
+}
+.court-time-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.court-time-footer {
+  flex: none;
+  padding-block: 12px;
+  border-top: 1px solid var(--line);
+}
+.court-time-footer .error-message {
+  margin-bottom: 10px;
+}
+.court-time-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
 .workspace-account-grid {
   display: grid;
   grid-template-columns: minmax(0, 650px) minmax(0, 320px);
