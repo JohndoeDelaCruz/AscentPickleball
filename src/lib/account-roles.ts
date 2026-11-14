@@ -1,7 +1,6 @@
 import type { WorkspaceRole } from "./session-access";
 
 export const accountRolesPath = "/admin/access";
-export const accountRolesPageSize = 25;
 export const accountRoleLabels = {
   player: "Player",
   cashier: "Cashier",

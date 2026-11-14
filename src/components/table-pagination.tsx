@@ -27,15 +27,16 @@ type TablePaginationProps = {
   count: number;
   page: number;
   pageSize: number;
+  showSinglePage?: boolean;
   anchorId?: string;
 } & (
   | { onPageChange: (page: number) => void; href?: never }
   | { href: (page: number) => string; onPageChange?: never }
 );
 
-export function TablePagination({ label, count, page, pageSize, anchorId, onPageChange, href }: TablePaginationProps) {
+export function TablePagination({ label, count, page, pageSize, showSinglePage = false, anchorId, onPageChange, href }: TablePaginationProps) {
   const pageCount = Math.ceil(count / pageSize);
-  if (pageCount < 2) return null;
+  if (pageCount === 0 || (pageCount === 1 && !showSinglePage)) return null;
 
   function control(text: string, nextPage: number) {
     const available = nextPage >= 1 && nextPage <= pageCount;

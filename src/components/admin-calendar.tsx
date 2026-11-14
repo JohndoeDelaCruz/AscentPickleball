@@ -25,17 +25,25 @@ import { BalancePaymentModal } from "./balance-payment-modal";
 import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 import { TablePagination, useTablePage } from "./table-pagination";
 import { CreateBookingModal } from "./create-booking-modal";
+import { RegisterControl, RegisterDay } from "./register-day";
+import type { RegisterDay as RegisterData } from "@/lib/register";
 
 export function AdminCalendar({
   bookings,
   date,
   venue,
   manager,
+  register,
+  canAssign,
+  operator,
 }: {
   bookings: CalendarBooking[];
   date: string;
   venue: VenueSettings;
   manager: boolean;
+  register: RegisterData | null;
+  canAssign: boolean;
+  operator: string;
 }) {
   const [createOpen, setCreateOpen, createClosing] = useAnimatedModal<true>();
   const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
@@ -92,6 +100,7 @@ export function AdminCalendar({
           {manager ? "Add booking or block" : "Add walk-in"}
         </button>
       } />
+      {register && <RegisterControl data={register} shift={register.active?.own_shift ?? undefined} operator={operator} ready />}
       {walkInSaved && <p className="success-message" role="status">Walk-in booking saved.</p>}
       <div className="admin-stats">
         <div className="panel stat-card">
@@ -140,6 +149,7 @@ export function AdminCalendar({
           />
         </label>
       </div>
+      {register && <RegisterDay key={date} data={register} date={date} manager={canAssign} />}
       {schedule.override && (
         <div className="notice" style={{ marginBottom: 20 }}>
           {schedule.override.name} · through{" "}

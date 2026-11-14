@@ -712,7 +712,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await db.query("insert into auth.users (id,email,email_confirmed_at) values ($1,'manager@test.example',now()),($2,'pending@test.example',null)", [manager, pending]);
       type ListedAccount = { id: string; email: string; role: string; email_confirmed: boolean };
       const list = (actor: string, query = "", page = 1) =>
-        call<{ row_count: number; rows: ListedAccount[] }>(actor, "admin_list_accounts", [query, page]);
+        call<{ row_count: number; page_size: number; rows: ListedAccount[] }>(actor, "admin_list_accounts", [query, page]);
       const change = (actor: string, user: string, from: string, to: string) =>
         call(actor, "admin_set_account_role", [user, from, to]);
       await assert.rejects(() => list(player), /authorization/);
@@ -724,12 +724,15 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => change(owner, owner, "owner", "player"), /own role/);
       await assert.rejects(() => change(owner, pending, "player", "owner"), /confirm their email/);
       assert.deepEqual(await list(owner, "PlAyEr@"), {
-        row_count: 1, rows: [{ id: player, email: "player@test.example", role: "player", email_confirmed: true }],
+        row_count: 1, page_size: 10, rows: [{ id: player, email: "player@test.example", role: "player", email_confirmed: true }],
       });
       assert.equal((await list(owner, "%")).row_count, 0);
       await db.query("insert into auth.users(id,email) select gen_random_uuid(), 'paging-' || n || '@test.example' from generate_series(1,26) n");
-      assert.equal((await list(owner, "paging-")).rows.length, 25);
-      assert.equal((await list(owner, "paging-", 2)).rows.length, 1);
+      const accountPages = [await list(owner, "paging-"), await list(owner, "paging-", 2), await list(owner, "paging-", 3)];
+      assert.deepEqual(accountPages.map(({ rows }) => rows.length), [10, 10, 6]);
+      assert.ok(accountPages.every(({ row_count, page_size }) => row_count === 26 && page_size === 10));
+      const accountEmails = accountPages.flatMap(({ rows }) => rows.map(({ email }) => email));
+      assert.deepEqual(accountEmails, Array.from({ length: 26 }, (_, i) => `paging-${i + 1}@test.example`).sort());
 
       await change(owner, manager, "player", "manager");
       assert.equal((await list(manager, "owner@")).rows[0].role, "owner");
@@ -759,6 +762,53 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         { actor_id: owner, detail: { from: "manager", to: "owner" } },
       ]);
       assert.equal((await as(cashier, () => db.query("select id from public.pos_audit where action='access.role_change'"))).rows.length, 0);
+    });
+
+    await t.test("daily cashier assignments preserve actual register operators and drawer totals", async () => {
+      const substitute = randomUUID();
+      await db.query("insert into auth.users (id,email) values($1,'relief@test.example')", [substitute]);
+      await call(owner, "admin_set_account_role", [substitute, "player", "cashier"]);
+      const date = dayKey();
+      const tomorrow = dayKey(new Date(Date.now() + 86400000));
+      type RegisterDay = { assignment: { id: string; label: string; eligible: boolean } | null;
+        cashiers: { id: string; label: string }[]; operators: string[];
+        active: { own_shift: { expected_cents: number } | null } | null };
+      const read = (actor: string, day = date) => call<RegisterDay>(actor, "pos_register_day", [day]);
+      const assign = (actor: string, id: string | null, expected: string | null = null, day = date) =>
+        call(actor, "pos_assign_cashier", [day, expected, id]);
+
+      assert.equal((await read(owner)).assignment, null);
+      await assert.rejects(() => read(player), /Authorized staff/);
+      await assert.rejects(() => assign(cashier, cashier), /Manager authorization/);
+      await assert.rejects(() => assign(owner, player), /confirmed account with the Cashier role/);
+      await assert.rejects(() => assign(owner, owner), /confirmed account with the Cashier role/);
+      await assert.rejects(() => as("", () => db.query("select public.pos_register_day(current_date)"), "anon"), /permission denied/);
+      assert.ok((await read(owner)).cashiers.some((row) => row.id === substitute));
+      await assign(owner, cashier);
+      await assign(owner, cashier);
+      assert.deepEqual((await read(cashier)).assignment, { id: cashier, label: "cashier", eligible: true });
+      assert.deepEqual((await read(cashier)).cashiers, []);
+      assert.equal((await read(owner, tomorrow)).assignment, null);
+      await assert.rejects(() => assign(owner, substitute), /assignment changed/);
+
+      const shift = await call<string>(substitute, "pos_open_shift", [10000]);
+      await call(substitute, "pos_record_expense", [randomUUID(), null, "supplies", "Shift supplies", 1200, "cash", shift]);
+      const own = await read(substitute);
+      assert.equal(own.assignment?.id, cashier);
+      assert.equal(own.active?.own_shift?.expected_cents, 8800);
+      assert.equal((await read(owner)).active?.own_shift, null);
+      assert.ok((await read(owner)).operators.includes("relief@test.example"));
+      assert.deepEqual((await read(owner, tomorrow)).operators, []);
+      await assign(owner, substitute, cashier);
+      await assert.rejects(() => call(owner, "pos_close_shift", [shift, 8800]), /Only your active shift/);
+      await call(substitute, "pos_close_shift", [shift, 8700]);
+      assert.equal((await read(owner)).active, null);
+      assert.ok((await read(owner)).operators.includes("relief@test.example"));
+      await call(owner, "admin_set_account_role", [substitute, "cashier", "player"]);
+      assert.equal((await read(owner)).assignment?.eligible, false);
+      await assign(owner, null, substitute);
+      assert.equal((await read(owner)).assignment, null);
+      assert.equal((await db.query("select id from public.pos_audit where action='shift.assignment' and detail->>'date'=$1", [date])).rows.length, 3);
     });
   } finally {
     await db.close();

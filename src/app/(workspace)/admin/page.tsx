@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdminCalendar } from "@/components/admin-calendar";
 import { WorkspaceRouteLoading } from "@/components/workspace-route-loading";
 import type { CalendarBooking } from "@/lib/types";
+import { getRegisterDay } from "@/lib/register-data";
 export default async function AdminPage({
   searchParams,
 }: {
@@ -26,15 +27,17 @@ export default async function AdminPage({
 }
 
 async function CalendarData({ date }: { date: string }) {
-  const { staff, role } = await getSession();
+  const { user, staff, role } = await getSession();
   if (!staff) return null;
   const manager = role !== "cashier";
   const venueRequest = getVenue();
+  const registerRequest = getRegisterDay(date);
   const supabase = await createClient();
   await supabase.rpc("expire_unpaid_holds");
-  const [result, { venue }] = await Promise.all([
+  const [result, { venue }, register] = await Promise.all([
     readCalendarBookings(supabase, date, manager),
     venueRequest,
+    registerRequest,
   ]);
   if (!result)
     return (
@@ -48,6 +51,9 @@ async function CalendarData({ date }: { date: string }) {
       date={date}
       venue={venue}
       manager={manager}
+      register={register}
+      canAssign={role === "manager" || role === "owner"}
+      operator={user?.email ?? "Signed-in staff"}
     />
   );
 }

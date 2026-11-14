@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { setAccountRole } from "@/app/(workspace)/admin/access/actions";
-import { accountRoleLabels, accountRolesHref, accountRolesPageSize, type AccountRole, type ManagedAccount } from "@/lib/account-roles";
+import { accountRoleLabels, accountRolesHref, type AccountRole, type ManagedAccount } from "@/lib/account-roles";
 import { Modal } from "./modal";
 import { TablePagination } from "./table-pagination";
 import { useAnimatedModal } from "./use-animated-modal";
@@ -18,10 +18,11 @@ const descriptions: Record<AccountRole, string> = {
   owner: "Full admin access, including Manager and Owner roles.",
 };
 
-export function AccountRoles({ rows, count, page, query, owner, userId }: {
+export function AccountRoles({ rows, count, page, pageSize, query, owner, userId }: {
   rows: ManagedAccount[];
   count: number;
   page: number;
+  pageSize: number;
   query: string;
   owner: boolean;
   userId: string;
@@ -50,6 +51,10 @@ export function AccountRoles({ rows, count, page, query, owner, userId }: {
         </form>
       </div>
       {status && <p className={`success-message ${styles.status}`} role="status">{status}</p>}
+      {rows.length > 0 && (
+        <TablePagination count={count} page={page} pageSize={pageSize} label="Account pages" showSinglePage
+          href={(nextPage) => accountRolesHref(query, nextPage)} />
+      )}
       {rows.length ? (
         <div className="console-table-wrap" tabIndex={0} role="region" aria-labelledby="account-roles">
           <table className={`console-table ${styles.table}`}>
@@ -78,7 +83,6 @@ export function AccountRoles({ rows, count, page, query, owner, userId }: {
           </table>
         </div>
       ) : <p className="panel-empty-note">{query ? "No accounts match this email search." : "No accounts found."}</p>}
-      <TablePagination count={count} page={page} pageSize={accountRolesPageSize} label="Account pages" href={(nextPage) => accountRolesHref(query, nextPage)} />
     </section>
     {account && <RoleDialog key={account.id} account={account} owner={owner} closing={closing}
       onClose={() => setAccount(null)} onSaved={(role) => {

@@ -171,7 +171,9 @@ export async function posCommand(
     if (error) {
       const match = error.message.match(/(?:POS|Booking):\s*([\s\S]+)/);
       return {
-        error: match?.[1] ?? (c.op === "reject_payment"
+        error: match?.[1] ?? (c.op === "open" || c.op === "close"
+          ? "The shift could not be updated. Refresh the register and try again."
+          : c.op === "reject_payment"
           ? "The reference could not be rejected. Refresh to check the booking status before retrying."
           : "The operation could not be completed. Check database setup and your permissions. For a checkout retry, keep the same cart."),
       };
@@ -189,7 +191,9 @@ export async function posCommand(
   } catch {
     return {
       error:
-        parsed.data.op === "reject_payment"
+        parsed.data.op === "open" || parsed.data.op === "close"
+          ? "Connection interrupted. Refresh the register to check the shift status."
+          : parsed.data.op === "reject_payment"
           ? "Connection interrupted. Refresh to check the booking status before retrying."
           : "Connection interrupted. Retry the same checkout to check its saved result before starting another sale.",
     };

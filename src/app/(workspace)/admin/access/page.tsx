@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountRoles } from "@/components/account-roles";
 import { WorkspacePageHeading } from "@/components/workspace-page-heading";
-import { accountRolesHref, accountRolesPageSize, accountRolesPath, type ManagedAccount } from "@/lib/account-roles";
+import { accountRolesHref, accountRolesPath, type ManagedAccount } from "@/lib/account-roles";
 import { getSession } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,8 +30,10 @@ export default async function AccessPage({ searchParams }: {
       : "Accounts couldn’t be loaded. Please refresh and try again."}</p>
   </>;
 
-  const { row_count: count, rows } = data as { row_count: number; rows: ManagedAccount[] };
-  if (page > 1 && (page - 1) * accountRolesPageSize >= count) redirect(accountRolesHref(query));
-  return <AccountRoles key={`${query}:${page}`} rows={rows} count={count} page={page}
+  const { row_count: count, rows, page_size: pageSize = 25 } = data as {
+    row_count: number; rows: ManagedAccount[]; page_size?: number;
+  };
+  if (page > 1 && (page - 1) * pageSize >= count) redirect(accountRolesHref(query));
+  return <AccountRoles key={`${query}:${page}`} rows={rows} count={count} page={page} pageSize={pageSize}
     query={query} owner={role === "owner"} userId={user.id} />;
 }

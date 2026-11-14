@@ -108,6 +108,10 @@ Apply `202611140023_cashier_walk_ins.sql` after 022 before deploying cashier acc
 
 Apply `202611140024_account_roles.sql` after 023 for **Access** in the admin sidebar. Owners can assign Player, Cashier, Manager, and Owner. Managers can switch accounts between Player and Cashier. The account must confirm its email before receiving staff access. Switch an account to Player to remove staff permissions while preserving its bookings. Staff must close any open register shift first. If the project has only managers and no owner, use the Supabase Table Editor to set your confirmed staff account’s `public.staff_members.role` to `owner` once. The migration preserves existing roles.
 
+Apply `202611140025_account_pages.sql` after 024 to show 10 accounts per page in **Access**. Page controls keep the current email search.
+
+Apply `202611140026_cashier_assignments.sql` after 025. In **Overview** or **Court calendar**, select a date and use **Cashier on duty** to assign one confirmed Cashier account. Managers and owners can replace or clear an assignment. Staff can see the assigned cashier and the operators who opened a shift that day. A scheduled assignment leaves register permissions with the existing staff roles. Use **Front desk register** to open a shift with the starting cash or close it with the counted cash. Expected cash includes register expenses as well as cash collections and refunds.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

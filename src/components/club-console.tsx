@@ -45,6 +45,8 @@ import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
+import { RegisterControl, RegisterDay, RegisterShiftDialog } from "./register-day";
+import type { RegisterDay as RegisterData } from "@/lib/register";
 type Modal =
   | "checkout"
   | "product"
@@ -78,10 +80,16 @@ export function ClubConsole({
   initial: data,
   initialDate,
   initialTab = "overview",
+  register,
+  operator,
+  canAssign,
 }: {
   initial: PosData;
   initialDate: string;
   initialTab?: Tab;
+  register: RegisterData | null;
+  operator: string;
+  canAssign: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -117,7 +125,7 @@ export function ClubConsole({
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (!modal) return;
+    if (!modal || modal === "open" || modal === "close") return;
     const previous = document.activeElement as HTMLElement | null;
     const dialog = document.querySelector<HTMLElement>(".console-modal");
     const controls = () =>
@@ -155,7 +163,7 @@ export function ClubConsole({
     };
   }, [modal]);
   const manager = data.role === "owner" || data.role === "manager";
-  const shift = data.shifts.find((s) => !s.closed_at);
+  const shift = register ? register.active?.own_shift ?? undefined : data.shifts.find((s) => !s.closed_at);
   const metrics = reportFor(data, date);
   const pending = data.paymentReviews ?? data.bookings.filter(
     (b) => b.status === "awaiting_verification",
@@ -358,18 +366,6 @@ export function ClubConsole({
               reason: text("reason"),
             },
             "Stock movement recorded.",
-          );
-          break;
-        case "open":
-          await run(
-            { op: "open", amount: centavos(text("amount")) },
-            "Cashier shift opened.",
-          );
-          break;
-        case "close":
-          await run(
-            { op: "close", id: shift!.id, amount: centavos(text("amount")) },
-            "Shift closed. Cash count recorded.",
           );
           break;
         case "refund":
@@ -576,6 +572,8 @@ export function ClubConsole({
           <div hidden={isNavigating}>
           {tab === "overview" && (
             <>
+              <RegisterControl data={register} shift={shift} operator={operator} ready={data.ready} />
+              {register && <RegisterDay key={initialDate} data={register} date={initialDate} manager={canAssign} />}
               <div className="metrics-grid">
                 <Metric
                   label="NET COLLECTIONS"
@@ -722,18 +720,6 @@ export function ClubConsole({
                     <b>{lowStock.length}</b>
                     <ChevronRight size={15} />
                   </button>
-                  <div className="shift-summary">
-                    <span className="live-dot" />
-                    <span>
-                      {shift
-                        ? "Shift open"
-                        : "Shift closed"}
-                    </span>
-                    <button onClick={() => open(shift ? "close" : "open")}>
-                      {shift ? "Close shift" : "Open shift"}
-                      <ArrowUpRight size={13} />
-                    </button>
-                  </div>
                 </section>
               </div>
               <section className="console-panel">
@@ -1285,7 +1271,7 @@ export function ClubConsole({
                   <div className="panel-heading">
                     <h2>Cashier shifts</h2>
                     <button
-                      disabled={!data.ready}
+                      disabled={!data.ready || Boolean(register?.active && !shift)}
                       onClick={() => open(shift ? "close" : "open")}
                     >
                       {shift ? "Close shift" : "Open shift"}
@@ -1352,7 +1338,14 @@ export function ClubConsole({
           </button>
         </div>
       )}
-      {modal && (
+      {(modal === "open" || modal === "close") && (
+        <RegisterShiftDialog key={modal} shift={modal === "close" ? shift : undefined} operator={operator}
+          closing={modalClosing} onClose={() => setModal(null)} onSaved={(message) => {
+            setModal(null);
+            setToast(message);
+          }} />
+      )}
+      {modal && modal !== "open" && modal !== "close" && (
         <div
           className={`console-modal-backdrop ${modal === "receipt" ? "receipt-backdrop" : ""}`}
           data-closing={modalClosing || undefined}
@@ -1463,8 +1456,6 @@ export function ClubConsole({
                           ? "Edit product"
                           : "Add product",
                         stock: "Adjust stock",
-                        open: "Open shift",
-                        close: "Close shift",
                         refund: "Record refund",
                         balance: "Collect balance",
                         verify: "Verify GCash payment",
@@ -1665,44 +1656,6 @@ export function ClubConsole({
                     </p>
                   </>
                 )}
-                {modal === "open" && (
-                  <>
-                    <p>Count the starting cash float before accepting sales.</p>
-                    <label>
-                      Opening cash (PHP)
-                      <input
-                        name="amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        defaultValue="1000"
-                      />
-                    </label>
-                  </>
-                )}
-                {modal === "close" && shift && (
-                  <>
-                    <div className="modal-amount">
-                      <span>Expected cash in drawer</span>
-                      <strong>{peso(shift.expected_cents)}</strong>
-                    </div>
-                    <p className="form-note">
-                      Opening float + cash collections − cash refunds. GCash
-                      stays separate.
-                    </p>
-                    <label>
-                      Actual cash counted (PHP)
-                      <input
-                        name="amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                    </label>
-                  </>
-                )}
                 {modal === "refund" && (
                   <>
                     <div className="modal-amount">
@@ -1832,9 +1785,7 @@ export function ClubConsole({
                           ? "Reject reference & release reservation"
                         : modal === "refund"
                           ? "Record completed refund"
-                          : modal === "close"
-                            ? "Close shift & record cash count"
-                            : "Save & continue"}
+                          : "Save & continue"}
                   <Check size={17} />
                 </button>
                 {modal === "verify" && selected && paymentReviews.has(selected.id) && (
