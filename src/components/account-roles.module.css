@@ -2,23 +2,14 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-.search,
+.search {
+  flex: 0 1 360px;
+  min-width: 0;
+}
 .actions {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.search {
-  flex: 0 1 360px;
-}
-.search label {
-  flex: 1;
-  min-width: 0;
-}
-.search button {
-  flex: none;
-}
-.actions {
   justify-content: flex-end;
 }
 .email {

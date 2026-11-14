@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Access" };
 
-const accountsPerPage = 7;
+const accountsPerPage = 10;
 const databasePageSize = 10;
 type AccountListResult = { row_count: number; rows: ManagedAccount[]; page_size?: number };
 
@@ -54,6 +54,6 @@ export default async function AccessPage({ searchParams }: {
     const { rows: nextRows } = nextData as AccountListResult;
     pageRows.push(...nextRows.slice(0, accountsPerPage - pageRows.length));
   }
-  return <AccountRoles key={`${query}:${page}`} rows={pageRows} count={count} page={page} pageSize={accountsPerPage}
+  return <AccountRoles rows={pageRows} count={count} page={page} pageSize={accountsPerPage}
     query={query} owner={role === "owner"} userId={user.id} />;
 }

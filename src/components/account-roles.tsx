@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
 import { setAccountRole } from "@/app/(workspace)/admin/access/actions";
 import { accountRoleLabels, accountRolesHref, type AccountRole, type ManagedAccount } from "@/lib/account-roles";
 import { Modal } from "./modal";
@@ -18,7 +17,7 @@ const descriptions: Record<AccountRole, string> = {
   owner: "Full admin access, including Manager and Owner roles.",
 };
 
-export function AccountRoles({ rows, count, page, pageSize, query, owner, userId }: {
+type AccountRolesProps = {
   rows: ManagedAccount[];
   count: number;
   page: number;
@@ -26,66 +25,94 @@ export function AccountRoles({ rows, count, page, pageSize, query, owner, userId
   query: string;
   owner: boolean;
   userId: string;
-}) {
-  const router = useRouter();
-  const [account, setAccount, closing] = useAnimatedModal<ManagedAccount>();
-  const [status, setStatus] = useState("");
+};
 
-  function search(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const value = new FormData(event.currentTarget).get("q");
-    router.push(accountRolesHref(typeof value === "string" ? value.trim() : ""));
+function AccountSearch({ query }: { query: string }) {
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const submittedQuery = useRef(query);
+
+  useEffect(() => () => clearTimeout(searchTimeout.current), []);
+  useEffect(() => {
+    if (query === submittedQuery.current) return;
+    clearTimeout(searchTimeout.current);
+    submittedQuery.current = query;
+    if (input.current) input.current.value = query;
+  }, [query]);
+
+  function search(value: string) {
+    clearTimeout(searchTimeout.current);
+    const nextQuery = value.trim();
+    searchTimeout.current = setTimeout(() => {
+      if (nextQuery === submittedQuery.current) return;
+      submittedQuery.current = nextQuery;
+      router.replace(accountRolesHref(nextQuery), { scroll: false });
+    }, 250);
   }
 
+  return <div role="search" aria-label="Find accounts" className={styles.search}>
+    <label className="field">
+      <span className="sr-only">Search by name or email</span>
+      <input ref={input} name="q" type="search" defaultValue={query} maxLength={254}
+        placeholder="Search by name or email" onChange={(event) => search(event.currentTarget.value)} />
+    </label>
+  </div>;
+}
+
+export function AccountRoles(props: AccountRolesProps) {
   return <>
     <WorkspacePageHeading title="Access" />
     <section className="console-panel" aria-labelledby="account-roles">
       <div className={`panel-heading ${styles.toolbar}`}>
         <h2 id="account-roles">Account roles</h2>
-        <form onSubmit={search} role="search" aria-label="Find accounts" className={styles.search}>
-          <label className="field">
-            <span className="sr-only">Search by name or email</span>
-            <input name="q" type="search" defaultValue={query} maxLength={254} placeholder="Search by name or email" />
-          </label>
-          <button className="button button-outline button-small"><Search size={16} aria-hidden="true" /> Search</button>
-        </form>
+        <AccountSearch query={props.query} />
       </div>
-      {status && <p className={`success-message ${styles.status}`} role="status">{status}</p>}
-      {rows.length > 0 && (
-        <TablePagination count={count} page={page} pageSize={pageSize} label="Account pages" showSinglePage
-          href={(nextPage) => accountRolesHref(query, nextPage)} />
-      )}
-      {rows.length ? (
-        <div className="console-table-wrap" tabIndex={0} role="region" aria-labelledby="account-roles">
-          <table className={`console-table ${styles.table}`}>
-            <thead><tr><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Action</th></tr></thead>
-            <tbody>
-              {rows.map((row) => {
-                const ownAccount = row.id === userId;
-                const canEdit = !ownAccount && (owner || row.role === "player" || row.role === "cashier")
-                  && (row.email_confirmed || row.role !== "player");
-                return <tr key={row.id}>
-                  <td className={styles.email}>
-                    <strong>{row.full_name || row.email}</strong>
-                    {row.full_name && <small>{row.email}</small>}
-                    {ownAccount && <small>Your account</small>}
-                    {!row.email_confirmed && <small>Email confirmation pending</small>}
-                  </td>
-                  <td>{accountRoleLabels[row.role]}</td>
-                  <td>{canEdit ? (
-                    <button className="button button-outline button-small" type="button"
-                      aria-label={`Edit role for ${row.full_name ? `${row.full_name} (${row.email})` : row.email}`}
-                      onClick={() => { setStatus(""); setAccount(row); }}>Edit role</button>
-                  ) : <span className="small-print">
-                    {ownAccount ? "Your role" : (row.role === "owner" || row.role === "manager") ? "Owner only" : "Awaiting confirmation"}
-                  </span>}</td>
-                </tr>;
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : <p className="panel-empty-note">{query ? "No accounts match this search." : "No accounts found."}</p>}
+      <AccountRoleResults key={accountRolesHref(props.query, props.page)} {...props} />
     </section>
+  </>;
+}
+
+function AccountRoleResults({ rows, count, page, pageSize, query, owner, userId }: AccountRolesProps) {
+  const [account, setAccount, closing] = useAnimatedModal<ManagedAccount>();
+  const [status, setStatus] = useState("");
+
+  return <>
+    {status && <p className={`success-message ${styles.status}`} role="status">{status}</p>}
+    {rows.length > 0 && (
+      <TablePagination count={count} page={page} pageSize={pageSize} label="Account pages" showSinglePage
+        href={(nextPage) => accountRolesHref(query, nextPage)} />
+    )}
+    {rows.length ? (
+      <div className="console-table-wrap" tabIndex={0} role="region" aria-labelledby="account-roles">
+        <table className={`console-table ${styles.table}`}>
+          <thead><tr><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Action</th></tr></thead>
+          <tbody>
+            {rows.map((row) => {
+              const ownAccount = row.id === userId;
+              const canEdit = !ownAccount && (owner || row.role === "player" || row.role === "cashier")
+                && (row.email_confirmed || row.role !== "player");
+              return <tr key={row.id}>
+                <td className={styles.email}>
+                  <strong>{row.full_name || row.email}</strong>
+                  {row.full_name && <small>{row.email}</small>}
+                  {ownAccount && <small>Your account</small>}
+                  {!row.email_confirmed && <small>Email confirmation pending</small>}
+                </td>
+                <td>{accountRoleLabels[row.role]}</td>
+                <td>{canEdit ? (
+                  <button className="button button-outline button-small" type="button"
+                    aria-label={`Edit role for ${row.full_name ? `${row.full_name} (${row.email})` : row.email}`}
+                    onClick={() => { setStatus(""); setAccount(row); }}>Edit role</button>
+                ) : <span className="small-print">
+                  {ownAccount ? "Your role" : (row.role === "owner" || row.role === "manager") ? "Owner only" : "Awaiting confirmation"}
+                </span>}</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+    ) : <p className="panel-empty-note">{query ? "No accounts match this search." : "No accounts found."}</p>}
     {account && <RoleDialog key={account.id} account={account} owner={owner} closing={closing}
       onClose={() => setAccount(null)} onSaved={(role) => {
         setStatus(`${account.full_name || account.email} now has ${accountRoleLabels[role]} access.`);
