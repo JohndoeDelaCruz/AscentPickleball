@@ -8,9 +8,18 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Access" };
 
-const accountsPerPage = 5;
+const accountsPerPage = 7;
 const databasePageSize = 10;
 type AccountListResult = { row_count: number; rows: ManagedAccount[]; page_size?: number };
+
+function AccountLoadError({ code }: { code?: string }) {
+  return <>
+    <WorkspacePageHeading title="Access" />
+    <p className="error-message" role="alert">{code === "PGRST202"
+      ? "Apply database migration 024 to manage account access."
+      : "Accounts couldn’t be loaded. Please refresh and try again."}</p>
+  </>;
+}
 
 export default async function AccessPage({ searchParams }: {
   searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
@@ -33,17 +42,18 @@ export default async function AccessPage({ searchParams }: {
   const chunkSize = (data as AccountListResult | null)?.page_size ?? 25;
   const chunk = Math.floor(offset / chunkSize) + 1;
   if (!error && data && chunk !== initialChunk) ({ data, error } = await read(chunk));
-  if (error || !data) return <>
-    <WorkspacePageHeading title="Access" />
-    <p className="error-message" role="alert">{error?.code === "PGRST202"
-      ? "Apply database migration 024 to manage account access."
-      : "Accounts couldn’t be loaded. Please refresh and try again."}</p>
-  </>;
+  if (error || !data) return <AccountLoadError code={error?.code} />;
 
   const { row_count: count, rows } = data as AccountListResult;
   if (page > 1 && offset >= count) redirect(accountRolesHref(query));
-  // Both database page sizes are multiples of five, so a display page fits in one chunk.
   const start = offset % chunkSize;
-  return <AccountRoles key={`${query}:${page}`} rows={rows.slice(start, start + accountsPerPage)} count={count} page={page} pageSize={accountsPerPage}
+  const pageRows = rows.slice(start, start + accountsPerPage);
+  if (start + accountsPerPage > chunkSize && offset + pageRows.length < count) {
+    const { data: nextData, error: nextError } = await read(chunk + 1);
+    if (nextError || !nextData) return <AccountLoadError code={nextError?.code} />;
+    const { rows: nextRows } = nextData as AccountListResult;
+    pageRows.push(...nextRows.slice(0, accountsPerPage - pageRows.length));
+  }
+  return <AccountRoles key={`${query}:${page}`} rows={pageRows} count={count} page={page} pageSize={accountsPerPage}
     query={query} owner={role === "owner"} userId={user.id} />;
 }
