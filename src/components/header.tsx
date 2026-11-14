@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowUpRight, Menu, X, LogOut, UserRound } from "lucide-react";
@@ -16,6 +16,8 @@ export function Header({
   staff: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const mobileNavId = useId();
+  const menuButton = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
@@ -33,7 +35,15 @@ export function Header({
     { href: "/#visit", label: "Find us" },
   ];
   return (
-    <header className={`site-header${isAdmin ? " site-header--admin" : ""}`}>
+    <header
+      className={`site-header${isAdmin ? " site-header--admin" : ""}`}
+      onKeyDown={(event) => {
+        if (!open || event.key !== "Escape") return;
+        event.preventDefault();
+        menuButton.current?.focus();
+        setOpen(false);
+      }}
+    >
       <div className="container nav-shell">
         <Brand compact={isAdmin} />
         {!isAdmin && (
@@ -105,55 +115,66 @@ export function Header({
           )}
         </div>
         <button
+          type="button"
+          ref={menuButton}
           className="icon-button mobile-menu"
-          onClick={() => setOpen(!open)}
+          onClick={() => setOpen((current) => !current)}
           aria-label={open ? "Close navigation" : "Open navigation"}
           aria-expanded={open}
+          aria-controls={mobileNavId}
         >
           {open ? <X /> : <Menu />}
         </button>
       </div>
-      {open && (
-        <nav className="mobile-nav" aria-label="Mobile navigation">
-          {!isAdmin && (
-            <>
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setOpen(false)}
-                >
-                  {link.label}
+      <nav
+        id={mobileNavId}
+        className="mobile-nav"
+        aria-label="Mobile navigation"
+        data-open={open}
+        inert={!open}
+      >
+        <div className="mobile-nav-clip">
+          <div className="mobile-nav-links">
+            {!isAdmin && (
+              <>
+                {links.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <Link href="/my-bookings" onClick={() => setOpen(false)}>
+                  My bookings
                 </Link>
-              ))}
-              <Link href="/my-bookings" onClick={() => setOpen(false)}>
-                My bookings
-              </Link>
-              {staff && (
-                <Link href="/staff" onClick={() => setOpen(false)}>
-                  Dashboard
-                </Link>
-              )}
-            </>
-          )}
-          <Link
-            href={signedIn ? "/account" : "/login"}
-            onClick={() => setOpen(false)}
-          >
-            {signedIn
-              ? "Account settings / Change password"
-              : "Log in / Sign up"}
-          </Link>
-          {signedIn && <button onClick={signOut}>Sign out</button>}
-          <Link
-            href="/book"
-            className="button button-dark"
-            onClick={() => setOpen(false)}
-          >
-            Book a court <ArrowUpRight size={16} />
-          </Link>
-        </nav>
-      )}
+                {staff && (
+                  <Link href="/staff" onClick={() => setOpen(false)}>
+                    Dashboard
+                  </Link>
+                )}
+              </>
+            )}
+            <Link
+              href={signedIn ? "/account" : "/login"}
+              onClick={() => setOpen(false)}
+            >
+              {signedIn
+                ? "Account settings / Change password"
+                : "Log in / Sign up"}
+            </Link>
+            {signedIn && <button onClick={signOut}>Sign out</button>}
+            <Link
+              href="/book"
+              className="button button-dark"
+              onClick={() => setOpen(false)}
+            >
+              Book a court <ArrowUpRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </nav>
     </header>
   );
 }

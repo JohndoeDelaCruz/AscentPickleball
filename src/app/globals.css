@@ -2935,26 +2935,6 @@ img {
     border: 0;
     margin-left: -12px;
   }
-  .mobile-nav {
-    display: flex;
-    position: absolute;
-    top: 74px;
-    left: 0;
-    right: 0;
-    padding: 22px;
-    gap: 20px;
-    flex-direction: column;
-    background: var(--cream);
-    border-bottom: 1px solid var(--line);
-    box-shadow: 0 10px 20px #203e3210;
-    font-size: 14px;
-  }
-  .mobile-nav > button {
-    border: 0;
-    text-align: left;
-    background: transparent;
-    padding: 0;
-  }
   .marquee-band {
     padding-block: 12px;
     --marquee-gap: 24px;
@@ -3775,19 +3755,42 @@ img {
     flex-shrink: 0;
   }
   .mobile-nav {
-    display: flex;
+    display: grid;
     position: absolute;
     top: 100%;
     inset-inline: 0;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    pointer-events: none;
+    box-shadow: 0 10px 20px #203e3210;
+    transition: grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 260ms;
+  }
+  .mobile-nav[data-open="true"] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  .mobile-nav-clip {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .mobile-nav-links {
+    display: flex;
+    max-height: calc(100dvh - var(--header-height));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 24px;
     gap: 22px;
     flex-direction: column;
     border-bottom: 1px solid var(--line);
     background: var(--cream);
-    box-shadow: 0 10px 20px #203e3210;
     font-size: 16px;
   }
-  .mobile-nav > button {
+  .mobile-nav-links > * {
+    flex-shrink: 0;
+  }
+  .mobile-nav-links > button {
     border: 0;
     padding: 0;
     text-align: left;
@@ -3887,11 +3890,11 @@ img {
 .site-header--admin .mobile-menu {
   display: none;
 }
-.site-header--admin .mobile-nav {
+.site-header--admin .mobile-nav-links {
   gap: 12px;
 }
-.site-header--admin .mobile-nav > a,
-.site-header--admin .mobile-nav > button {
+.site-header--admin .mobile-nav-links > a,
+.site-header--admin .mobile-nav-links > button {
   display: flex;
   align-items: center;
   min-height: 44px;
