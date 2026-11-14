@@ -12,6 +12,7 @@ export type AccountRole = keyof typeof accountRoleLabels;
 export type ManagedAccount = {
   id: string;
   email: string;
+  full_name?: string | null;
   email_confirmed: boolean;
   role: AccountRole;
 };

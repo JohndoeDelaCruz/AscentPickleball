@@ -44,8 +44,8 @@ export function AccountRoles({ rows, count, page, pageSize, query, owner, userId
         <h2 id="account-roles">Account roles</h2>
         <form onSubmit={search} role="search" aria-label="Find accounts" className={styles.search}>
           <label className="field">
-            <span className="sr-only">Search by email</span>
-            <input name="q" type="search" defaultValue={query} maxLength={254} placeholder="Search by email" />
+            <span className="sr-only">Search by name or email</span>
+            <input name="q" type="search" defaultValue={query} maxLength={254} placeholder="Search by name or email" />
           </label>
           <button className="button button-outline button-small"><Search size={16} aria-hidden="true" /> Search</button>
         </form>
@@ -66,13 +66,15 @@ export function AccountRoles({ rows, count, page, pageSize, query, owner, userId
                   && (row.email_confirmed || row.role !== "player");
                 return <tr key={row.id}>
                   <td className={styles.email}>
-                    <strong>{row.email}</strong>
+                    <strong>{row.full_name || row.email}</strong>
+                    {row.full_name && <small>{row.email}</small>}
                     {ownAccount && <small>Your account</small>}
                     {!row.email_confirmed && <small>Email confirmation pending</small>}
                   </td>
                   <td>{accountRoleLabels[row.role]}</td>
                   <td>{canEdit ? (
-                    <button className="button button-outline button-small" type="button" aria-label={`Edit role for ${row.email}`}
+                    <button className="button button-outline button-small" type="button"
+                      aria-label={`Edit role for ${row.full_name ? `${row.full_name} (${row.email})` : row.email}`}
                       onClick={() => { setStatus(""); setAccount(row); }}>Edit role</button>
                   ) : <span className="small-print">
                     {ownAccount ? "Your role" : (row.role === "owner" || row.role === "manager") ? "Owner only" : "Awaiting confirmation"}
@@ -82,11 +84,11 @@ export function AccountRoles({ rows, count, page, pageSize, query, owner, userId
             </tbody>
           </table>
         </div>
-      ) : <p className="panel-empty-note">{query ? "No accounts match this email search." : "No accounts found."}</p>}
+      ) : <p className="panel-empty-note">{query ? "No accounts match this search." : "No accounts found."}</p>}
     </section>
     {account && <RoleDialog key={account.id} account={account} owner={owner} closing={closing}
       onClose={() => setAccount(null)} onSaved={(role) => {
-        setStatus(`${account.email} now has ${accountRoleLabels[role]} access.`);
+        setStatus(`${account.full_name || account.email} now has ${accountRoleLabels[role]} access.`);
         setAccount(null);
       }} />}
   </>;
@@ -123,7 +125,11 @@ function RoleDialog({ account, owner, closing, onClose, onSaved }: {
 
   return <Modal title="Edit account role" closing={closing} onClose={() => !pending && onClose()}>
     <form className="form-stack" onSubmit={save}>
-      <div className={styles.email}><strong>{account.email}</strong><p className="small-print">Current role: {accountRoleLabels[account.role]}</p></div>
+      <div className={styles.email}>
+        <strong>{account.full_name || account.email}</strong>
+        {account.full_name && <p className="small-print">{account.email}</p>}
+        <p className="small-print">Current role: {accountRoleLabels[account.role]}</p>
+      </div>
       <label className="field">
         <span>New role</span>
         <select value={role} disabled={pending} onChange={(event) => {

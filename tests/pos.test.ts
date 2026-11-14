@@ -78,6 +78,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       "insert into auth.users values($1,'owner@test.example'),($2,'cashier@test.example'),($3,'player@test.example')",
       [owner, cashier, player],
     );
+    await db.exec("alter table auth.users add column raw_user_meta_data jsonb");
     await db.query(
       "insert into public.staff_members(user_id) values($1)",
       [owner],
@@ -710,7 +711,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
     await t.test("account access separates owners, managers, cashiers, and players", async () => {
       const manager = randomUUID(), pending = randomUUID();
       await db.query("insert into auth.users (id,email,email_confirmed_at) values ($1,'manager@test.example',now()),($2,'pending@test.example',null)", [manager, pending]);
-      type ListedAccount = { id: string; email: string; role: string; email_confirmed: boolean };
+      type ListedAccount = { id: string; email: string; full_name: string | null; role: string; email_confirmed: boolean };
       const list = (actor: string, query = "", page = 1) =>
         call<{ row_count: number; page_size: number; rows: ListedAccount[] }>(actor, "admin_list_accounts", [query, page]);
       const change = (actor: string, user: string, from: string, to: string) =>
@@ -723,9 +724,17 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => as(owner, () => db.query("update public.staff_members set role='owner' where user_id=$1", [cashier])), /permission denied/);
       await assert.rejects(() => change(owner, owner, "owner", "player"), /own role/);
       await assert.rejects(() => change(owner, pending, "player", "owner"), /confirm their email/);
+      await db.query("update auth.users set raw_user_meta_data=$2 where id=$1", [player, JSON.stringify({ full_name: "  Ana\t  de la Cruz  ", role: "owner", private_note: "hidden" })]);
+      const playerRow = { id: player, email: "player@test.example", full_name: "Ana de la Cruz", role: "player", email_confirmed: true };
       assert.deepEqual(await list(owner, "PlAyEr@"), {
-        row_count: 1, page_size: 10, rows: [{ id: player, email: "player@test.example", role: "player", email_confirmed: true }],
+        row_count: 1, page_size: 10, rows: [playerRow],
       });
+      assert.deepEqual((await list(owner, "AnA  de La")).rows, [playerRow]);
+      await db.query("update auth.users set raw_user_meta_data=$2 where id=$1", [pending, JSON.stringify({ full_name: " \t " })]);
+      await db.query("update auth.users set raw_user_meta_data=$2 where id=$1", [cashier, JSON.stringify({ full_name: { name: "Do not show" } })]);
+      assert.equal((await list(owner, "pending@")).rows[0].full_name, null);
+      assert.equal((await list(owner, "cashier@")).rows[0].full_name, null);
+      assert.equal((await list(owner, "owner@")).rows[0].full_name, null);
       assert.equal((await list(owner, "%")).row_count, 0);
       await db.query("insert into auth.users(id,email) select gen_random_uuid(), 'paging-' || n || '@test.example' from generate_series(1,26) n");
       const accountPages = [await list(owner, "paging-"), await list(owner, "paging-", 2), await list(owner, "paging-", 3)];

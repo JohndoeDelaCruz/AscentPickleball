@@ -38,7 +38,7 @@ test("Paddle Stack keeps the queue, court permissions, and final scores consiste
       create schema extensions;
       set search_path = public, extensions;
       grant usage on schema public, auth, storage to anon, authenticated;
-      create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
+      create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb);
       create function auth.uid() returns uuid language sql stable as
         $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid;$$;
       create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);

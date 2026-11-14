@@ -114,6 +114,8 @@ Apply `202611140026_cashier_assignments.sql` after 025. In **Overview** or **Cou
 
 Apply `202611140027_overview_trends.sql` after 026 to enable the **Overview** metric charts. Collections, reservations, and retail sales use seven days ending on the selected Philippine date. Booking balances show outstanding amounts by play date from the selected date through 30 days ahead.
 
+Apply `202611140028_account_names.sql` after 027 to show saved full names in **Access** and search by name or email. Accounts without a saved name use their email address.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
