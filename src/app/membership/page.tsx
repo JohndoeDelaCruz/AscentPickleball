@@ -1,24 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  Check,
-  Gift,
-  Users,
-  Wallet,
-  CalendarDays,
-  Trophy,
-  Heart,
-  GraduationCap,
-} from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { benefitIcons } from "@/components/membership-benefit-icons";
 import { getMembershipSettings, getSession, getVenueSettings } from "@/lib/data";
 import { money } from "@/lib/booking";
-import type { MembershipDetails } from "@/lib/membership";
-
-const benefitIcons = {
-  trophy: Trophy, wallet: Wallet, users: Users, calendar: CalendarDays,
-  check: Check, heart: Heart, gift: Gift, coaching: GraduationCap,
-} satisfies Record<MembershipDetails["benefits"][number]["icon"], typeof Trophy>;
 
 export async function generateMetadata(): Promise<Metadata> {
   const { details } = await getMembershipSettings();
@@ -48,7 +33,7 @@ export default async function MembershipPage() {
             </h2>
             <div className="membership-benefits">
               {details.benefits.map(({ icon, title, description }, index) => {
-                const Icon = benefitIcons[icon];
+                const { Icon } = benefitIcons[icon];
                 return <article key={index} className="panel membership-benefit">
                   <Icon size={24} aria-hidden="true" />
                   <h3>{title}</h3>

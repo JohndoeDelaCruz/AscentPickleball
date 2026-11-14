@@ -3,13 +3,14 @@ import { z } from "zod";
 export const maxMembershipPrice = 100_000;
 export const maxMembershipBenefits = 16;
 export const membershipTextLimits = { title: 80, period: 24, body: 500 };
+export const membershipBenefitIcons = ["trophy", "wallet", "users", "calendar", "check", "heart", "gift", "coaching"] as const;
 
 function requiredText(label: string, max: number) {
   return z.string().trim().min(1, `Enter ${label}.`).max(max, `Use up to ${max} characters for ${label}.`);
 }
 
 const benefitSchema = z.object({
-  icon: z.enum(["trophy", "wallet", "users", "calendar", "check", "heart", "gift", "coaching"]),
+  icon: z.enum(membershipBenefitIcons),
   title: requiredText("a benefit title", membershipTextLimits.title),
   description: requiredText("a benefit description", membershipTextLimits.body),
 });

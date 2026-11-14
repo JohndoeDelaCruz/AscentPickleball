@@ -3,8 +3,9 @@
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Plus, Save, Trash2, Trophy } from "lucide-react";
 import { saveMembershipDetails } from "@/app/(workspace)/admin/settings/membership-actions";
-import { maxMembershipBenefits, maxMembershipPrice, membershipTextLimits, type MembershipDetails } from "@/lib/membership";
+import { maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipTextLimits, type MembershipDetails } from "@/lib/membership";
 import { parseSettingNumber } from "@/lib/settings-input";
+import { benefitIcons } from "./membership-benefit-icons";
 import styles from "./membership-editor.module.css";
 
 const pageTextFields = [
@@ -13,6 +14,8 @@ const pageTextFields = [
   { key: "redemption", label: "How to use benefits" },
   { key: "home_summary", label: "Homepage summary" },
 ] as const;
+
+type Benefit = MembershipDetails["benefits"][number];
 
 export function MembershipEditor({ initial }: { initial: { details: MembershipDetails; revision: number | null } }) {
   const [details, setDetails] = useState(initial.details);
@@ -31,8 +34,8 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
     setError("");
   }
 
-  function updateBenefit(index: number, key: "title" | "description", value: string) {
-    update("benefits", details.benefits.map((benefit, position) => position === index ? { ...benefit, [key]: value } : benefit));
+  function updateBenefit(index: number, patch: Partial<Benefit>) {
+    update("benefits", details.benefits.map((benefit, position) => position === index ? { ...benefit, ...patch } : benefit));
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -121,30 +124,43 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
       </header>
       <div className={`settings-card-body ${styles.benefits}`}>
         {details.benefits.length === 0 && <p className="small-print">No benefits listed.</p>}
-        {details.benefits.map((benefit, index) => (
-          <details key={benefitKeys[index].id} className={`workspace-disclosure ${styles.benefit}`} open={benefitKeys[index].startOpen}>
-            <summary>{benefit.title || "New benefit"}</summary>
-            <fieldset disabled={disabled} className={styles.fields} onInvalid={(event) => {
-              const section = event.currentTarget.closest("details");
-              if (section) section.open = true;
-            }}>
-              <legend className="sr-only">{benefit.title || "New benefit"}</legend>
-              <label className="field"><span>Benefit title</span>
-                <input required value={benefit.title} maxLength={membershipTextLimits.title}
-                  onChange={(event) => updateBenefit(index, "title", event.target.value)} />
-              </label>
-              <label className="field"><span>Description</span>
-                <textarea required value={benefit.description} maxLength={membershipTextLimits.body}
-                  onChange={(event) => updateBenefit(index, "description", event.target.value)} />
-              </label>
-              <button type="button" className="console-button" aria-label={`Remove ${benefit.title || "new benefit"}`}
-                onClick={() => {
-                  setBenefitKeys((current) => current.filter((_, position) => position !== index));
-                  update("benefits", details.benefits.filter((_, position) => position !== index));
-                }}><Trash2 size={15} aria-hidden="true" /> Remove benefit</button>
-            </fieldset>
-          </details>
-        ))}
+        {details.benefits.map((benefit, index) => {
+          const { id, startOpen } = benefitKeys[index];
+          const { Icon } = benefitIcons[benefit.icon];
+          return <details key={id} className={`workspace-disclosure ${styles.benefit}`} open={startOpen}>
+              <summary><Icon className={styles.preview} size={18} aria-hidden="true" />{benefit.title || "New benefit"}</summary>
+              <fieldset disabled={disabled} className={styles.fields} onInvalid={(event) => {
+                const section = event.currentTarget.closest("details");
+                if (section) section.open = true;
+              }}>
+                <legend className="sr-only">{benefit.title || "New benefit"}</legend>
+                <label className="field"><span>Benefit title</span>
+                  <input required value={benefit.title} maxLength={membershipTextLimits.title}
+                    onChange={(event) => updateBenefit(index, { title: event.target.value })} />
+                </label>
+                <label className="field"><span>Description</span>
+                  <textarea required value={benefit.description} maxLength={membershipTextLimits.body}
+                    onChange={(event) => updateBenefit(index, { description: event.target.value })} />
+                </label>
+                <fieldset className={styles.iconPicker}>
+                  <legend>Benefit icon</legend>
+                  {membershipBenefitIcons.map((icon) => {
+                    const { Icon: OptionIcon, label } = benefitIcons[icon];
+                    return <label key={icon}>
+                      <input className="sr-only" type="radio" name={`benefit-icon-${id}`} value={icon}
+                        checked={benefit.icon === icon} onChange={() => updateBenefit(index, { icon })} />
+                      <span className={styles.iconChoice}><OptionIcon size={18} aria-hidden="true" />{label}</span>
+                    </label>;
+                  })}
+                </fieldset>
+                <button type="button" className="console-button" aria-label={`Remove ${benefit.title || "new benefit"}`}
+                  onClick={() => {
+                    setBenefitKeys((current) => current.filter((_, position) => position !== index));
+                    update("benefits", details.benefits.filter((_, position) => position !== index));
+                  }}><Trash2 size={15} aria-hidden="true" /> Remove benefit</button>
+              </fieldset>
+          </details>;
+        })}
       </div>
     </section>
     {error && <p className="error-message" role="alert">{error}</p>}

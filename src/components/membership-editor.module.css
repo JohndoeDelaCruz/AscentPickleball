@@ -27,3 +27,49 @@
 .benefit > fieldset {
   padding: 8px 14px 16px;
 }
+.preview {
+  flex: none;
+  color: #66823e;
+}
+.iconPicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 8px;
+  max-width: 680px;
+  min-width: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.iconPicker > legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.iconChoice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 4px;
+  color: var(--console-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.iconPicker input:checked + .iconChoice {
+  background: #edf3e8;
+  border-color: #66823e;
+  color: #24543f;
+  font-weight: 600;
+}
+.iconPicker input:focus-visible + .iconChoice {
+  outline: 2px solid #24543f;
+  outline-offset: 2px;
+}
+.iconPicker input:disabled + .iconChoice {
+  cursor: default;
+  opacity: .7;
+}
