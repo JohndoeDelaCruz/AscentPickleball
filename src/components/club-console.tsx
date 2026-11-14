@@ -912,11 +912,11 @@ export function ClubConsole({
                       className="open-shift-link"
                       onClick={() => open("open")}
                     >
-                      Open a cashier shift to accept payments
+                      Open a register shift to accept payments
                     </button>
                   ) : (
                     <span className="cart-secure">
-                      <CheckCircle2 size={13} /> Your cashier shift is active
+                      <CheckCircle2 size={13} /> Your register shift is active
                     </span>
                   )}
                 </div>
@@ -1273,7 +1273,7 @@ export function ClubConsole({
                 </section>
                 <section className="console-panel">
                   <div className="panel-heading">
-                    <h2>Cashier shifts</h2>
+                    <h2>Register shifts</h2>
                     <button
                       disabled={!data.ready || Boolean(register?.active && !shift)}
                       onClick={() => open(shift ? "close" : "open")}
@@ -1762,7 +1762,7 @@ export function ClubConsole({
                         <Verified text="I received and checked the complete outstanding balance." />
                         {!shift && (
                           <p className="form-note">
-                            Cash requires an open cashier shift.
+                            Cash requires an open register shift.
                           </p>
                         )}
                       </>

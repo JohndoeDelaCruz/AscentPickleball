@@ -27,6 +27,9 @@
 .email p {
   margin: 4px 0 0;
 }
+.table.table :is(th, td) {
+  padding-block: 8px;
+}
 .table td:last-child {
   width: 1%;
   white-space: nowrap;

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getSession } from "@/lib/data";
 import { expenseCategories, expensePaymentMethods, expensesPath } from "@/lib/expenses";
 import { centavos } from "@/lib/pos";
+import { posMessage } from "@/lib/pos-message";
 import { createClient } from "@/lib/supabase/server";
 
 const recordSchema = z.object({
@@ -18,7 +19,7 @@ const recordSchema = z.object({
 });
 
 function expenseError(message: string) {
-  return { error: message.startsWith("POS: ") ? message.slice(5) : "The expense could not be saved. Check your connection and try again." };
+  return { error: message.startsWith("POS: ") ? posMessage(message.slice(5)) : "The expense could not be saved. Check your connection and try again." };
 }
 
 export async function recordExpense(input: unknown) {

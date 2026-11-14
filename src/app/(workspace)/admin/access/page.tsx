@@ -8,6 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Access" };
 
+const accountsPerPage = 5;
+const databasePageSize = 10;
+type AccountListResult = { row_count: number; rows: ManagedAccount[]; page_size?: number };
+
 export default async function AccessPage({ searchParams }: {
   searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
@@ -22,7 +26,13 @@ export default async function AccessPage({ searchParams }: {
   const requestedPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isInteger(requestedPage) && requestedPage >= 1 && requestedPage <= 2147483647 ? requestedPage : 1;
   const db = await createClient();
-  const { data, error } = await db.rpc("admin_list_accounts", { p_query: query, p_page: page });
+  const offset = (page - 1) * accountsPerPage;
+  const read = (chunk: number) => db.rpc("admin_list_accounts", { p_query: query, p_page: chunk });
+  const initialChunk = Math.floor(offset / databasePageSize) + 1;
+  let { data, error } = await read(initialChunk);
+  const chunkSize = (data as AccountListResult | null)?.page_size ?? 25;
+  const chunk = Math.floor(offset / chunkSize) + 1;
+  if (!error && data && chunk !== initialChunk) ({ data, error } = await read(chunk));
   if (error || !data) return <>
     <WorkspacePageHeading title="Access" />
     <p className="error-message" role="alert">{error?.code === "PGRST202"
@@ -30,10 +40,10 @@ export default async function AccessPage({ searchParams }: {
       : "Accounts couldn’t be loaded. Please refresh and try again."}</p>
   </>;
 
-  const { row_count: count, rows, page_size: pageSize = 25 } = data as {
-    row_count: number; rows: ManagedAccount[]; page_size?: number;
-  };
-  if (page > 1 && (page - 1) * pageSize >= count) redirect(accountRolesHref(query));
-  return <AccountRoles key={`${query}:${page}`} rows={rows} count={count} page={page} pageSize={pageSize}
+  const { row_count: count, rows } = data as AccountListResult;
+  if (page > 1 && offset >= count) redirect(accountRolesHref(query));
+  // Both database page sizes are multiples of five, so a display page fits in one chunk.
+  const start = offset % chunkSize;
+  return <AccountRoles key={`${query}:${page}`} rows={rows.slice(start, start + accountsPerPage)} count={count} page={page} pageSize={accountsPerPage}
     query={query} owner={role === "owner"} userId={user.id} />;
 }

@@ -30,10 +30,10 @@ export default async function MyBookings() {
       </div>
       {offDuty && (
         <div className="notice" role="status">
-          <span>Another cashier is on duty today. You can still use My bookings. If you’re covering the shift, ask a manager to update today’s assignment.</span>
+          <span>Another front desk staff member is on duty today. If you’re covering the shift, ask a manager to update today’s assignment.</span>
         </div>
       )}
-      {openShift && <OffDutyCloseout shift={openShift} operator={user.email ?? "Signed-in cashier"} />}
+      {openShift && <OffDutyCloseout shift={openShift} operator={user.email ?? "Signed-in staff"} />}
       <CurrentMatches />
       <Link href="/my-bookings/all" prefetch={false} className="button button-outline button-small">
         See all bookings <ArrowRight size={17} aria-hidden="true" />

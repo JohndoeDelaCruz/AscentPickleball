@@ -7,6 +7,7 @@ import { checkoutSchema, productSchema, type Sale } from "@/lib/pos";
 import { readVerifiedUser } from "@/lib/session-access";
 import { bookingSchema, openPlaySchema } from "@/lib/booking";
 import { bookingError } from "@/lib/customer-request";
+import { posMessage } from "@/lib/pos-message";
 const id = z.uuid();
 const cents = z.int().min(0).max(100000000);
 const schema = z.discriminatedUnion("op", [
@@ -119,7 +120,7 @@ export async function posCommand(
     // The close RPC verifies ownership even during a change of cashier duty.
     if (c.op !== "close") {
       const { data: allowed } = await db.rpc("is_club_staff");
-      if (!allowed) return { error: "Staff tools are available to the cashier assigned for today." };
+      if (!allowed) return { error: "Staff tools are available to the front desk staff member assigned for today." };
     }
     let rpc: string;
     let args: Record<string, unknown>;
@@ -174,7 +175,7 @@ export async function posCommand(
     if (error) {
       const match = error.message.match(/(?:POS|Booking):\s*([\s\S]+)/);
       return {
-        error: match?.[1] ?? (c.op === "open" || c.op === "close"
+        error: match ? posMessage(match[1]) : (c.op === "open" || c.op === "close"
           ? "The shift could not be updated. Refresh the register and try again."
           : c.op === "reject_payment"
           ? "The reference could not be rejected. Refresh to check the booking status before retrying."

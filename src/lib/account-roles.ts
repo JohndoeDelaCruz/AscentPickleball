@@ -3,7 +3,7 @@ import type { WorkspaceRole } from "./session-access";
 export const accountRolesPath = "/admin/access";
 export const accountRoleLabels = {
   player: "Player",
-  cashier: "Cashier",
+  cashier: "Front Desk Staff",
   manager: "Manager",
   owner: "Owner",
 } satisfies Record<WorkspaceRole | "player", string>;

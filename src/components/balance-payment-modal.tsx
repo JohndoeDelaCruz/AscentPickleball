@@ -36,7 +36,7 @@ export function BalancePaymentModal({
       </div>
       <p className="small-print">
         Save only after you have received and checked this payment. This marks
-        the reservation as fully paid. Cash requires an open cashier shift once the POS is enabled.
+        the reservation as fully paid. Cash requires an open register shift once the POS is enabled.
       </p>
       <form
         className="form-stack"

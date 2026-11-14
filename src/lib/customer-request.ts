@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { posMessage } from "./pos-message";
 
 export type CustomerBookingAction =
   | "reserve_court"
@@ -39,7 +40,7 @@ export function bookingError(error: RpcError) {
   return error.message.startsWith("Booking: ")
     ? error.message.slice(9)
     : error.message.startsWith("POS: ")
-      ? error.message.slice(5)
+      ? posMessage(error.message.slice(5))
     : "We couldn’t complete that request. Please refresh and try again.";
 }
 

@@ -8,9 +8,10 @@ import { WorkspaceMenuButton } from "./workspace-menu-button";
 import { WorkspaceContext } from "./workspace-context";
 import { workspaceTab, type WorkspaceTab } from "@/lib/workspace";
 import { CashierAccessCheck } from "./cashier-access-check";
+import type { WorkspaceRole } from "@/lib/session-access";
 
 export function WorkspaceShell({ children, role, roleLoading = false, courtCount, totalCourtCount }: {
-  children: ReactNode; role?: string; roleLoading?: boolean; courtCount?: number; totalCourtCount?: number;
+  children: ReactNode; role?: WorkspaceRole; roleLoading?: boolean; courtCount?: number; totalCourtCount?: number;
 }) {
   const [mobile, setMobile] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);

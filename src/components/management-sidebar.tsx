@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Brand } from "./brand";
 import { createClient } from "@/lib/supabase/client";
+import { accountRoleLabels } from "@/lib/account-roles";
+import type { WorkspaceRole } from "@/lib/session-access";
 
 const preferenceKey = "ascent:sidebar-collapsed";
 const mobileQuery = "(max-width: 650px)";
@@ -26,7 +28,7 @@ export function ManagementSidebar({
   children: ReactNode;
   mobileOpen: boolean;
   onMobileClose: () => void;
-  role?: string;
+  role?: WorkspaceRole;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
@@ -168,7 +170,7 @@ export function ManagementSidebar({
           <Link href="/account" className="sidebar-profile" title="Account settings" aria-current={path === "/account" ? "page" : undefined} onNavigate={onMobileClose}>
             <span aria-hidden="true">AP</span>
             <div className="management-label">
-              <strong>{role ?? "Staff"}</strong>
+              <strong>{role ? accountRoleLabels[role] : "Staff"}</strong>
               <small>Account settings</small>
             </div>
             <Settings2 size={16} className="management-label sidebar-account-icon" aria-hidden="true" />

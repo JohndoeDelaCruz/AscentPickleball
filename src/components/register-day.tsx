@@ -15,7 +15,7 @@ import styles from "./register-day.module.css";
 export function RegisterPanel({ data, date, manager, shift, operator, ready }: {
   data: RegisterData | null; date: string; manager: boolean; shift?: Shift; operator: string; ready: boolean;
 }) {
-  return <section className={`console-panel ${styles.register}`} aria-label="Register and cashier assignment">
+  return <section className={`console-panel ${styles.register}`} aria-label="Register and staff assignment">
     <div className={styles.rows} data-has-assignment={Boolean(data)}>
       <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
       {data && <CashierAssignment key={date} data={data} date={date} manager={manager} />}
@@ -64,11 +64,11 @@ export function OnDutyCard({ data, date, manager, followToday }: {
     <div className="panel-heading">
       <h2>On duty</h2>
       {data && manager && !waiting && <button type="button" onClick={() => { setStatus(""); setEditing(true); }}>
-        {assignment ? "Edit assignment" : "Assign cashier"}
+        {assignment ? "Edit assignment" : "Assign staff"}
       </button>}
     </div>
     {data && !waiting ? <>
-      <table className={`console-table ${styles.dutyTable}`} aria-label="Cashier assignment for selected date">
+      <table className={`console-table ${styles.dutyTable}`} aria-label="Staff assignment for selected date">
         <thead><tr><th scope="col">Name</th><th scope="col">Date</th></tr></thead>
         <tbody><tr>
           <td>
@@ -81,7 +81,7 @@ export function OnDutyCard({ data, date, manager, followToday }: {
       </table>
       {data.operators.length > 0 && <p className={styles.dutyNote}>Opened register: {data.operators.join(", ")}</p>}
       {status && <p className={styles.dutyNote} role="status">{status}</p>}
-    </> : <p className="panel-empty-note" role="status">{waiting ? "Checking the new day’s assignment…" : "Cashier assignment unavailable"}</p>}
+    </> : <p className="panel-empty-note" role="status">{waiting ? "Checking the new day’s assignment…" : "Staff assignment unavailable"}</p>}
     {data && !waiting && editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
       onSaved={(message) => { setStatus(message); setEditing(null); }} />}
   </section>;
@@ -93,15 +93,15 @@ function CashierAssignment({ data, date, manager }: {
   const [editing, setEditing, editClosing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const assignment = data.assignment;
-  return <div className={styles.row} role="group" aria-label="Cashier assignment">
+  return <div className={styles.row} role="group" aria-label="Staff assignment">
     <div className={styles.identity}>
-      <h2>Cashier on duty</h2>
+      <h2>Staff on duty</h2>
       <p>{assignment?.name || assignment?.label || "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
       <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
       {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
     {manager && <button type="button" className="button button-outline button-small" onClick={() => { setStatus(""); setEditing(true); }}>
-      {assignment ? "Edit assignment" : "Assign cashier"}
+      {assignment ? "Edit assignment" : "Assign staff"}
     </button>}
     {editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
       onSaved={(message) => { setStatus(message); setEditing(null); }} />}
@@ -125,18 +125,18 @@ function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
       try {
         const result = await assignCashier({ date, expected: original?.id ?? null, cashier: selected || null });
         if (result.error) setError(result.error);
-        else onSaved(selected ? "Cashier assignment saved." : "Cashier assignment cleared.");
+        else onSaved(selected ? "Staff assignment saved." : "Staff assignment cleared.");
       } catch {
-        setError("Couldn’t confirm the assignment. Refresh to check the saved cashier.");
+        setError("Couldn’t confirm the assignment. Refresh to see who’s on duty.");
       }
     });
   }
 
-  return <Modal title="Cashier on duty" closing={closing} onClose={() => !pending && onClose()}>
+  return <Modal title="Staff on duty" closing={closing} onClose={() => !pending && onClose()}>
     <form className={styles.form} onSubmit={save}>
       <p className={styles.note}>{formatDate(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
       <label className="field">
-        <span>Cashier account</span>
+        <span>Front desk staff member</span>
         <select value={selected} disabled={pending} onChange={(event) => setSelected(event.target.value)}>
           <option value="">Unassigned</option>
           {original && !data.cashiers.some((cashier) => cashier.id === original.id) && (
@@ -146,7 +146,7 @@ function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
             {cashier.name ? `${cashier.name} (${cashier.label})` : cashier.label}
           </option>)}
         </select>
-        {data.cashiers.length === 0 && <small>Give a confirmed account the Cashier role under Access first.</small>}
+        {data.cashiers.length === 0 && <small>Give a confirmed account the Front Desk Staff role under Access first.</small>}
       </label>
       {error && <p className="error-message" role="alert">{error}</p>}
       <div className={styles.actions}>

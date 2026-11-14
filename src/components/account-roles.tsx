@@ -14,7 +14,7 @@ import styles from "./account-roles.module.css";
 const descriptions: Record<AccountRole, string> = {
   player: "Customer bookings and open play.",
   cashier: "Register, walk-ins, Paddle Stack, and register expenses.",
-  manager: "Venue settings, inventory, finance, and cashier access.",
+  manager: "Venue settings, inventory, finance, and front desk staff access.",
   owner: "Full admin access, including Manager and Owner roles.",
 };
 

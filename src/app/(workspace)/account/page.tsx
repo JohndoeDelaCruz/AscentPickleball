@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSession } from "@/lib/data";
+import { accountRoleLabels } from "@/lib/account-roles";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { WorkspacePageHeading } from "@/components/workspace-page-heading";
 
@@ -22,7 +23,7 @@ export default async function AccountPage() {
         <aside className="console-panel workspace-account-note">
           <h2>Signed-in account</h2>
           <strong>{user.email}</strong>
-          <span className="status-pill status-ok workspace-account-role">{role ?? "Staff"}</span>
+          <span className="status-pill status-ok workspace-account-role">{role ? accountRoleLabels[role] : "Staff"}</span>
         </aside>
       </div>
     </>
