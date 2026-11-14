@@ -17,6 +17,7 @@ import { EquipmentRental } from "./equipment-rental";
 import { Modal } from "./modal";
 
 type ReservationType = "court" | "open_play" | "block";
+type StepPosition = { step: number; direction: "forward" | "backward" | null };
 const customerDetails = bookingSchema.pick({ customer_name: true, customer_phone: true });
 const blockDetails = bookingSchema.pick({ customer_name: true });
 
@@ -33,7 +34,7 @@ export function CreateBookingModal({
   const courts = activeCourts(venue.courts);
   const today = localDate();
   const [type, setType] = useState<ReservationType>("court");
-  const [step, setStep] = useState(0);
+  const [{ step, direction }, setStepPosition] = useState<StepPosition>({ step: 0, direction: null });
   const [bookingDate, setBookingDate] = useState(date < today ? today : date);
   const [courtId, setCourtId] = useState(courts[0]?.id);
   const [startHour, setStartHour] = useState(6);
@@ -52,7 +53,6 @@ export function CreateBookingModal({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const walkInRequest = useRef<{ payload: string; key: string } | null>(null);
-  const scrollArea = useRef<HTMLDivElement>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const router = useRouter();
 
@@ -85,14 +85,13 @@ export function CreateBookingModal({
   const collected = total === null ? null : initialPaymentAmount(total, paymentOption);
 
   useEffect(() => {
-    if (scrollArea.current) scrollArea.current.scrollTop = 0;
     stepHeading.current?.focus({ preventScroll: true });
   }, [step]);
 
   function goToStep(next: number) {
     setError("");
     setVerified(false);
-    setStep(next);
+    setStepPosition({ step: next, direction: next > step ? "forward" : "backward" });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -188,7 +187,7 @@ export function CreateBookingModal({
       onClose={() => !pending && onClose()}
     >
       <form onSubmit={submit} className="court-time-form" aria-busy={pending}>
-        <div className="court-time-scroll" ref={scrollArea}>
+        <div key={step} className="court-time-scroll" data-slide={direction ?? undefined}>
           <h3 className="court-time-step" ref={stepHeading} tabIndex={-1}>
             {stepTitle} <span>Step {step + 1} of {lastStep + 1}</span>
           </h3>
