@@ -112,6 +112,8 @@ Apply `202611140025_account_pages.sql` after 024 to show 10 accounts per page in
 
 Apply `202611140026_cashier_assignments.sql` after 025. In **Overview** or **Court calendar**, select a date and use **Cashier on duty** to assign one confirmed Cashier account. Managers and owners can replace or clear an assignment. Staff can see the assigned cashier and the operators who opened a shift that day. A scheduled assignment leaves register permissions with the existing staff roles. Use **Front desk register** to open a shift with the starting cash or close it with the counted cash. Expected cash includes register expenses as well as cash collections and refunds.
 
+Apply `202611140027_overview_trends.sql` after 026 to enable the **Overview** metric charts. Collections, reservations, and retail sales use seven days ending on the selected Philippine date. Booking balances show outstanding amounts by play date from the selected date through 30 days ahead.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

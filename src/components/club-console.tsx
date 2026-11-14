@@ -46,6 +46,7 @@ import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
 import { RegisterPanel, RegisterShiftDialog } from "./register-day";
+import { OverviewMetricValue } from "./overview-metric-value";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 type Modal =
   | "checkout"
@@ -576,31 +577,32 @@ export function ClubConsole({
               <div className="metrics-grid">
                 <Metric
                   label="NET COLLECTIONS"
-                  value={peso(metrics.net)}
+                  value={<OverviewMetricValue value={metrics.net} currency animate={!isNavigating}
+                    trend={data.overviewTrends && { values: data.overviewTrends.net, label: "Daily net collections over the seven days ending on the selected date" }} />}
                   hint="Payments received less refunds"
                   icon={<Banknote size={19} />}
                   tone="lime"
                 />
                 <Metric
                   label="COURT RESERVATIONS"
-                  value={String(
-                    todayBookings.filter((b) => b.status === "confirmed")
-                      .length,
-                  )}
+                  value={<OverviewMetricValue value={todayBookings.filter((b) => b.status === "confirmed").length} animate={!isNavigating}
+                    trend={data.overviewTrends && { values: data.overviewTrends.reservations, label: "Daily confirmed reservations over the seven days ending on the selected date" }} />}
                   hint={`${pending.length} payment${pending.length === 1 ? "" : "s"} to verify`}
                   icon={<CalendarDays size={19} />}
                   tone="lavender"
                 />
                 <Metric
                   label="RETAIL SALES"
-                  value={peso(metrics.retail)}
+                  value={<OverviewMetricValue value={metrics.retail} currency animate={!isNavigating}
+                    trend={data.overviewTrends && { values: data.overviewTrends.retail, label: "Daily retail sales over the seven days ending on the selected date" }} />}
                   hint="Counter sales created on this date"
                   icon={<ShoppingBasket size={19} />}
                   tone="peach"
                 />
                 <Metric
                   label="BOOKING BALANCES"
-                  value={peso(metrics.due)}
+                  value={<OverviewMetricValue value={metrics.due} currency animate={!isNavigating}
+                    trend={data.overviewTrends && { values: data.overviewTrends.balances, label: "Outstanding balances by play date from the selected date through 30 days ahead" }} />}
                   hint="Confirmed reservations in the next 30 days"
                   icon={<Clock3 size={19} />}
                   tone="blue"
@@ -1817,7 +1819,7 @@ function Metric({
   tone,
 }: {
   label: string;
-  value: string;
+  value: string | React.ReactElement;
   hint: string;
   icon: React.ReactNode;
   tone: string;
@@ -1828,7 +1830,7 @@ function Metric({
         <span>{label.charAt(0) + label.slice(1).toLowerCase()}</span>
         {icon}
       </div>
-      <strong>{value}</strong>
+      {typeof value === "string" ? <strong>{value}</strong> : value}
       <p>{hint}</p>
     </article>
   );

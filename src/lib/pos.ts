@@ -90,6 +90,12 @@ export type PosPaymentReview = PosBooking & {
   payment_submitted_at: string | null;
   overdue: boolean;
 };
+export type OverviewTrends = {
+  net: number[];
+  reservations: number[];
+  retail: number[];
+  balances: number[];
+};
 export type PosData = {
   courts?: Court[];
   products: Product[];
@@ -100,6 +106,7 @@ export type PosData = {
   movements: Movement[];
   bookings: PosBooking[];
   paymentReviews?: PosPaymentReview[];
+  overviewTrends?: OverviewTrends;
   role: string;
   ready: boolean;
   error?: string;

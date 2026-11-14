@@ -1,6 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "./supabase/server";
-import { dayKey, type PosBooking, type PosData, type PosPaymentReview, type Sale, type SaleItem } from "./pos";
+import { dayKey, type OverviewTrends, type PosBooking, type PosData, type PosPaymentReview, type Sale, type SaleItem } from "./pos";
 import { getCourtInventory } from "./data";
 
 async function readPosRows<Row>(read: (start: number, end: number) => PromiseLike<{
@@ -36,7 +36,7 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
     const db = await createClient();
     const start = `${day}T00:00:00+08:00`;
     const end = new Date(new Date(start).getTime() + 86400000).toISOString();
-    const [products, payments, refunds, shifts, movements, bookings, role, reviews] = await Promise.all([
+    const [products, payments, refunds, shifts, movements, bookings, role, reviews, trends] = await Promise.all([
       readPosRows((start, end) => db.from("pos_products").select("*").order("name").order("id").range(start, end)),
       db
         .from("pos_payments")
@@ -60,6 +60,7 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
       readPosRows<PosBooking>((start, end) => db.rpc("pos_reservations", { p_date: day }).range(start, end)),
       db.rpc("club_role"),
       readPosRows<PosPaymentReview>((start, end) => db.rpc("pos_payment_reviews").range(start, end)),
+      db.rpc("pos_overview_trends", { p_date: day }),
     ]);
     if ([products, payments, refunds, shifts, movements, bookings, role].some((r) => r.error))
       return {
@@ -111,6 +112,7 @@ export async function getPosData(day = dayKey()): Promise<PosData> {
       movements: movements.data ?? [],
       bookings: bookings.data ?? [],
       paymentReviews: reviews.error ? undefined : (reviews.data ?? []),
+      overviewTrends: trends.error ? undefined : (trends.data as OverviewTrends | null) ?? undefined,
       role: role.data ?? "cashier",
       ready: true,
     };

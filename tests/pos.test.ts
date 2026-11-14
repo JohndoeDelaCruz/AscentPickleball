@@ -810,6 +810,31 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal((await read(owner)).assignment, null);
       assert.equal((await db.query("select id from public.pos_audit where action='shift.assignment' and detail->>'date'=$1", [date])).rows.length, 3);
     });
+
+    await t.test("overview trends use Philippine payment and play dates with a separate upcoming balances series", async () => {
+      const sale = randomUUID();
+      await db.query("insert into public.pos_sales(id, kind, customer_name, total_cents, created_at) values($1,'retail','Trend fixture',4500,'2035-05-20 15:59:59+00')", [sale]);
+      await db.query(`insert into public.pos_payments(sale_id,amount_cents,method,reference,created_at) values
+        ($1,4500,'gcash','TREND-123456','2035-05-20 15:59:59+00'),
+        ($1,1200,'gcash','TREND-234567','2035-05-20 16:00:00+00')`, [sale]);
+      await db.query(`insert into public.pos_refunds(sale_id,amount_cents,method,reason,restock,shift_id,actor_id,created_at)
+        select $1,2000,'gcash','Trend fixture',false,id,$2,'2035-05-21 16:00:00+00' from public.pos_shifts limit 1`, [sale, owner]);
+      await db.query(`insert into public.bookings (court_id,booking_date,start_hour,duration,total_amount,status,customer_name,customer_phone,payment_option) values
+        (1,'2035-05-22',18,1,200,'confirmed','Trend fixture','09171234567','reservation_fee'),
+        (1,'2035-06-21',18,1,200,'confirmed','Trend fixture','09171234567','reservation_fee'),
+        (1,'2035-06-22',18,1,200,'confirmed','Trend fixture','09171234567','reservation_fee')`);
+      type Trends = { net: number[]; retail: number[]; reservations: number[]; balances: number[] };
+      const get = (actor: string) => call<Trends>(actor, "pos_overview_trends", ["2035-05-22"]);
+      const trends = await get(cashier);
+      assert.deepEqual(trends.net, [0, 0, 0, 0, 4500, 1200, -2000]);
+      assert.deepEqual(trends.retail, [0, 0, 0, 0, 4500, 0, 0]);
+      assert.deepEqual(trends.reservations, [0, 0, 0, 0, 0, 0, 1]);
+      assert.equal(trends.balances.length, 31);
+      assert.equal(trends.balances[0], 10000);
+      assert.equal(trends.balances[30], 10000);
+      assert.equal(trends.balances.reduce((a, b) => a + b, 0), 20000);
+      await assert.rejects(() => get(player), /Authorized staff/);
+    });
   } finally {
     await db.close();
   }

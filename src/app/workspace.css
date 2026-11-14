@@ -1040,6 +1040,21 @@
 .club-app .stat-card > strong { display: block; margin: 18px 0 0; font-size: clamp(24px, 2.4vw, 32px); font-weight: 600; line-height: 1.2; letter-spacing: -.8px; overflow-wrap: anywhere; color: var(--console-ink); }
 .club-app .metric-card > p,
 .club-app .stat-card > small { display: block; margin: 10px 0 0; font-size: 13px; color: var(--console-muted); line-height: 1.6; }
+.club-app .metric-card > .overview-metric-value {
+  display: flex;
+  align-items: center;
+  gap: 5px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.overview-metric-number { flex: 1 1 auto; min-width: 0; }
+.overview-sparkline { width: clamp(28px, 26%, 82px); height: auto; flex: none; color: #557643; }
+.overview-sparkline-fill { opacity: .1; }
+.lavender .overview-sparkline { color: #7e6896; }
+.peach .overview-sparkline { color: #a16c42; }
+.blue .overview-sparkline { color: #4e7b85; }
+@media (max-width: 520px) {
+  .club-app .metric-card > .overview-metric-value { font-size: clamp(16px, 5vw, 24px); gap: 6px; }
+}
 .club-app :is(.console-panel, .panel) { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: none; }
 .club-app .panel-heading { padding: 18px 22px; min-height: 62px; border-color: #e9eeea; gap: 16px; }
 .club-app .panel-heading h2 { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
