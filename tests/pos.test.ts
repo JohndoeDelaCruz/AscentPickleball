@@ -67,7 +67,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
     ).then((r) => r.rows[0].value);
   try {
     await db.exec(
-      `create role anon;create role authenticated;create schema auth;create schema storage;create schema extensions;set search_path=public,extensions;grant usage on schema public,auth,storage to anon,authenticated;create table auth.users(id uuid primary key,email text);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid;$$;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;grant select,insert,update on storage.objects to anon,authenticated;alter default privileges grant execute on functions to anon,authenticated;alter default privileges grant all on tables to anon,authenticated;`,
+      `create role anon;create role authenticated;create schema auth;create schema storage;create schema extensions;set search_path=public,extensions;grant usage on schema public,auth,storage to anon,authenticated;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz default now());create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid;$$;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;grant select,insert,update on storage.objects to anon,authenticated;alter default privileges grant execute on functions to anon,authenticated;alter default privileges grant all on tables to anon,authenticated;`,
     );
     const files = (await readdir("supabase/migrations"))
       .filter((f) => f.endsWith(".sql"))
@@ -705,6 +705,60 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await book(group(20));
       await assert.rejects(() => book(group(3)), /places|spots|capacity/i);
       await call(cashier, "pos_close_shift", [drawer, 8000]);
+    });
+
+    await t.test("account access separates owners, managers, cashiers, and players", async () => {
+      const manager = randomUUID(), pending = randomUUID();
+      await db.query("insert into auth.users (id,email,email_confirmed_at) values ($1,'manager@test.example',now()),($2,'pending@test.example',null)", [manager, pending]);
+      type ListedAccount = { id: string; email: string; role: string; email_confirmed: boolean };
+      const list = (actor: string, query = "", page = 1) =>
+        call<{ row_count: number; rows: ListedAccount[] }>(actor, "admin_list_accounts", [query, page]);
+      const change = (actor: string, user: string, from: string, to: string) =>
+        call(actor, "admin_set_account_role", [user, from, to]);
+      await assert.rejects(() => list(player), /authorization/);
+      await assert.rejects(() => list(cashier), /authorization/);
+      await assert.rejects(() => change(player, owner, "owner", "player"), /authorization/);
+      await assert.rejects(() => change(cashier, player, "player", "cashier"), /authorization/);
+      await assert.rejects(() => as("", () => db.query("select public.admin_list_accounts('',1)"), "anon"), /permission denied/);
+      await assert.rejects(() => as(owner, () => db.query("update public.staff_members set role='owner' where user_id=$1", [cashier])), /permission denied/);
+      await assert.rejects(() => change(owner, owner, "owner", "player"), /own role/);
+      await assert.rejects(() => change(owner, pending, "player", "owner"), /confirm their email/);
+      assert.deepEqual(await list(owner, "PlAyEr@"), {
+        row_count: 1, rows: [{ id: player, email: "player@test.example", role: "player", email_confirmed: true }],
+      });
+      assert.equal((await list(owner, "%")).row_count, 0);
+      await db.query("insert into auth.users(id,email) select gen_random_uuid(), 'paging-' || n || '@test.example' from generate_series(1,26) n");
+      assert.equal((await list(owner, "paging-")).rows.length, 25);
+      assert.equal((await list(owner, "paging-", 2)).rows.length, 1);
+
+      await change(owner, manager, "player", "manager");
+      assert.equal((await list(manager, "owner@")).rows[0].role, "owner");
+      await assert.rejects(() => change(manager, owner, "owner", "cashier"), /Only an owner/);
+      await assert.rejects(() => change(manager, cashier, "cashier", "manager"), /Only an owner/);
+      await assert.rejects(() => change(manager, player, "player", "owner"), /Only an owner/);
+      await change(manager, player, "player", "cashier");
+      assert.equal(await call(player, "club_role"), "cashier");
+      assert.equal(await call(player, "is_staff"), false);
+      const shift = await call<string>(player, "pos_open_shift", [0]);
+      await assert.rejects(() => change(manager, player, "cashier", "player"), /close their register shift/);
+      await call(player, "pos_close_shift", [shift, 0]);
+      const bookings = await db.query("select id,user_id from public.bookings where user_id=$1", [player]);
+      assert.ok(bookings.rows.length);
+      await change(manager, player, "cashier", "player");
+      assert.equal(await call(player, "is_club_staff"), false);
+      await assert.rejects(() => call(player, "pos_open_shift", [0]), /Authorized staff/);
+      assert.deepEqual((await db.query("select id,user_id from public.bookings where user_id=$1", [player])).rows, bookings.rows);
+
+      await assert.rejects(() => change(owner, manager, "cashier", "owner"), /role changed/);
+      await change(owner, manager, "manager", "owner");
+      await change(owner, manager, "manager", "owner");
+      assert.equal(await call(manager, "club_role"), "owner");
+      const audit = await db.query("select actor_id,detail from public.pos_audit where action='access.role_change' and entity_id=$1 order by created_at", [manager]);
+      assert.deepEqual(audit.rows, [
+        { actor_id: owner, detail: { from: "player", to: "manager" } },
+        { actor_id: owner, detail: { from: "manager", to: "owner" } },
+      ]);
+      assert.equal((await as(cashier, () => db.query("select id from public.pos_audit where action='access.role_change'"))).rows.length, 0);
     });
   } finally {
     await db.close();

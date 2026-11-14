@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBasket, CalendarDays, Package, ReceiptText,
-  ChartNoAxesCombined, Settings2, ListOrdered, Wallet,
+  ChartNoAxesCombined, Settings2, ListOrdered, Wallet, ShieldCheck,
 } from "lucide-react";
 import { workspaceTabs, type WorkspaceTab } from "@/lib/workspace";
 import { paddleStackPath } from "@/lib/paddle-stack";
 import { expensesPath } from "@/lib/expenses";
+import { accountRolesPath } from "@/lib/account-roles";
 
 const icons = {
   overview: LayoutDashboard, pos: ShoppingBasket, bookings: CalendarDays,
@@ -24,12 +25,13 @@ const groups = [
 ];
 
 export function WorkspaceNavigation({
-  activeTab, onSelect, onNavigate, manager = true, pendingCount = 0,
+  activeTab, onSelect, onNavigate, manager = true, canManageAccess = false, pendingCount = 0,
 }: {
   activeTab?: WorkspaceTab;
   onSelect?: (tab: WorkspaceTab) => void;
   onNavigate: () => void;
   manager?: boolean;
+  canManageAccess?: boolean;
   pendingCount?: number;
 }) {
   const path = usePathname();
@@ -85,6 +87,14 @@ export function WorkspaceNavigation({
             <span className="management-label">{group.page.label}</span>
           </Link>
         }
+        {group.label === "Settings" && canManageAccess && (
+          <Link href={accountRolesPath} title="Access" aria-label="Access"
+            className={path === accountRolesPath ? "selected" : ""}
+            aria-current={path === accountRolesPath ? "page" : undefined} onNavigate={onNavigate}>
+            <ShieldCheck size={19} aria-hidden="true" />
+            <span className="management-label">Access</span>
+          </Link>
+        )}
         </nav>
         </div>;
       })}

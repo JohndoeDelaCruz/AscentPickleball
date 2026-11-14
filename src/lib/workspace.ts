@@ -1,5 +1,6 @@
 import { paddleStackPath } from "./paddle-stack";
 import { expensesPath } from "./expenses";
+import { accountRolesPath } from "./account-roles";
 
 export const workspaceTabs = [
   { id: "overview", label: "Overview" },
@@ -11,7 +12,7 @@ export const workspaceTabs = [
 ] as const;
 
 export type WorkspaceTab = (typeof workspaceTabs)[number]["id"];
-export type WorkspaceView = WorkspaceTab | "calendar" | "finance" | "expenses" | "settings" | "account";
+export type WorkspaceView = WorkspaceTab | "calendar" | "finance" | "expenses" | "settings" | "account" | "access";
 
 export function isWorkspacePath(path: string) {
   return path === "/staff" || path === paddleStackPath || path === expensesPath || path === "/admin" || path.startsWith("/admin/") || path === "/account";
@@ -25,6 +26,7 @@ export function workspaceView(path: string, tab?: unknown): WorkspaceView {
   if (path === "/admin/settings") return "settings";
   if (path === "/admin/finance") return "finance";
   if (path === expensesPath) return "expenses";
+  if (path === accountRolesPath) return "access";
   if (path.startsWith("/admin")) return "calendar";
   if (path === "/account") return "account";
   return workspaceTab(tab);

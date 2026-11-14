@@ -106,6 +106,8 @@ Apply `202611140022_paddle_stack_auto_requeue.sql` after 021 to return all four 
 
 Apply `202611140023_cashier_walk_ins.sql` after 022 before deploying cashier access to **Court calendar**. Give the worker’s account the `cashier` role in `public.staff_members`. Cashiers can record private walk-ins and open-play passes with cash on their open register shift or with a manually verified GCash reference. For online payment reviews and remaining balances, use **Reservations**. Court blocks, venue settings, inventory edits, and Booking Finance require a manager or owner.
 
+Apply `202611140024_account_roles.sql` after 023 for **Access** in the admin sidebar. Owners can assign Player, Cashier, Manager, and Owner. Managers can switch accounts between Player and Cashier. The account must confirm its email before receiving staff access. Switch an account to Player to remove staff permissions while preserving its bookings. Staff must close any open register shift first. If the project has only managers and no owner, use the Supabase Table Editor to set your confirmed staff account’s `public.staff_members.role` to `owner` once. The migration preserves existing roles.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |

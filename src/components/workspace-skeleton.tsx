@@ -6,6 +6,7 @@ const labels: Record<WorkspaceView, string> = {
   overview: "club overview", pos: "point of sale", bookings: "reservations",
   inventory: "inventory", transactions: "transactions", reports: "sales reports",
   expenses: "expenses",
+  access: "account access",
   calendar: "court calendar", finance: "booking finance", settings: "venue settings", account: "account settings",
 };
 const tones = ["lime", "lavender", "peach", "blue"];
@@ -98,6 +99,7 @@ export function WorkspaceSkeleton({ view, heading = true, courtCount, financeVie
       {heading && <Heading />}
       {view === "overview" ? <Overview courtCount={courtCount} />
         : view === "pos" ? <PointOfSale />
+        : view === "access" ? <><Toolbar /><Table columns={3} /></>
         : view === "calendar" ? <Calendar courtCount={courtCount} />
         : view === "finance" ? <Finance courtCount={courtCount} daily={financeView === "daily"} />
         : view === "settings" ? <Settings />

@@ -30,6 +30,7 @@ export function WorkspaceShell({ children, role, roleLoading = false, courtCount
     <main id="main" className="club-app workspace-app">
       <ManagementSidebar mobileOpen={mobile} onMobileClose={() => setMobile(false)} role={role}>
         <WorkspaceNavigation manager={!roleLoading && role !== "cashier"} onNavigate={() => setMobile(false)}
+          canManageAccess={role === "owner" || role === "manager"}
           activeTab={consolePage ? tab : undefined} onSelect={consolePage ? selectTab : undefined} pendingCount={pendingCount} />
       </ManagementSidebar>
       <div className="club-main">
