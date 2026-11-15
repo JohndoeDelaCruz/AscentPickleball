@@ -84,6 +84,7 @@ export type Booking = {
   start_hour: number;
   duration: number;
   total_amount: number;
+  membership_discount_amount?: number;
   payment_option: PaymentOption;
   initial_payment_amount: number;
   paid_amount: number;

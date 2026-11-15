@@ -115,11 +115,22 @@ export function BookingCalendar({
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
   const [accepted, setAccepted] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [memberQuote, setMemberQuote] = useState<{ key: string; discount: number; failed?: true } | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [pending, startTransition] = useTransition();
   const summaryRef = useRef<HTMLElement>(null);
   const router = useRouter();
   const open = ready && openPlayReady && canBook(venue);
+  const selectedHour = selection?.hour;
+  const quoteKey = open && signedIn && mode === "court" && selectedHour !== undefined
+    ? `${date}:${selectedHour}:${duration}:${revision}` : null;
+  const quote = memberQuote?.key === quoteKey ? memberQuote : null;
+  const quoteLoading = quoteKey !== null && !quote;
+  const memberDiscount = quote?.discount ?? 0;
+  const courtSubtotal = selectedHour === undefined ? null : calculateCourtTotal(venue, selectedHour, duration, date);
+  const bookingTotal = courtSubtotal === null ? null : calculateReservationTotal(
+    courtSubtotal - memberDiscount, venue.equipment_rental_price, equipmentQuantity,
+  );
   const preview = venue.opening_hour === null || venue.closing_hour === null;
   const hours = venue.schedule_config
     ? scheduleHours(daySchedule.blocks)
@@ -133,6 +144,32 @@ export function BookingCalendar({
     const interval = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const key = quoteKey;
+    if (!key || selectedHour === undefined) return;
+    let active = true;
+    const client = createClient();
+    async function loadQuote(key: string, hour: number) {
+      try {
+        const { data, error } = await client.rpc("get_private_booking_member_discount", {
+          p_date: date, p_start: hour, p_duration: duration,
+        });
+        if (!active) return;
+        if (error?.code === "PGRST202") {
+          setMemberQuote({ key, discount: 0 });
+        } else if (error || typeof data !== "number" || !Number.isFinite(data) || data < 0) {
+          setMemberQuote({ key, discount: 0, failed: true });
+        } else {
+          setMemberQuote({ key, discount: data });
+        }
+      } catch {
+        if (active) setMemberQuote({ key, discount: 0, failed: true });
+      }
+    }
+    void loadQuote(key, selectedHour);
+    return () => { active = false; };
+  }, [quoteKey, date, selectedHour, duration]);
 
   useEffect(() => {
     if (!ready) return;
@@ -213,7 +250,7 @@ export function BookingCalendar({
   }
   function reserve(event: React.FormEvent) {
     event.preventDefault();
-    if (!selection || !accepted || !open) return;
+    if (!selection || !accepted || !open || quoteLoading || quote?.failed || bookingTotal === null) return;
     setError("");
     startTransition(async () => {
       const result = await reserveCourt({
@@ -226,6 +263,7 @@ export function BookingCalendar({
         equipment_rental: equipmentQuantity > 0,
         equipment_quantity: equipmentQuantity,
         payment_option: paymentOption,
+        expected_total_cents: Math.round(bookingTotal * 100),
       });
       if (result.error) {
         setError(result.error);
@@ -638,17 +676,11 @@ export function BookingCalendar({
             <dl className="summary-rows equipment-cost-rows">
               <div>
                 <dt>Court subtotal</dt>
-                <dd>
-                  {money(
-                    calculateCourtTotal(
-                      venue,
-                      selection.hour,
-                      duration,
-                      date,
-                    ) ?? 0,
-                  )}
-                </dd>
+                <dd>{courtSubtotal === null ? "To be announced" : money(courtSubtotal)}</dd>
               </div>
+              {memberDiscount > 0 && <div>
+                <dt>Membership discount</dt><dd>−{money(memberDiscount)}</dd>
+              </div>}
               <div>
                 <dt>Equipment rental</dt>
                 <dd>
@@ -658,34 +690,17 @@ export function BookingCalendar({
             </dl>
             <div className="summary-total">
               <span>Booking total</span>
-              <strong>
-                {calculateCourtTotal(venue, selection.hour, duration, date) !==
-                null
-                  ? money(
-                      calculateReservationTotal(
-                        calculateCourtTotal(
-                          venue,
-                          selection.hour,
-                          duration,
-                          date,
-                        )!,
-                        venue.equipment_rental_price,
-                        equipmentQuantity,
-                      ),
-                    )
-                  : "To be announced"}
-              </strong>
+              <strong>{quoteLoading ? "Checking price…" : quote?.failed ? "Unavailable" : bookingTotal === null ? "To be announced" : money(bookingTotal)}</strong>
             </div>
-            <PaymentOptions
-              total={calculateReservationTotal(
-                calculateCourtTotal(venue, selection.hour, duration, date) ?? 0,
-                venue.equipment_rental_price,
-                equipmentQuantity,
-              )}
+            {quote?.failed && <div className="error-message" role="alert">
+              Couldn’t check your member price. <button className="button button-small button-outline" type="button" onClick={() => setRevision((value) => value + 1)}>Retry</button>
+            </div>}
+            {!quoteLoading && !quote?.failed && bookingTotal !== null && <PaymentOptions
+              total={bookingTotal}
               value={paymentOption}
               onChange={setPaymentOption}
               disabled={pending}
-            />
+            />}
             {!open ? (
               <div className="notice">
                 <Info size={16} />
@@ -772,7 +787,7 @@ export function BookingCalendar({
                 <button
                   className="button button-dark"
                   disabled={
-                    pending || loading || Boolean(loadError) || !accepted
+                    pending || loading || Boolean(loadError) || !accepted || quoteLoading || Boolean(quote?.failed) || bookingTotal === null
                   }
                 >
                   {pending ? "Reserving…" : "Reserve & view GCash QR"}

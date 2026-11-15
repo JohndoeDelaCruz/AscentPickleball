@@ -17,6 +17,7 @@ import { CourtManager } from "./court-manager";
 import { MembershipEditor } from "./membership-editor";
 import { activeCourts, defaultCourts } from "@/lib/courts";
 import type { IndividualSettingKey } from "@/lib/venue-setting";
+import { membershipPlanLabels, type MembershipPlan, type MembershipPlanId } from "@/lib/membership";
 import { WorkspacePageHeading } from "./workspace-page-heading";
 import { WorkspaceTabs } from "./workspace-tabs";
 
@@ -40,12 +41,13 @@ type FieldFeedback = { error?: string; message?: string };
 export function SettingsForm({ initial, courtsReady = false, membership }: {
   initial: VenueSettings;
   courtsReady?: boolean;
-  membership: ComponentProps<typeof MembershipEditor>["initial"] | null;
+  membership: MembershipPlan[] | null;
 }) {
   const canEditMembership = membership !== null;
   const availableSections = canEditMembership ? sections : sections.filter((item) => item.id !== "membership");
   const [venue, setVenue] = useState(initial);
   const [section, setSection] = useState<SettingsSection>("details");
+  const [membershipPlan, setMembershipPlan] = useState<MembershipPlanId>("annual");
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -313,7 +315,12 @@ export function SettingsForm({ initial, courtsReady = false, membership }: {
           onChange={(courts) => setVenue((old) => ({ ...old, courts }))} />
         </div>
         {membership && <section id="settings-panel-membership" role="tabpanel" aria-labelledby="settings-tab-membership" hidden={section !== "membership"} tabIndex={0}>
-          <MembershipEditor initial={membership} />
+          <WorkspaceTabs id="membership-plan" label="Membership plans" value={membershipPlan} onChange={setMembershipPlan}
+            items={membership.map(({ id }) => ({ id, label: membershipPlanLabels[id] }))} />
+          {membership.map((plan) => <div key={plan.id} id={`membership-plan-panel-${plan.id}`} role="tabpanel"
+            aria-labelledby={`membership-plan-tab-${plan.id}`} hidden={membershipPlan !== plan.id} tabIndex={0}>
+            <MembershipEditor initial={plan} />
+          </div>)}
         </section>}
         <form id="venue-settings-form" className="venue-settings-form" onSubmit={submit} noValidate hidden={section === "membership" || section === "courts" || section === "schedule"}>
           <section id="settings-panel-details" data-settings-section="details" role="tabpanel" aria-labelledby="settings-tab-details" hidden={section !== "details"} tabIndex={0} className="console-panel settings-card">

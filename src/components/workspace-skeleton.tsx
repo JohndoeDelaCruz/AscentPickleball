@@ -7,6 +7,7 @@ const labels: Record<WorkspaceView, string> = {
   inventory: "inventory", transactions: "transactions", reports: "sales reports",
   expenses: "expenses",
   access: "account access",
+  memberships: "membership applications",
   calendar: "court calendar", finance: "booking finance", settings: "venue settings", account: "account settings",
 };
 const tones = ["lime", "lavender", "peach", "blue"];

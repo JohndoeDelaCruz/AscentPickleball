@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/data";
-import { membershipDetailsSchema } from "@/lib/membership";
+import { membershipDetailsSchema, type MembershipPlanId } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 
-export async function saveMembershipDetails(input: unknown, revision: number) {
+export async function saveMembershipDetails(plan: MembershipPlanId, input: unknown, revision: number) {
+  if (plan !== "annual" && plan !== "six-month") return { error: "Choose a membership plan." };
   const parsed = membershipDetailsSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   if (!Number.isInteger(revision) || revision < 0 || revision > 2147483647)
@@ -17,10 +18,13 @@ export async function saveMembershipDetails(input: unknown, revision: number) {
     if (role !== "owner" && role !== "manager") return { error: "Manager or owner access is required." };
 
     const db = await createClient();
-    const { data, error } = await db.rpc("save_membership_details", {
+    const params = {
       p_details: parsed.data,
       p_expected_revision: revision,
-    });
+    };
+    const { data, error } = plan === "annual"
+      ? await db.rpc("save_membership_details", params)
+      : await db.rpc("save_membership_plan", { ...params, p_plan: plan });
     if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
     if (error || typeof data !== "number") return { error: "Membership details couldn’t be saved. Please try again." };
 

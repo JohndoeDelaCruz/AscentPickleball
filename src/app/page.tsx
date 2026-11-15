@@ -10,7 +10,7 @@ import {
   QrCode,
   CalendarDays,
 } from "lucide-react";
-import { getMembershipSettings, getVenue } from "@/lib/data";
+import { getMembershipPlans, getVenue } from "@/lib/data";
 import { activeCourts, courtPhoto } from "@/lib/courts";
 import { Starburst } from "@/components/starburst";
 import { LandingMotion } from "@/components/landing-motion";
@@ -25,7 +25,7 @@ import {
 } from "@/lib/booking";
 
 export default async function Home() {
-  const [{ venue }, { details: membership }] = await Promise.all([getVenue(), getMembershipSettings()]);
+  const [{ venue }, membershipPlans] = await Promise.all([getVenue(), getMembershipPlans()]);
   const courts = activeCourts(venue.courts);
   const open = canBook(venue);
   const ratePeriods = getRatePeriods(venue);
@@ -94,13 +94,6 @@ export default async function Home() {
             fetchPriority="high"
             className="hero-art"
           />
-          <div className="visual-top">
-            <span className="hero-coordinates">
-              PHILIPPINES
-              <br />
-              FOR THE LOVE OF PLAY
-            </span>
-          </div>
           <div className="vertical-word">LET’S PLAY.</div>
           <div className="hero-image-caption" data-hero="">
             <div>
@@ -239,8 +232,13 @@ export default async function Home() {
       >
         <div>
           <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
-          <h2 id="membership-home-title">{membership.plan_name} — {money(membership.price_cents / 100)}/{membership.price_period}</h2>
-          <p>{membership.home_summary}</p>
+          <h2 id="membership-home-title">Membership plans</h2>
+          <ul className="membership-home-plans">
+            {membershipPlans.map(({ id, details }) => <li key={id}>
+              <strong>{details.plan_name} · {money(details.price_cents / 100)} / {details.price_period}</strong>
+              <p>{details.home_summary}</p>
+            </li>)}
+          </ul>
         </div>
         <Link href="/membership" className="button button-lime">
           View membership benefits <ArrowUpRight size={18} />

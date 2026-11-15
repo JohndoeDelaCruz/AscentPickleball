@@ -35,6 +35,7 @@ export function BookingDetail({
   const [pending, startTransition] = useTransition();
   const [remaining, setRemaining] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState(false);
+  const memberDiscount = Number(b.membership_discount_amount ?? 0);
   const router = useRouter();
   useEffect(() => {
     if (!b.hold_expires_at || b.status !== "awaiting_payment") return;
@@ -161,13 +162,16 @@ export function BookingDetail({
               </div>
             )}
           </dl>
-          {b.equipment_rental && (
+          {(b.equipment_rental || memberDiscount > 0) && (
             <dl className="summary-rows equipment-cost-rows">
               <div>
                 <dt>{openPlay ? "Open-play passes" : "Court subtotal"}</dt>
-                <dd>{money(bookingBaseAmount(b))}</dd>
+                <dd>{money(bookingBaseAmount(b) + memberDiscount)}</dd>
               </div>
-              <div>
+              {memberDiscount > 0 && <div>
+                <dt>Membership discount</dt><dd>−{money(memberDiscount)}</dd>
+              </div>}
+              {b.equipment_rental && <div>
                 <dt>
                   Equipment rental
                   <small className="equipment-description">
@@ -175,7 +179,7 @@ export function BookingDetail({
                   </small>
                 </dt>
                 <dd>{money(b.equipment_amount)}</dd>
-              </div>
+              </div>}
             </dl>
           )}
           <div className="summary-total">

@@ -4,6 +4,9 @@ export const maxMembershipPrice = 100_000;
 export const maxMembershipBenefits = 16;
 export const membershipTextLimits = { title: 80, period: 24, body: 500 };
 export const membershipBenefitIcons = ["trophy", "wallet", "users", "calendar", "check", "heart", "gift", "coaching"] as const;
+export const membershipPlanIds = ["annual", "six-month"] as const;
+export type MembershipPlanId = (typeof membershipPlanIds)[number];
+export const membershipPlanLabels = { annual: "Annual plan", "six-month": "Six-month plan" } satisfies Record<MembershipPlanId, string>;
 
 function requiredText(label: string, max: number) {
   return z.string().trim().min(1, `Enter ${label}.`).max(max, `Use up to ${max} characters for ${label}.`);
@@ -28,9 +31,10 @@ export const membershipDetailsSchema = z.object({
 });
 
 export type MembershipDetails = z.infer<typeof membershipDetailsSchema>;
+export type MembershipPlan = { id: MembershipPlanId; details: MembershipDetails; revision: number | null };
 
 export const defaultMembership: MembershipDetails = {
-  price_cents: 30_000,
+  price_cents: 50_000,
   plan_name: "Annual Membership",
   price_period: "year",
   heading: "A YEAR OF GOOD GAMES.",
@@ -79,5 +83,24 @@ export const defaultMembership: MembershipDetails = {
       title: "Coaching discounts",
       description: "Receive exclusive member discounts on coaching sessions. Ask staff about available coaching and member pricing.",
     },
+  ],
+};
+
+export const defaultSixMonthMembership: MembershipDetails = {
+  price_cents: 30_000,
+  plan_name: "Six-Month Membership",
+  price_period: "6 months",
+  heading: "Six months of more play",
+  introduction: "Join Ascent for six months of member rates and perks on and off the court.",
+  validity: "Valid for six months from activation. Staff will confirm your start and expiry dates when you join.",
+  redemption: "Sign in to see your member rate on eligible online private court bookings. Contact the Ascent team to redeem other perks.",
+  home_summary: "Member rates for open play and evening court bookings, free equipment use, and more.",
+  benefits: [
+    { icon: "users", title: "₱70 member open play", description: "Ask staff which open-play sessions are eligible for the ₱70 per player member rate." },
+    { icon: "wallet", title: "₱170 evening private booking", description: "Pay up to ₱170 per court per hour on eligible evening private bookings while your membership is active." },
+    { icon: "gift", title: "Birthday free play", description: "Arrange your birthday free play with the Ascent team." },
+    { icon: "trophy", title: "Free equipment borrowing", description: "Borrow paddles and balls for free when you play at Ascent." },
+    { icon: "coaching", title: "Discounted group training", description: "Ask staff for member rates and available group training sessions." },
+    { icon: "calendar", title: "Priority access to event passes", description: "Contact staff about priority access to passes for Ascent events." },
   ],
 };

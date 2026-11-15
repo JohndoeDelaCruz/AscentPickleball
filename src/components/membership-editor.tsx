@@ -3,8 +3,9 @@
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Plus, Save, Trash2, Trophy } from "lucide-react";
 import { saveMembershipDetails } from "@/app/(workspace)/admin/settings/membership-actions";
-import { maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipTextLimits, type MembershipDetails } from "@/lib/membership";
+import { maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipPlanLabels, membershipTextLimits, type MembershipDetails, type MembershipPlan } from "@/lib/membership";
 import { parseSettingNumber } from "@/lib/settings-input";
+import { membershipTerms } from "@/lib/membership-applications";
 import { benefitIcons } from "./membership-benefit-icons";
 import styles from "./membership-editor.module.css";
 
@@ -17,7 +18,7 @@ const pageTextFields = [
 
 type Benefit = MembershipDetails["benefits"][number];
 
-export function MembershipEditor({ initial }: { initial: { details: MembershipDetails; revision: number | null } }) {
+export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
   const [details, setDetails] = useState(initial.details);
   const [price, setPrice] = useState(String(initial.details.price_cents / 100));
   const [revision, setRevision] = useState(initial.revision);
@@ -51,7 +52,7 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
     const input = { ...details, price_cents: Math.round(amount.value * 100) };
     startTransition(async () => {
       try {
-        const result = await saveMembershipDetails(input, revision);
+        const result = await saveMembershipDetails(initial.id, input, revision);
         if (result.error !== undefined) {
           setError(result.error);
           return;
@@ -66,18 +67,20 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
     });
   }
 
+  const planHeadingId = `membership-editor-heading-${initial.id}`;
+  const benefitsHeadingId = `membership-benefits-editor-heading-${initial.id}`;
   return <form className="venue-settings-form" onSubmit={submit}>
-    <section className="console-panel settings-card" aria-labelledby="membership-editor-heading">
+    <section className="console-panel settings-card" aria-labelledby={planHeadingId}>
       <header className="settings-card-heading">
         <span className="settings-card-icon"><Trophy size={20} aria-hidden="true" /></span>
         <div>
-          <h2 id="membership-editor-heading">Membership details</h2>
+          <h2 id={planHeadingId}>{membershipPlanLabels[initial.id]} details</h2>
           <p>Publish the plan, price, and benefits shown on your website.</p>
         </div>
       </header>
       <div className="settings-card-body">
         {revision === null && <p className="notice notice-warning" role="status">
-          Membership settings are unavailable. Apply migration 031 if it’s pending, then reload this page.
+          Membership settings are unavailable. Apply migration {initial.id === "annual" ? "031" : "032"} if it’s pending, then reload this page.
         </p>}
         <fieldset disabled={disabled} className={styles.fields}>
           <legend className="sr-only">Plan details</legend>
@@ -97,10 +100,10 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
                 setError("");
               }} />
             </label>
-            <label className="field"><span>Price period</span>
+            <label className="field"><span>Price period label</span>
               <input required value={details.price_period} maxLength={membershipTextLimits.period}
                 onChange={(event) => update("price_period", event.target.value)} />
-              <small>For example, year or month.</small>
+              <small>Shown next to the price. Online activations for this plan last {membershipTerms[initial.id]}.</small>
             </label>
           </div>
           <div className="field-grid">
@@ -112,9 +115,9 @@ export function MembershipEditor({ initial }: { initial: { details: MembershipDe
         </fieldset>
       </div>
     </section>
-    <section className="console-panel settings-card" aria-labelledby="membership-benefits-editor-heading">
+    <section className="console-panel settings-card" aria-labelledby={benefitsHeadingId}>
       <header className={`settings-card-heading ${styles.benefitsHeader}`}>
-        <h2 id="membership-benefits-editor-heading">Membership benefits</h2>
+        <h2 id={benefitsHeadingId}>Membership benefits</h2>
         <button type="button" className="console-button" disabled={disabled || details.benefits.length >= maxMembershipBenefits}
           onClick={() => {
             const key = nextBenefitKey.current++;

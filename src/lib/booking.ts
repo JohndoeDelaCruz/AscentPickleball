@@ -249,6 +249,7 @@ export const bookingSchema = z.object({
   booking_date: z.iso.date(),
   start_hour: z.coerce.number().int().min(0).max(23),
   duration: z.coerce.number().int().min(1).max(4),
+  expected_total_cents: z.number().int().min(1).max(9_999_999_999).optional(),
   customer_name: z
     .string()
     .trim()

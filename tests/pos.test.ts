@@ -5,7 +5,8 @@ import { readFile, readdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { centavos, cartTotal, collectionsCsv, dayKey, reportFor, type PosData } from "../src/lib/pos";
-import { defaultMembership, membershipDetailsSchema } from "../src/lib/membership";
+import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema } from "../src/lib/membership";
+import { membershipStatus, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -611,7 +612,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       )).rows[0].expected_cents);
 
       const before = await readCurrentData();
-      for (const file of files.filter((f) => f >= "202611130020"))
+      for (const file of files.filter((f) => f >= "202611130020" && f < "202611150032"))
         await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
       assert.deepEqual(await readCurrentData(), before);
 
@@ -686,6 +687,42 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => save(owner, secondRevision), /Someone updated the membership details/);
       assert.equal(await save(owner, secondRevision, 1), 2);
       assert.deepEqual(await publicRead(), { details: secondRevision, revision: 2 });
+      assert.deepEqual(await readCurrentData(), before);
+    });
+    await t.test("adding or reapplying the six-month plan preserves published plans and keeps revisions independent", async () => {
+      const readPlans = () => as("", () => db.query<{ id: boolean; details: unknown; revision: number }>(
+        "select id, details, revision from public.membership_settings order by id desc",
+      ), "anon").then((result) => result.rows);
+      const [annual] = await readPlans();
+      const before = await readCurrentData();
+      const planMigration = await readFile("supabase/migrations/202611150032_membership_plans.sql", "utf8");
+      await db.exec(planMigration);
+      for (const file of files.filter((f) => f > "202611150032_membership_plans.sql" && f < "202611150034"))
+        await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
+      assert.deepEqual(await readPlans(), [annual, { id: false, details: null, revision: 0 }]);
+
+      const details = { ...defaultSixMonthMembership, heading: "Six months at Ascent" };
+      const savePlan = (user: string, plan: string, revision: number, input = details) =>
+        call<number>(user, "save_membership_plan", [plan, JSON.stringify(input), revision]);
+      await assert.rejects(() => savePlan(cashier, "six-month", 0), /Manager or owner access/);
+      await assert.rejects(() => savePlan(player, "six-month", 0), /Manager or owner access/);
+      await assert.rejects(() => as("", () => db.query("select public.save_membership_plan('six-month','{}',0)"), "anon"), /permission denied/);
+      await assert.rejects(() => savePlan(owner, "weekly", 0), /Choose a membership plan/);
+      await assert.rejects(() => savePlan(owner, "six-month", 0, { ...details, benefits: [{ icon: "gift", title: " ", description: "A perk" }] }), /valid membership benefits/);
+      assert.equal(await savePlan(owner, "six-month", 0), 1);
+      assert.equal(await savePlan(owner, "six-month", 0), 1);
+      await assert.rejects(() => savePlan(owner, "six-month", 0, { ...details, price_cents: 35000 }), /updated this membership plan/);
+      assert.deepEqual(await readPlans(), [annual, { id: false, details, revision: 1 }]);
+
+      const updatedAnnual = { ...defaultMembership, price_cents: 50_000 };
+      assert.equal(await call(owner, "save_membership_details", [JSON.stringify(updatedAnnual), annual.revision]), annual.revision + 1);
+      await db.exec(planMigration);
+      assert.deepEqual(await readPlans(), [
+        { id: true, details: updatedAnnual, revision: annual.revision + 1 },
+        { id: false, details, revision: 1 },
+      ]);
+      assert.equal(await savePlan(owner, "six-month", 1), 1);
+      await assert.rejects(() => savePlan(player, "six-month", 1), /Manager or owner access/);
       assert.deepEqual(await readCurrentData(), before);
     });
     await t.test("cashier calendar and walk-ins reuse booking and register protections", async () => {
@@ -899,6 +936,256 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(trends.balances[30], 10000);
       assert.equal(trends.balances.reduce((a, b) => a + b, 0), 20000);
       await assert.rejects(() => get(player), /Authorized staff/);
+    });
+
+    await t.test("online membership quotes, GCash reviews, and expiry are account-bound", async () => {
+      const applicant = randomUUID();
+      await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,'member@test.example',$2)",
+        [applicant, JSON.stringify({ full_name: "Ascent Member" })]);
+      const ref = "MEMBER-123456";
+      const read = async (actor: string, id: string) => (await as(actor, () => db.query<MembershipApplication>(
+        "select id, plan_id, plan_name, price_cents, status, gcash_name, gcash_number, payment_reference, starts_on::text, expires_on::text, review_note from public.membership_applications where id=$1",
+        [id],
+      ))).rows[0];
+      const start = (actor: string, plan: string, revision: number) => call<string>(actor, "start_membership_application", [plan, revision]);
+      const submit = (actor: string, id: string, reference: string) => call(actor, "submit_membership_payment", [id, reference]);
+      const review = (actor: string, id: string, approve: boolean, reason = "") => call(actor, "review_membership_payment", [id, approve, reason]);
+      const list = (actor: string, reviewed = false) => call<{ row_count: number; rows: MembershipReviewRow[] }>(actor, "list_membership_applications", [reviewed, 1]);
+      const testBookingReference = (reference: string) => db.query(`insert into public.bookings
+        (court_id, booking_date, start_hour, duration, total_amount, status, customer_name, customer_phone, payment_reference)
+        values(1,current_date-30,6,1,100,'cancelled','Reference fixture','09171234567',$1)`, [reference]);
+      const originalPlan = (await db.query<{ revision: number }>("select revision from public.membership_settings where not id")).rows[0];
+      const annualPlan = (await db.query<{ revision: number }>("select revision from public.membership_settings where id")).rows[0];
+
+      await assert.rejects(() => as("", () => db.query("select public.start_membership_application('six-month',0)"), "anon"), /permission denied/);
+      await db.exec("update public.venue_settings set gcash_name='', gcash_number='', gcash_qr_url=''");
+      await assert.rejects(() => start(applicant, "six-month", originalPlan.revision), /payment details are unavailable/);
+      await db.exec("update public.venue_settings set gcash_name='Ascent', gcash_number='09171234567'");
+      const saved = await readCurrentData();
+      await assert.rejects(() => start(applicant, "six-month", originalPlan.revision - 1), /plan has changed/);
+      const id = await start(applicant, "six-month", originalPlan.revision);
+      assert.equal(await start(applicant, "annual", annualPlan.revision), id);
+      assert.equal((await read(applicant, id)).price_cents, 30000);
+      assert.equal(await read(player, id), undefined);
+      await assert.rejects(() => as(applicant, () => db.query("update public.membership_applications set status='approved'")), /permission denied/);
+      await assert.rejects(() => submit(player, id, ref), /could not be found/);
+      await assert.rejects(() => submit(applicant, id, "------"), /valid GCash reference/);
+      assert.equal((await list(owner)).row_count, 0);
+      assert.equal(await call(owner, "save_membership_plan", ["six-month", JSON.stringify({ ...defaultSixMonthMembership, price_cents: 32500 }), originalPlan.revision]), originalPlan.revision + 1);
+      assert.equal((await read(applicant, id)).price_cents, 30000);
+      await submit(applicant, id, ref);
+      await submit(applicant, id, "member123456");
+      assert.equal(membershipStatus(await read(applicant, id)), "Pending verification");
+      await assert.rejects(() => call(applicant, "cancel_membership_application", [id]), /already has a payment under review/);
+      await assert.rejects(() => review(applicant, id, true), /Authorized staff/);
+      await assert.rejects(() => list(applicant), /Authorized staff/);
+      assert.equal((await list(cashier)).rows[0].full_name, "Ascent Member");
+      await call(owner, "pos_assign_cashier", [dayKey(), null, cashier]);
+      const nextCashier = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'membership-relief@test.example')", [nextCashier]);
+      await db.query("insert into public.staff_members(user_id,role) values($1,'cashier')", [nextCashier]);
+      assert.equal((await list(cashier)).row_count, 1);
+      await assert.rejects(() => list(nextCashier), /Authorized staff/);
+      await assert.rejects(() => review(nextCashier, id, true), /Authorized staff/);
+      await call(owner, "pos_assign_cashier", [dayKey(), cashier, null]);
+
+      await review(cashier, id, true);
+      const approved = await read(applicant, id);
+      const dates = (await db.query<{ starts: string; expires: string }>(`
+        select (now() at time zone 'Asia/Manila')::date::text starts,
+          ((now() at time zone 'Asia/Manila')::date + interval '6 months')::date::text expires`,
+      )).rows[0];
+      assert.equal(approved.starts_on, dates.starts);
+      assert.equal(approved.expires_on, dates.expires);
+      assert.equal(membershipStatus(approved, dates.starts), "Active");
+      assert.equal(membershipStatus(approved, dates.expires), "Expired");
+      await review(cashier, id, true);
+      assert.deepEqual(await read(applicant, id), approved);
+      await assert.rejects(() => review(owner, id, false, "Wrong amount"), /no longer pending/);
+      await assert.rejects(() => start(applicant, "annual", annualPlan.revision), /already have an active membership/);
+      await assert.rejects(() => testBookingReference("member123456"), /already recorded or submitted/);
+      assert.deepEqual(await readCurrentData(), saved);
+
+      const unpaid = await start(player, "annual", annualPlan.revision);
+      await call(player, "cancel_membership_application", [unpaid]);
+      assert.equal(await read(player, unpaid), undefined);
+      const pending = await start(player, "annual", annualPlan.revision);
+      await submit(player, pending, "APP-BOOK-654321");
+      await testBookingReference("appbook654321");
+      await assert.rejects(() => review(owner, pending, true), /already recorded or submitted/);
+      await review(owner, pending, false, "Reference belongs to a reservation.");
+      assert.equal((await read(player, pending)).review_note, "Reference belongs to a reservation.");
+      assert.equal((await list(owner, true)).row_count, 2);
+      assert.equal((await list(owner)).row_count, 0);
+
+      const annual = await start(player, "annual", annualPlan.revision);
+      await submit(player, annual, "ANNUAL-123456");
+      await review(owner, annual, true);
+      const expiry = (await db.query<{ expires: string }>("select ((now() at time zone 'Asia/Manila')::date + interval '12 months')::date::text expires")).rows[0].expires;
+      assert.equal((await read(player, annual)).expires_on, expiry);
+    });
+
+    await t.test("membership rate limits count failed attempts and protect every customer mutation", async () => {
+      const membershipRows = () => db.query("select * from public.membership_applications order by id").then(({ rows }) => rows);
+      const bookingCounters = () => db.query("select * from private.booking_request_limits order by user_id, action").then(({ rows }) => rows);
+      const existingMemberships = await membershipRows();
+      const existingBookingData = await readCurrentData();
+      const existingBookingCounters = await bookingCounters();
+      const migration = await readFile("supabase/migrations/202611150034_membership_rate_limits.sql", "utf8");
+      await db.exec(migration);
+      assert.deepEqual(await membershipRows(), existingMemberships);
+      assert.deepEqual(await readCurrentData(), existingBookingData);
+
+      const member = randomUUID(), other = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'limited@example.test'),($2,'other-member@example.test')", [member, other]);
+      const request = (actor: string, action: string, input: unknown) =>
+        call<{ success?: true; code?: string; error?: string; retry_after_seconds?: number }>(actor, "request_customer_membership", [action, JSON.stringify(input)]);
+      const current = async (actor: string) => (await as(actor, () => db.query<{ id: string; status: string }>(
+        "select id, status from public.membership_applications where status in ('awaiting_payment','pending')",
+      ))).rows[0];
+      const plan = (await db.query<{ revision: number }>("select revision from public.membership_settings where id")).rows[0];
+      const start = { plan: "annual", revision: plan.revision };
+
+      for (const signature of ["start_membership_application(text,integer)", "submit_membership_payment(uuid,text)", "cancel_membership_application(uuid)"]) {
+        const grants = await db.query<{ anon: boolean; customer: boolean }>(`
+          select has_function_privilege('anon',$1,'execute') anon,
+            has_function_privilege('authenticated',$1,'execute') customer`, [`public.${signature}`]);
+        assert.deepEqual(grants.rows[0], { anon: false, customer: false });
+      }
+      await assert.rejects(() => as("", () => db.query("select public.request_customer_membership('start',null)"), "anon"), /permission denied/);
+      await assert.rejects(() => as(member, () => db.query("select * from private.membership_request_limits")), /permission denied/);
+
+      assert.equal((await request(member, "start", { ...start, revision: plan.revision - 1 })).code, "REQUEST_REJECTED");
+      for (let i = 0; i < 3; i++) {
+        assert.deepEqual(await request(member, "start", start), { success: true });
+        assert.deepEqual(await request(member, "cancel", { id: (await current(member)).id }), { success: true });
+      }
+      assert.deepEqual(await request(member, "start", start), { success: true });
+      const blocked = await request(member, "start", start);
+      assert.equal(blocked.code, "RATE_LIMITED");
+      assert.ok(blocked.retry_after_seconds && blocked.retry_after_seconds <= 600);
+      assert.match(blocked.error ?? "", /Please try again in \d+ minutes?\./);
+      const { id } = await current(member);
+      assert.deepEqual(await request(member, "submit", { id, reference: "LIMITED-123456" }), { success: true });
+      assert.equal((await request(member, "cancel", { id })).code, "REQUEST_REJECTED");
+      assert.equal((await request(member, "cancel", null)).code, "INVALID_INPUT");
+      assert.equal((await request(member, "cancel", { id })).code, "RATE_LIMITED");
+      assert.equal((await current(member)).status, "pending");
+      await call(owner, "review_membership_payment", [id, true, ""]);
+
+      assert.deepEqual(await request(other, "start", start), { success: true });
+      const second = await current(other);
+      assert.equal((await request(other, "submit", { id, reference: "OTHER-123456" })).error, "Application could not be found.");
+      assert.equal((await request(other, "submit", { id: "bad-id" })).code, "INVALID_INPUT");
+      for (let i = 0; i < 3; i++)
+        assert.equal((await request(other, "submit", { id: second.id, reference: "-----" })).code, "REQUEST_REJECTED");
+      const submit = { id: second.id, reference: "OTHER-123456" };
+      assert.equal((await request(other, "submit", submit)).code, "RATE_LIMITED");
+      assert.equal((await current(other)).status, "awaiting_payment");
+      await db.query("update private.membership_request_limits set attempts[1] = clock_timestamp() - interval '11 minutes' where user_id=$1 and action='submit'", [other]);
+      assert.deepEqual(await request(other, "submit", submit), { success: true });
+      assert.equal((await current(other)).status, "pending");
+      assert.equal((await request(other, "submit", submit)).code, "RATE_LIMITED");
+      assert.deepEqual((await db.query("select cardinality(attempts) count from private.membership_request_limits where user_id=$1 and action='submit'", [other])).rows, [{ count: 5 }]);
+      assert.deepEqual(await bookingCounters(), existingBookingCounters);
+      assert.deepEqual(await readCurrentData(), existingBookingData);
+    });
+
+    await t.test("approved memberships price eligible online court bookings and persist the discount", async () => {
+      const before = await readCurrentData();
+      await db.exec(await readFile("supabase/migrations/202611150035_private_booking_member_discounts.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), {
+        ...before,
+        bookings: before.bookings.map((row) => ({ ...(row as object), membership_discount_amount: "0.00" })),
+      });
+
+      const date = dayKey(new Date(Date.now() + 25 * 86400000));
+      const next = dayKey(new Date(Date.now() + 26 * 86400000));
+      const days = [1, 2, 3, 4, 5, 6, 7];
+      const blocksForTest = [
+        { id: "member-day", days, start: 6, end: 16, kind: "court", rate: 100, capacity: 8 },
+        { id: "member-evening", days, start: 16, end: 21, kind: "court", rate: 200, capacity: 8 },
+        { id: "member-late", days, start: 21, end: 22, kind: "court", rate: 150, capacity: 8 },
+        { id: "member-open", days, start: 22, end: 24, kind: "open_play", rate: 100, capacity: 24 },
+      ];
+      await db.query(`update public.venue_settings set booking_enabled=true, gcash_qr_url='https://example.com/qr.png',
+        evening_start_hour=16, schedule_config=jsonb_set(schedule_config,'{overrides}',
+          (schedule_config->'overrides') || $1::jsonb)`,
+        [JSON.stringify([{ id: "member-test", name: "Member test hours", start_date: date, end_date: next, blocks: blocksForTest }])]);
+
+      const six = randomUUID(), annual = randomUUID(), guest = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'six@test.example'),($2,'annual@test.example'),($3,'guest@test.example')", [six, annual, guest]);
+      const membership = (actor: string, action: string, input: unknown) => call<{ success?: true }>(actor,
+        "request_customer_membership", [action, JSON.stringify(input)]);
+      async function apply(actor: string, plan: "annual" | "six-month", reference: string) {
+        const { revision } = (await db.query<{ revision: number }>("select revision from public.membership_settings where id=$1", [plan === "annual"])).rows[0];
+        assert.deepEqual(await membership(actor, "start", { plan, revision }), { success: true });
+        const { id } = (await db.query<{ id: string }>("select id from public.membership_applications where user_id=$1", [actor])).rows[0];
+        assert.deepEqual(await membership(actor, "submit", { id, reference }), { success: true });
+        return id;
+      }
+      const quote = async (actor: string, start: number, duration: number, playDate = date) =>
+        Number(await call(actor, "get_private_booking_member_discount", [playDate, start, duration]));
+      const reserve = (actor: string, payload: Record<string, unknown>, action = "reserve_court") => call<{ id: string; error?: string }>(
+        actor, "request_customer_booking_v2", [action, JSON.stringify({
+          booking_date: date, customer_name: "Test Player", customer_phone: "09171234567", ...payload,
+        })],
+      );
+      const getPrice = async (id: string) => (await db.query(
+        "select membership_discount_amount, total_amount, initial_payment_amount, equipment_amount, paid_amount from public.bookings where id=$1", [id],
+      )).rows[0];
+
+      const sixId = await apply(six, "six-month", "DISCOUNT-SIX-123456");
+      assert.equal(await quote(six, 16, 2), 0);
+      await call(owner, "review_membership_payment", [sixId, true, ""]);
+      assert.equal(await quote(six, 15, 3), 60);
+      assert.equal(await quote(six, 6, 1), 0);
+      assert.equal(await quote(six, 21, 1), 0);
+      assert.equal(await quote(six, 22, 1), 0);
+      assert.equal(await quote(guest, 16, 2), 0);
+      await assert.rejects(() => as("", () => db.query("select public.get_private_booking_member_discount($1,16,2)", [date]), "anon"), /permission denied/);
+
+      const rental = { court_id: 1, start_hour: 15, duration: 3, equipment_quantity: 2, payment_option: "reservation_fee" };
+      assert.match((await reserve(six, { ...rental, expected_total_cents: 56000 })).error ?? "", /Your booking price changed/);
+      assert.deepEqual((await db.query("select id from public.bookings where user_id=$1", [six])).rows, []);
+      const reserved = await reserve(six, { ...rental, expected_total_cents: 50000 });
+      assert.ok(reserved.id, reserved.error);
+      assert.deepEqual(await getPrice(reserved.id), {
+        membership_discount_amount: "60.00", total_amount: "500.00", initial_payment_amount: "250.00", equipment_amount: "60.00", paid_amount: "0.00",
+      });
+      await call(six, "request_customer_booking_v2", ["payment", JSON.stringify({ booking_id: reserved.id, reference: "MEMBER-BOOKING-REF-123456" })]);
+      await call(owner, "pos_verify_booking", [reserved.id]);
+      assert.deepEqual(await getPrice(reserved.id), {
+        membership_discount_amount: "60.00", total_amount: "500.00", initial_payment_amount: "250.00", equipment_amount: "60.00", paid_amount: "250.00",
+      });
+      const open = await reserve(six, { start_hour: 22, participant_count: 2 }, "reserve_open_play");
+      assert.ok(open.id, open.error);
+      assert.deepEqual(await getPrice(open.id), {
+        membership_discount_amount: "0.00", total_amount: "200.00", initial_payment_amount: "200.00", equipment_amount: "0.00", paid_amount: "0.00",
+      });
+
+      await db.query("update public.membership_applications set expires_on=$1 where id=$2", [next, sixId]);
+      assert.equal(await quote(six, 16, 2, next), 0);
+      const expired = await reserve(six, { booking_date: next, court_id: 1, start_hour: 16, duration: 1, expected_total_cents: 20000 });
+      assert.ok(expired.id, expired.error);
+      assert.deepEqual(await getPrice(expired.id), {
+        membership_discount_amount: "0.00", total_amount: "200.00", initial_payment_amount: "200.00", equipment_amount: "0.00", paid_amount: "0.00",
+      });
+
+      const annualId = await apply(annual, "annual", "DISCOUNT-ANNUAL-123456");
+      await call(owner, "review_membership_payment", [annualId, true, ""]);
+      assert.equal(await quote(annual, 16, 1), 0);
+      assert.equal(await quote(annual, 16, 3), 30);
+      const annualCourt = await reserve(annual, { court_id: 2, start_hour: 16, duration: 3, expected_total_cents: 57000 });
+      assert.ok(annualCourt.id, annualCourt.error);
+      assert.deepEqual(await getPrice(annualCourt.id), {
+        membership_discount_amount: "30.00", total_amount: "570.00", initial_payment_amount: "570.00", equipment_amount: "0.00", paid_amount: "0.00",
+      });
+      const regular = await reserve(guest, { court_id: 1, start_hour: 19, duration: 1, membership_discount_amount: 200 });
+      assert.ok(regular.id, regular.error);
+      assert.deepEqual(await getPrice(regular.id), {
+        membership_discount_amount: "0.00", total_amount: "200.00", initial_payment_amount: "200.00", equipment_amount: "0.00", paid_amount: "0.00",
+      });
     });
   } finally {
     await db.close();

@@ -120,13 +120,22 @@ Apply `202611140029_cashier_display_names.sql` after 028 to show saved staff nam
 
 Apply `202611150030_cashier_duty_access.sql` after 029. A staff assignment for the current Philippine date gives the assigned person exclusive access among Front Desk Staff accounts. Managers and owners retain access, and all front desk staff can access staff tools when the date is unassigned. Off-duty staff use **My bookings** and can record the closing count for their own open drawer during a handover.
 
+Apply `202611150031_membership_details.sql` after 030 and `202611150032_membership_plans.sql` after 031. Managers and owners can publish plan details under **Venue settings → Membership**. Migration 032 adds the six-month plan and preserves the published annual plan.
+
+Apply `202611150033_membership_applications.sql` after 032. Signed-in customers choose a plan, pay using the configured GCash details, and submit a reference. Authorized staff review payments under **Memberships**. Approved memberships start on the Philippine date of verification. Customers can see the status and dates in **Account settings**.
+
+Apply `202611150034_membership_rate_limits.sql` after 033 and deploy the matching app. Membership starts, payment submissions, and cancellations each allow five attempts per account in a rolling ten-minute window. The database counts rejected requests and restricts customer mutations to the rate-limited entry point.
+
+Apply `202611150035_private_booking_member_discounts.sql` after 034 and deploy the matching app. Approved memberships valid on the play date receive online private court discounts. Annual members get ₱30 off bookings longer than an hour. Six-month members pay up to ₱170 per court per evening hour. The database saves the discount with the booking and checks the quoted total before creating the hold.
+
 ## Main routes
 
 | Route             | Purpose                                                                             |
 | ----------------- | ----------------------------------------------------------------------------------- |
 | `/`               | Responsive venue website, both courts, FAQs, directions when configured             |
 | `/book`           | Public availability and reservation flow                                            |
-| `/membership`     | Annual membership benefits and staff enrollment through Facebook                    |
+| `/membership`     | Annual and six-month membership plans, benefits, and enrollment contact             |
+| `/membership/apply` | Signed-in membership application and GCash submission                              |
 | `/court-rules`    | Court time, capacity, equipment, etiquette, and safety rules                          |
 | `/login`          | Sign up, log in, password recovery                                                  |
 | `/account`        | Signed-in customers and staff: change password after verifying the current password |
@@ -134,6 +143,7 @@ Apply `202611150030_cashier_duty_access.sql` after 029. A staff assignment for t
 | `/booking/[id]`   | Booking details, GCash QR, payment reference, unpaid cancellation                   |
 | `/staff`          | Overview, point of sale, reservations, inventory, transactions, collections report |
 | `/staff/expenses` | Monthly expense log, totals, and cash drawer expenses                               |
+| `/staff/memberships` | Staff membership payment verification and application history                     |
 | `/admin`          | Staff calendar, GCash reviews, confirmed walk-ins, maintenance blocks               |
 | `/admin/settings` | Editable venue details, rates/hours, QR upload, booking toggle                      |
 | `/admin/finance`  | Daily log, monthly sales/hours, payment methods, private staff notes, CSV downloads |
@@ -144,7 +154,7 @@ Apply `202611150030_cashier_duty_access.sql` after 029. A staff assignment for t
 - A database exclusion constraint prevents overlapping court reservations even when requests arrive together. Adjacent bookings and bookings on the other court remain valid.
 - Open-play passes cover one selected session, with 1–20 players per reservation. Each session has its own optional player limit; leaving it blank allows unlimited players. A database lock protects capacity and prevents private bookings or maintenance blocks from conflicting with active passes.
 - Rates, time blocks, session capacity, and private-court player limits are saved together with **Save schedule**. The equipment price, rental ball count, default private capacity, and unpaid hold duration retain individual **Apply** buttons. These defaults are separate from the limits saved in existing schedule rows. Native clock pickers accept whole hours, including midnight at the end of a day.
-- Membership is ₱300 for one year. Enrollment, payment, verification, and benefit redemption are arranged with staff through the configured Facebook page. The displayed ₱30 court discount applies once to the booking total for bookings longer than one hour. Membership status and discounts are not automatically applied by the online booking system.
+- Membership plans default to ₱500 per year and ₱300 for six months. The quoted fee and GCash destination are saved before payment. Staff verify payments. Eligible online private bookings show the member discount in the booking summary, and staff arrange other perks.
 - Rental ball counts are saved per booking. Existing rental reservations retain the previously advertised 2 balls; new reservations use the configured ball count. Capacity and equipment inclusions appear on the homepage, court rules, and booking flow. Full court rules are linked from the booking agreements and footer.
 - Passes use the same GCash reference, hold, confirmation, cancellation, and account pages as court bookings. Staff can record paid walk-in passes in the calendar. Prices and session times are saved on each reservation, preserving past totals when settings change.
 - Existing court reservations are preserved. If one overlaps an open-play session, pass sales for that session stay unavailable until staff resolves the conflict. Schedule changes are prevented while future active reservations depend on the existing hours.

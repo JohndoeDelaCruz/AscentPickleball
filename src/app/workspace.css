@@ -1089,6 +1089,8 @@
 .club-app .workspace-tabs > button[aria-selected="true"] { color: #24543f; border-bottom-color: #24543f; font-weight: 650; }
 .club-app .workspace-tabs > button:focus-visible { outline-offset: -4px; }
 .club-app [role="tabpanel"] { min-width: 0; }
+.membership-review-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.membership-review-message { margin: 12px 18px; }
 .club-app .settings-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; font-size: 13px; color: var(--console-muted); }
 .club-app .settings-status-bar > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
 .club-app .settings-status-bar .settings-unsaved { color: #98672d; }
