@@ -18,7 +18,7 @@ export default async function ApplyMembershipPage({ searchParams }: { searchPara
 
   const [application, plans, venue] = await Promise.all([getCurrentMembership(user.id), getMembershipPlans(), getVenueSettings()]);
   const status = application ? membershipStatus(application) : null;
-  const showCurrentStatus = status === "Pending verification" || status === "Active" || status === "Payment rejected";
+  const showCurrentStatus = status === "Pending verification" || status === "Active" || status === "Payment rejected" || status === "Refunded";
   return <main id="main" className="container membership-apply-page">
     <div className="page-heading">
       <Link className="text-link" href="/membership"><ArrowLeft size={16} /> Membership plans</Link>

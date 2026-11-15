@@ -445,7 +445,7 @@ export function ClubConsole({
               <td>{s.customer_name}</td>
               <td>
                 <span className="subtle-pill">
-                  {s.kind === "retail" ? "Retail" : "Court booking"}
+                  {s.kind === "retail" ? "Retail" : s.kind === "membership" ? "Membership" : "Court booking"}
                 </span>
               </td>
               <td>

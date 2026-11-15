@@ -1187,6 +1187,108 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         membership_discount_amount: "0.00", total_amount: "200.00", initial_payment_amount: "200.00", equipment_amount: "0.00", paid_amount: "0.00",
       });
     });
+
+    await t.test("walk-in membership sales activate the existing account and reconcile cash, GCash, and refunds", async () => {
+      const previous = await readCurrentData();
+      const readMemberships = async () => (await db.query("select to_jsonb(a) - 'payment_method' - 'pos_sale_id' from public.membership_applications a order by id")).rows;
+      const existing = await readMemberships();
+      await db.exec(await readFile("supabase/migrations/202611150036_walk_in_membership_sales.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), previous);
+      assert.deepEqual(await readMemberships(), existing);
+
+      const buyer = randomUUID(), onlinePending = randomUUID(), second = randomUUID(), unconfirmed = randomUUID();
+      await db.query(`insert into auth.users (id,email,email_confirmed_at,raw_user_meta_data) values
+        ($1,'walk-in-buyer@example.test',now(),'{"full_name":"Maya Tan"}'), ($2,'walk-in-pending@example.test',now(),null),
+        ($3,'walk-in-second@example.test',now(),null), ($4,'walk-in-unconfirmed@example.test',null,null)`,
+        [buyer, onlinePending, second, unconfirmed]);
+      const manager = (await db.query<{ id: string }>("select id from auth.users where email='membership-manager@example.test'")).rows[0].id;
+      const plans = (await db.query<{ id: boolean; revision: number; price: number }>(`select id,revision,
+        coalesce((details->>'price_cents')::integer,case when id then 50000 else 30000 end) price from public.membership_settings order by id desc`)).rows;
+      const [annual, sixMonth] = plans;
+      const request = (actor: string, action: string, input: unknown) => call(actor, "request_customer_membership", [action, JSON.stringify(input)]);
+      await request(buyer, "start", { plan: "six-month", revision: sixMonth.revision });
+      await request(onlinePending, "start", { plan: "annual", revision: annual.revision });
+      const applicationId = async (actor: string) => (await db.query<{ id: string }>("select id from public.membership_applications where user_id=$1", [actor])).rows[0].id;
+      const draft = await applicationId(buyer);
+      await request(onlinePending, "submit", { id: await applicationId(onlinePending), reference: "WALK-IN-PENDING-123456" });
+
+      const find = (actor: string, query: string) => as(actor, () => db.query("select * from public.pos_find_membership_customers($1)", [query])).then((r) => r.rows);
+      type Receipt = { receipt_number: string; price_cents: number; starts_on: string; expires_on: string; status: string };
+      const sell = (actor: string, args: unknown[], role = "authenticated") => as(actor, () => db.query<Receipt>(
+        `select receipt_number,price_cents,starts_on::text,expires_on::text,status from public.pos_sell_membership($1,$2,$3,$4,$5,$6,$7,$8)`, args), role
+      ).then((r) => r.rows[0]);
+      const cashKey = randomUUID();
+      const cash = [cashKey, buyer, "six-month", sixMonth.revision, "cash", sixMonth.price + 5000, null, false];
+      const gcashKey = randomUUID();
+      const gcash = [gcashKey, second, "annual", annual.revision, "gcash", annual.price, "WALK-IN-GCASH-123456", true];
+      const paymentDate = dayKey();
+      const playDate = dayKey(new Date(Date.now() + 25 * 86400000));
+      const quote = (actor: string) => call(actor, "get_private_booking_member_discount", [playDate, 16, 2]).then(Number);
+
+      assert.deepEqual(await find(owner, "maya TAN"), [{ id: buyer, full_name: "Maya Tan", email: "w•••@e•••", availability: "available" }]);
+      assert.deepEqual(await find(owner, "walk-in-buyer@example.test"), [{ id: buyer, full_name: "Maya Tan", email: "walk-in-buyer@example.test", availability: "available" }]);
+      assert.deepEqual(await find(owner, "walk-in-buyer@"), []);
+      assert.deepEqual(await find(owner, "walk-in-unconfirmed@example.test"), []);
+      assert.deepEqual(await find(manager, "walk-in-pending@example.test"), [{ id: onlinePending, full_name: null, email: "walk-in-pending@example.test", availability: "pending" }]);
+      await assert.rejects(() => find(player, "walk-in"), /Authorized staff/);
+      await assert.rejects(() => sell("", cash, "anon"), /permission denied/);
+      await assert.rejects(() => sell(player, cash), /Authorized staff/);
+      await call(owner, "pos_assign_cashier", [paymentDate, null, cashier]);
+      const offDuty = (await db.query<{ id: string }>(`select id from auth.users where email='membership-relief@test.example'`)).rows[0].id;
+      await assert.rejects(() => find(offDuty, "walk-in"), /Authorized staff/);
+      await assert.rejects(() => sell(offDuty, cash), /Authorized staff/);
+      await assert.rejects(() => sell(owner, [gcashKey, unconfirmed, ...gcash.slice(2)]), /confirmed email/);
+      await assert.rejects(() => sell(owner, [gcashKey, onlinePending, ...gcash.slice(2)]), /online GCash payment/);
+      await assert.rejects(() => sell(manager, [...gcash.slice(0, 3), annual.revision + 1, ...gcash.slice(4)]), /plan changed/);
+      await assert.rejects(() => sell(manager, [...gcash.slice(0, 7), false]), /Verify the GCash payment/);
+      await assert.rejects(() => sell(manager, [...gcash.slice(0, 6), "discountannual123456", true]), /reference is already/);
+      await assert.rejects(() => sell(cashier, cash), /Open your/);
+      assert.deepEqual((await db.query("select id from public.pos_sales where id in ($1,$2)", [cashKey, gcashKey])).rows, []);
+      assert.equal(await quote(buyer), 0);
+
+      const shift = await call<string>(cashier, "pos_open_shift", [10000]);
+      await assert.rejects(() => sell(cashier, [...cash.slice(0, 5), sixMonth.price - 1, null, false]), /cover the full/);
+      const receipt = await sell(cashier, cash);
+      assert.equal(receipt.price_cents, sixMonth.price);
+      assert.equal(receipt.starts_on, paymentDate);
+      assert.equal(receipt.expires_on, (await db.query<{ date: string }>("select ($1::date + interval '6 months')::date::text date", [paymentDate])).rows[0].date);
+      assert.match(receipt.receipt_number, /^AP-POS-/);
+      assert.deepEqual(await sell(cashier, cash), receipt);
+      await assert.rejects(() => sell(owner, cash), /key was already used/);
+      await assert.rejects(() => sell(cashier, [randomUUID(), ...cash.slice(1)]), /already has an active membership/);
+      assert.equal(await applicationId(buyer), draft);
+      assert.equal(await quote(buyer), 60);
+      assert.deepEqual((await find(cashier, "maya tan")).map((row) => (row as { availability: string }).availability), ["active"]);
+      assert.deepEqual((await db.query(`select p.shift_id,p.method,p.amount_cents,p.actor_id,s.paid_cents,s.kind,
+        s.customer_name,i.product_id,i.quantity,a.payment_reference,a.payment_method,a.reviewed_by
+        from public.pos_payments p join public.pos_sales s on s.id=p.sale_id join public.pos_sale_items i on i.sale_id=s.id
+        join public.membership_applications a on a.pos_sale_id=s.id where s.id=$1`, [cashKey])).rows, [{
+        shift_id: shift, method: "cash", amount_cents: sixMonth.price, actor_id: cashier, paid_cents: sixMonth.price,
+        kind: "membership", customer_name: "Maya Tan", product_id: null, quantity: 1, payment_reference: null, payment_method: "cash", reviewed_by: cashier,
+      }]);
+      assert.equal(Number(await db.query<{ value: number }>("select private.pos_expected_cash($1,10000) value", [shift]).then((r) => r.rows[0].value)), 10000 + sixMonth.price);
+
+      const digital = await sell(manager, gcash);
+      assert.equal(digital.price_cents, annual.price);
+      assert.equal(digital.expires_on, (await db.query<{ date: string }>("select ($1::date + interval '12 months')::date::text date", [paymentDate])).rows[0].date);
+      assert.equal(await quote(second), 30);
+      assert.deepEqual((await db.query("select method, reference, shift_id, actor_id from public.pos_payments where sale_id=$1", [gcashKey])).rows,
+        [{ method: "gcash", reference: "WALK-IN-GCASH-123456", shift_id: null, actor_id: manager }]);
+      await call(cashier, "pos_close_shift", [shift, 10000 + sixMonth.price]);
+      const ownerShift = await call<string>(owner, "pos_open_shift", [sixMonth.price]);
+      await call(owner, "pos_refund", [cashKey, "cash", "Customer returned at the counter", false]);
+      assert.equal((await sell(cashier, cash)).status, "refunded");
+      assert.equal(await quote(buyer), 0);
+      const reviewed = await call<{ rows: MembershipReviewRow[] }>(owner, "list_membership_applications", [true, 1]);
+      assert.ok(reviewed.rows.some((row) => row.receipt_number === receipt.receipt_number && row.payment_method === "cash" && membershipStatus(row) === "Refunded"));
+      const frontDeskHistory = await call<{ rows: MembershipReviewRow[] }>(cashier, "list_membership_applications", [true, 1]);
+      assert.equal(frontDeskHistory.rows.find((row) => row.receipt_number === receipt.receipt_number)?.email, "w•••@e•••");
+      await assert.rejects(() => sell(owner, [randomUUID(), buyer, ...gcash.slice(2, 6), "walkingcash123456", true]), /reference is already/);
+      const reactivated = await sell(owner, [randomUUID(), buyer, ...gcash.slice(2, 6), "WALK-IN-RENEW-123456", true]);
+      assert.equal(reactivated.status, "approved");
+      assert.equal(await quote(buyer), 30);
+      await call(owner, "pos_close_shift", [ownerShift, 0]);
+    });
   } finally {
     await db.close();
   }

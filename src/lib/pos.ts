@@ -25,7 +25,7 @@ export type SaleItem = {
 export type Sale = {
   id: string;
   number: string;
-  kind: "retail" | "booking";
+  kind: "retail" | "booking" | "membership";
   booking_id: string | null;
   customer_name: string;
   total_cents: number;

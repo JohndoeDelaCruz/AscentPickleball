@@ -22,16 +22,21 @@ export function MembershipReviewTable({ rows, count, page, reviewed }: {
         href={(next) => membershipReviewHref(reviewed, next)} />
       <div className="console-table-wrap" role="region" aria-labelledby="membership-queue-heading" tabIndex={0}>
         <table className="console-table">
-          <thead><tr><th scope="col">Applicant</th><th scope="col">Plan</th><th scope="col">GCash reference</th>
-            <th scope="col">Submitted</th><th scope="col">{reviewed ? "Status" : "Action"}</th></tr></thead>
+          <thead><tr><th scope="col">{reviewed ? "Customer" : "Applicant"}</th><th scope="col">Plan</th>
+            <th scope="col">{reviewed ? "Payment" : "GCash reference"}</th>
+            <th scope="col">{reviewed ? "Payment date" : "Submitted"}</th><th scope="col">{reviewed ? "Status" : "Action"}</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.id}>
             <td><strong>{row.full_name || row.email || "Account removed"}</strong>{row.full_name && row.email && <small>{row.email}</small>}</td>
             <td><strong>{row.plan_name}</strong><small>{money(row.price_cents / 100)}</small></td>
-            <td>{row.payment_reference}</td>
+            <td>{reviewed ? <>
+              <strong>{row.payment_method === "cash" ? "Cash" : "GCash"}</strong>
+              {row.payment_reference && <small>{row.payment_reference}</small>}
+              {row.receipt_number && <small>{row.receipt_number}</small>}
+            </> : row.payment_reference}</td>
             <td>{row.submitted_at && formatDate(localDate(new Date(row.submitted_at)))}</td>
             <td>{reviewed ? <>
               <strong>{membershipStatus(row)}</strong>
-              {row.expires_on && <small>Expiry {formatDate(row.expires_on)}</small>}
+              {row.status === "approved" && row.expires_on && <small>Expiry {formatDate(row.expires_on)}</small>}
               {row.review_note && <small>{row.review_note}</small>}
             </> : <button className="console-button" onClick={() => { setMessage(""); setApplication(row); }}>Review payment</button>}</td>
           </tr>)}</tbody>

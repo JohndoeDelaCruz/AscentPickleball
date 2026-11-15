@@ -16,7 +16,7 @@ export type MembershipApplication = {
   plan_id: MembershipPlanId;
   plan_name: string;
   price_cents: number;
-  status: "awaiting_payment" | "pending" | "approved" | "rejected";
+  status: "awaiting_payment" | "pending" | "approved" | "rejected" | "refunded";
   gcash_name: string;
   gcash_number: string;
   gcash_qr_url: string;
@@ -30,13 +30,16 @@ export type MembershipApplication = {
 export type MembershipReviewRow = Pick<MembershipApplication,
   "id" | "plan_name" | "price_cents" | "status" | "payment_reference" | "submitted_at" |
   "starts_on" | "expires_on" | "review_note" | "gcash_name" | "gcash_number"
-> & { email: string | null; full_name: string | null; reviewed_at: string | null };
+> & { email: string | null; full_name: string | null; reviewed_at: string | null;
+  payment_method?: "cash" | "gcash"; receipt_number?: string | null;
+};
 
 export function membershipStatus(application: Pick<MembershipApplication, "status" | "expires_on">, date = localDate()) {
   if (application.status === "approved")
     return application.expires_on && application.expires_on > date ? "Active" : "Expired";
   if (application.status === "pending") return "Pending verification";
   if (application.status === "rejected") return "Payment rejected";
+  if (application.status === "refunded") return "Refunded";
   return "Awaiting payment";
 }
 

@@ -8,6 +8,7 @@ import { readVerifiedUser } from "@/lib/session-access";
 import { bookingSchema, openPlaySchema } from "@/lib/booking";
 import { bookingError } from "@/lib/customer-request";
 import { posMessage } from "@/lib/pos-message";
+import { membershipApplyPath, membershipReviewPath } from "@/lib/membership-applications";
 const id = z.uuid();
 const cents = z.int().min(0).max(100000000);
 const schema = z.discriminatedUnion("op", [
@@ -188,7 +189,12 @@ export async function posCommand(
     revalidatePath("/my-bookings/all");
     if (c.op === "close") revalidatePath("/my-bookings");
     revalidatePath("/booking/[id]", "page");
-    if (c.op === "reject_payment") revalidatePath("/book");
+    if (c.op === "reject_payment" || c.op === "refund") revalidatePath("/book");
+    if (c.op === "refund") {
+      revalidatePath(membershipReviewPath);
+      revalidatePath(membershipApplyPath);
+      revalidatePath("/account");
+    }
     return {
       ok: true,
       ...(c.op === "checkout" ? { receipt: data as Sale } : {}),

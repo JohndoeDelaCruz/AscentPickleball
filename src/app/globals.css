@@ -2734,6 +2734,24 @@ img {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.membership-customer-results {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.console-button.membership-customer-result {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.membership-customer-result small {
+  color: var(--muted);
+}
 .rules-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
