@@ -5,6 +5,12 @@ import { membershipPlanIds, type MembershipPlanId } from "./membership";
 export const membershipApplyPath = "/membership/apply";
 export const membershipReviewPath = "/staff/memberships";
 export const membershipReviewPageSize = 10;
+export const membershipViews = [
+  { id: "pending", label: "Pending verification" },
+  { id: "active", label: "Active members" },
+  { id: "reviewed", label: "Reviewed" },
+] as const;
+export type MembershipView = typeof membershipViews[number]["id"];
 export const membershipPlanIdSchema = z.enum(membershipPlanIds);
 export const membershipTerms = { annual: "1 year", "six-month": "6 months" } satisfies Record<MembershipPlanId, string>;
 export const membershipReferenceSchema = z.string().trim()
@@ -34,6 +40,13 @@ export type MembershipReviewRow = Pick<MembershipApplication,
   payment_method?: "cash" | "gcash"; receipt_number?: string | null;
 };
 
+export type ActiveMembershipRow = Pick<MembershipApplication, "id" | "plan_name"> & {
+  full_name: string | null;
+  email: string | null;
+  starts_on: string;
+  expires_on: string;
+};
+
 export function membershipStatus(application: Pick<MembershipApplication, "status" | "expires_on">, date = localDate()) {
   if (application.status === "approved")
     return application.expires_on && application.expires_on > date ? "Active" : "Expired";
@@ -43,9 +56,9 @@ export function membershipStatus(application: Pick<MembershipApplication, "statu
   return "Awaiting payment";
 }
 
-export function membershipReviewHref(reviewed: boolean, page = 1) {
+export function membershipReviewHref(view: MembershipView, page = 1) {
   const params = new URLSearchParams();
-  if (reviewed) params.set("view", "reviewed");
+  if (view !== "pending") params.set("view", view);
   if (page > 1) params.set("page", String(page));
   return params.size ? `${membershipReviewPath}?${params}` : membershipReviewPath;
 }

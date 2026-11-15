@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { centavos, cartTotal, collectionsCsv, dayKey, reportFor, type PosData } from "../src/lib/pos";
 import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema } from "../src/lib/membership";
-import { membershipStatus, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
+import { membershipStatus, type ActiveMembershipRow, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -1288,6 +1288,65 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(reactivated.status, "approved");
       assert.equal(await quote(buyer), 30);
       await call(owner, "pos_close_shift", [ownerShift, 0]);
+    });
+
+    await t.test("the active members list is staff-only, paginated, and uses Philippine membership dates", async () => {
+      await db.exec(await readFile("supabase/migrations/202611160037_active_memberships.sql", "utf8"));
+      const list = (actor: string, page = 1) => call<{ row_count: number; rows: ActiveMembershipRow[] }>(actor, "list_active_memberships", [page]);
+      const before = await list(owner);
+      const walkIn = before.rows.find((row) => row.email === "walk-in-buyer@example.test");
+      assert.ok(walkIn);
+      assert.ok(before.rows.some((row) => row.email === "annual@test.example"));
+      assert.equal((await list(cashier)).rows.find((row) => row.id === walkIn.id)?.email, "w•••@e•••");
+      assert.ok(!before.rows.some((row) => row.email === "walk-in-pending@example.test"));
+
+      const offDuty = (await db.query<{ id: string }>(`select id from auth.users where email='membership-relief@test.example'`)).rows[0].id;
+      await assert.rejects(() => list(offDuty), /Authorized staff/);
+      await assert.rejects(() => list(player), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select public.list_active_memberships(1)"), "anon"), /permission denied/);
+      await assert.rejects(() => list(owner, 0), /valid page/);
+
+      await db.exec(`with seed as (
+        select i, gen_random_uuid() as user_id, (now() at time zone 'Asia/Manila')::date as today
+        from generate_series(0, 13) i
+      ), accounts as (
+        insert into auth.users(id,email)
+        select user_id, 'active-test-' || i || '@example.test' from seed returning id
+      )
+      insert into public.membership_applications (user_id,plan_id,plan_name,price_cents,status,
+        gcash_name,gcash_number,gcash_qr_url,payment_reference,submitted_at,reviewed_at,starts_on,expires_on)
+      select case when i = 13 then null else user_id end,'annual','Annual Membership',50000,'approved',
+        'Ascent','','','ACTIVE-LIST-TEST-' || i, now(), now(),
+        today + case when i = 0 then -1 when i = 12 then 1 else 0 end, today + i
+      from seed join accounts on accounts.id = seed.user_id;
+
+      insert into public.membership_applications (user_id,plan_id,plan_name,price_cents,status,
+        gcash_name,gcash_number,gcash_qr_url,payment_reference,submitted_at,reviewed_at,starts_on,expires_on)
+      select user_id,plan_id,'Previous Plan',price_cents,status,
+        gcash_name,gcash_number,gcash_qr_url,'ACTIVE-LIST-PREVIOUS',submitted_at,reviewed_at,starts_on - 1,expires_on + 1
+      from public.membership_applications where payment_reference = 'ACTIVE-LIST-TEST-1';`);
+      const first = await list(owner);
+      const second = await list(owner, 2);
+      const rows = [...first.rows, ...second.rows];
+      assert.equal(first.row_count, before.row_count + 11);
+      assert.equal(second.row_count, first.row_count);
+      assert.equal(first.rows.length, 10);
+      assert.equal(rows.length, first.row_count);
+      assert.equal(new Set(rows.map((row) => row.id)).size, rows.length);
+      assert.deepEqual(rows.map((row) => row.expires_on), rows.map((row) => row.expires_on).sort());
+      assert.equal(rows.find((row) => row.email === "active-test-1@example.test")?.plan_name, "Annual Membership");
+      assert.equal(rows.filter((row) => row.email?.startsWith("active-test-")).length, 11);
+      assert.ok(!rows.some((row) => row.email === "active-test-0@example.test" || row.email === "active-test-12@example.test"));
+      assert.deepEqual(Object.keys(first.rows[0]).sort(), ["email", "expires_on", "full_name", "id", "plan_name", "starts_on"]);
+      assert.deepEqual((await list(owner, 99)).rows, []);
+
+      const saleId = (await db.query<{ id: string }>("select pos_sale_id as id from public.membership_applications where id=$1", [walkIn.id])).rows[0].id;
+      const shift = await call<string>(owner, "pos_open_shift", [0]);
+      await call(owner, "pos_refund", [saleId, "gcash", "Membership refunded", false]);
+      const afterRefund = await list(owner, 2);
+      assert.equal(afterRefund.row_count, first.row_count - 1);
+      assert.ok(!afterRefund.rows.some((row) => row.id === walkIn.id));
+      await call(owner, "pos_close_shift", [shift, 0]);
     });
   } finally {
     await db.close();

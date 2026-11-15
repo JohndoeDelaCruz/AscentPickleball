@@ -19,7 +19,7 @@ export function MembershipReviewTable({ rows, count, page, reviewed }: {
     {message && <p className="success-message membership-review-message" role="status">{message}</p>}
     {rows.length === 0 ? <p className="panel-empty-note">{reviewed ? "No applications have been reviewed." : "No applications are waiting for verification."}</p> : <>
       <TablePagination count={count} page={page} pageSize={membershipReviewPageSize} label="Application pages"
-        href={(next) => membershipReviewHref(reviewed, next)} />
+        href={(next) => membershipReviewHref(reviewed ? "reviewed" : "pending", next)} />
       <div className="console-table-wrap" role="region" aria-labelledby="membership-queue-heading" tabIndex={0}>
         <table className="console-table">
           <thead><tr><th scope="col">{reviewed ? "Customer" : "Applicant"}</th><th scope="col">Plan</th>
