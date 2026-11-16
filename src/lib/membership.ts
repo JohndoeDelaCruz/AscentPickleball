@@ -36,12 +36,15 @@ const membershipCourtDiscountSchema = z.object({
   amountCents: z.number().int().min(1).max(maxMembershipPrice * 100),
   minHours: z.number().int().min(1).max(4),
 });
-export const membershipCourtDiscountStateSchema = membershipCourtDiscountSchema.extend({ revision: z.number().int().min(0).max(2147483647) });
+export const membershipCourtDiscountStateSchema = membershipCourtDiscountSchema.extend({
+  revision: z.number().int().min(0).max(2147483647),
+});
 
 export type MembershipDetails = z.infer<typeof membershipDetailsSchema>;
 export type MembershipCourtDiscount = z.infer<typeof membershipCourtDiscountStateSchema>;
 export type MembershipPlan = { id: MembershipPlanId; details: MembershipDetails; revision: number | null;
   courtDiscount: MembershipCourtDiscount | null;
+  legacyCourtRates?: { daytime: number | null; evening: number | null };
 };
 
 type MembershipBenefit = MembershipDetails["benefits"][number];
@@ -128,32 +131,41 @@ export const defaultSixMonthMembership: MembershipDetails = {
 
 export function isBuiltInCourtDiscountBenefit(plan: MembershipPlan, benefit: MembershipBenefit) {
   const legacy = legacyCourtDiscountBenefits[plan.id];
-  return plan.courtDiscount !== null && benefit.title === legacy.title && benefit.description === legacy.description;
+  return Boolean(plan.courtDiscount || plan.legacyCourtRates) && benefit.title === legacy.title && benefit.description === legacy.description;
 }
 
-function membershipCourtDiscountBenefit(plan: MembershipPlan): MembershipBenefit | null {
-  if (!plan.courtDiscount?.enabled) return null;
+function membershipCourtDiscountBenefits(plan: MembershipPlan): MembershipBenefit[] {
+  const discount = plan.courtDiscount;
   const icon = plan.details.benefits.find((benefit) => isBuiltInCourtDiscountBenefit(plan, benefit))?.icon ?? "wallet";
-  const amount = money(plan.courtDiscount.amountCents / 100);
-  if (plan.id === "annual") {
-    const minimum = plan.courtDiscount.minHours;
-    return { icon, title: `${amount} off private court bookings`,
-      description: `Save ${amount} once per online private court booking of at least ${minimum} ${minimum === 1 ? "hour" : "hours"}.` };
+  if (discount) {
+    if (!discount.enabled) return [];
+    const amount = money(discount.amountCents / 100);
+    const minimum = discount.minHours;
+    return [{ icon, title: `${amount} off private court bookings`,
+      description: `Save ${amount} once per online private court booking of at least ${minimum} ${minimum === 1 ? "hour" : "hours"}.` }];
   }
-  return { icon, title: `Up to ${amount} per evening court hour`,
-    description: "Your member rate applies automatically to eligible evening hours when you book a private court online." };
+
+  return (["daytime", "evening"] as const).flatMap((period) => {
+    const cap = plan.legacyCourtRates?.[period];
+    return cap == null ? [] : [{ icon, title: `Up to ${money(cap / 100)} per ${period} court hour`,
+      description: `Your member rate applies automatically to eligible ${period} hours when you book a private court online.` }];
+  });
 }
 
 export function publishedMembershipDetails(plan: MembershipPlan): MembershipDetails {
-  const { details, courtDiscount } = plan;
-  if (!courtDiscount) return details;
-  const benefit = membershipCourtDiscountBenefit(plan);
-  const benefits = details.benefits.filter((item) => !isBuiltInCourtDiscountBenefit(plan, item));
-  const omitEveningOffer = plan.id === "six-month" && !courtDiscount.enabled;
-  return { ...details, benefits: benefit ? [benefit, ...benefits] : benefits,
-    home_summary: omitEveningOffer && details.home_summary === defaultSixMonthMembership.home_summary
-      ? "Member rates for open play, free equipment use, and more." : details.home_summary,
-    redemption: omitEveningOffer && details.redemption === defaultSixMonthMembership.redemption
-      ? "Contact the Ascent team to redeem your membership perks." : details.redemption,
-  };
+  const { details, courtDiscount, legacyCourtRates } = plan;
+  if (!courtDiscount && !legacyCourtRates) return details;
+  const discounts = membershipCourtDiscountBenefits(plan);
+  const benefits = [...discounts, ...details.benefits.filter((item) => !isBuiltInCourtDiscountBenefit(plan, item))];
+  if (plan.id === "annual") return { ...details, benefits };
+
+  const daytime = legacyCourtRates?.daytime != null;
+  const evening = legacyCourtRates?.evening != null;
+  const courtOffer = courtDiscount?.enabled || (daytime && evening) ? " and private court bookings"
+    : daytime ? " and daytime court bookings" : evening ? " and evening court bookings" : "";
+  return { ...details, benefits,
+    home_summary: details.home_summary === defaultSixMonthMembership.home_summary
+      ? `Member rates for open play${courtOffer}, free equipment use, and more.` : details.home_summary,
+    redemption: !courtOffer && details.redemption === defaultSixMonthMembership.redemption
+      ? "Contact the Ascent team to redeem your membership perks." : details.redemption };
 }

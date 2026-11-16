@@ -41,10 +41,17 @@ export const getMembershipPlans = cache(async (): Promise<MembershipPlan[]> => {
       const row = data.find(({ id }) => id === (plan.id === "annual"));
       if (!row || !Number.isInteger(row.revision)) return plan;
       const parsed = membershipDetailsSchema.safeParse(row.details ?? plan.details);
+      const perBooking = plan.id === "annual" || row.court_booking_discount_cents !== undefined;
       const discount = membershipCourtDiscountStateSchema.safeParse({ enabled: row.court_discount_enabled,
-        amountCents: row.court_discount_cents, minHours: row.court_discount_min_hours, revision: row.court_discount_revision });
+        amountCents: row.court_booking_discount_cents ?? row.court_discount_cents,
+        minHours: row.court_discount_min_hours, revision: row.court_discount_revision });
       return { ...plan, ...(parsed.success && { details: parsed.data, revision: row.revision }),
-        courtDiscount: discount.success ? discount.data : null };
+        courtDiscount: perBooking && discount.success ? discount.data : null,
+        ...(!perBooking && discount.success && { legacyCourtRates: {
+          daytime: row.court_daytime_cap_cents ?? null,
+          evening: discount.data.enabled ? discount.data.amountCents : null,
+        } }),
+      };
     });
   } catch {
     return fallback;

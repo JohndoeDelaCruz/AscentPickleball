@@ -51,11 +51,16 @@ test("the public court benefit shows saved terms and keeps custom membership ben
   assert.ok(!displayed.benefits.some((benefit) => benefit.title.includes("₱30")));
   assert.ok(displayed.benefits.includes(custom));
   const six = { id: "six-month" as const, revision: 0, details: defaultSixMonthMembership,
-    courtDiscount: { enabled: true, amountCents: 12550, minHours: 1, revision: 1 } };
-  assert.equal(publishedMembershipDetails(six).benefits[0].title, "Up to ₱125.50 per evening court hour");
+    courtDiscount: { enabled: true, amountCents: 2250, minHours: 2, revision: 1 } };
+  const sixPublished = publishedMembershipDetails(six);
+  assert.equal(sixPublished.benefits[0].title, "₱22.50 off private court bookings");
+  assert.match(sixPublished.benefits[0].description, /at least 2 hours/);
+  assert.ok(!sixPublished.benefits.some((benefit) => benefit.title.includes("evening")));
   const disabled = publishedMembershipDetails({ ...six, courtDiscount: { ...six.courtDiscount, enabled: false } });
-  assert.ok(!disabled.benefits.some((benefit) => benefit.title.includes("evening")));
-  assert.ok(!disabled.home_summary.includes("evening"));
+  assert.ok(!disabled.benefits.some((benefit) => benefit.title.includes("court bookings")));
+  assert.ok(!disabled.home_summary.includes("court bookings"));
+  const legacy = publishedMembershipDetails({ ...six, courtDiscount: null, legacyCourtRates: { daytime: null, evening: 12550 } });
+  assert.equal(legacy.benefits[0].title, "Up to ₱125.50 per evening court hour");
 });
 
 test("full database: atomic checkout, ledger integrity, permissions, booking deposits and shifts", async (t) => {
@@ -1473,6 +1478,72 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         from public.bookings where id=$1`, [fresh.id])).rows, [{
         total_amount: "184.50", initial_payment_amount: "92.25", equipment_amount: "30.00", membership_discount_amount: "45.50",
       }]);
+    });
+
+    await t.test("both plans use configurable flat discounts at any time of day", async () => {
+      const readPlans = async () => (await db.query("select id,details,revision from public.membership_settings order by id")).rows;
+      const beforePlans = await readPlans();
+      const beforeBookings = await readCurrentData();
+      const userId = async (email: string) => (await db.query<{ id: string }>("select id from auth.users where email=$1", [email])).rows[0].id;
+      const annual = await userId("annual@test.example"), six = await userId("six@test.example");
+      const manager = await userId("membership-manager@example.test");
+      const date = dayKey(new Date(Date.now() + 25 * 86400000));
+      const quote = (actor: string, hour: number, duration: number) =>
+        call(actor, "get_private_booking_member_discount", [date, hour, duration]).then(Number);
+      assert.equal(await call(owner, "save_membership_court_discount", ["six-month", true, 12550, 1, 2]), 3);
+      assert.equal(await quote(six, 6, 1), 0);
+      assert.equal(await quote(six, 16, 1), 74.5);
+
+      await db.exec(await readFile("supabase/migrations/202611160041_flat_membership_booking_discounts.sql", "utf8"));
+      assert.deepEqual(await readPlans(), beforePlans);
+      assert.deepEqual(await readCurrentData(), beforeBookings);
+      assert.deepEqual((await db.query(`select court_discount_enabled,court_booking_discount_cents,court_discount_min_hours,court_discount_revision
+        from public.membership_settings where not id`)).rows, [{ court_discount_enabled: true,
+        court_booking_discount_cents: 4550, court_discount_min_hours: 1, court_discount_revision: 4 }]);
+      assert.equal(await quote(six, 6, 1), 45.5);
+      assert.equal(await quote(six, 16, 1), 45.5);
+      assert.equal(await quote(six, 15, 3), 45.5);
+
+      const save = (actor: string, enabled: boolean, cents: number, hours: number, revision: number) =>
+        call<number>(actor, "save_membership_booking_discount", ["six-month", enabled, cents, hours, revision]);
+      await assert.rejects(() => save(cashier, true, 2250, 2, 4), /Manager or owner access/);
+      await assert.rejects(() => save(player, true, 2250, 2, 4), /Manager or owner access/);
+      await assert.rejects(() => as("", () => db.query("select public.save_membership_booking_discount('six-month',true,2250,2,4)"), "anon"), /permission denied/);
+      await assert.rejects(() => save(owner, true, 2250, 5, 4), /valid court discount/);
+      await assert.rejects(() => call(owner, "save_membership_court_discount", ["six-month", true, 17000, 1, 4]), /Reload to edit/);
+      assert.equal(await call(owner, "save_membership_court_discount", ["annual", true, 4550, 1, 2]), 2);
+
+      assert.equal(await save(manager, true, 2250, 2, 4), 5);
+      assert.equal(await save(manager, true, 2250, 2, 4), 5);
+      await assert.rejects(() => save(owner, false, 2250, 2, 4), /Someone updated this discount/);
+      assert.equal(await quote(six, 6, 1), 0);
+      assert.equal(await quote(six, 6, 2), 22.5);
+      assert.equal(await quote(six, 16, 2), 22.5);
+      assert.equal(await quote(six, 15, 3), 22.5);
+      assert.equal(await quote(six, 22, 1), 0);
+      assert.equal(await quote(annual, 6, 1), 45.5);
+      assert.deepEqual(await readCurrentData(), beforeBookings);
+
+      const newMember = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'daytime-rate@test.example')", [newMember]);
+      const { revision } = (await db.query<{ revision: number }>("select revision from public.membership_settings where not id")).rows[0];
+      assert.deepEqual(await call(newMember, "request_customer_membership", ["start", JSON.stringify({ plan: "six-month", revision })]), { success: true });
+      const { id } = (await db.query<{ id: string }>("select id from public.membership_applications where user_id=$1", [newMember])).rows[0];
+      assert.deepEqual(await call(newMember, "request_customer_membership", ["submit", JSON.stringify({ id, reference: "DAYTIME-TEST-123456" })]), { success: true });
+      await call(manager, "review_membership_payment", [id, true, ""]);
+      const reserve = (expectedTotal: number) => call<{ id?: string; error?: string }>(newMember, "request_customer_booking_v2", ["reserve_court", JSON.stringify({
+        booking_date: date, customer_name: "Flat discount member", customer_phone: "09171234567",
+        court_id: 2, start_hour: 6, duration: 2, expected_total_cents: expectedTotal,
+      })]);
+      assert.match((await reserve(20000)).error ?? "", /Your booking price changed/);
+      const booking = await reserve(17750);
+      assert.ok(booking.id, booking.error);
+      assert.deepEqual((await db.query("select total_amount,membership_discount_amount from public.bookings where id=$1", [booking.id])).rows,
+        [{ total_amount: "177.50", membership_discount_amount: "22.50" }]);
+      assert.equal(await save(owner, false, 2250, 2, 5), 6);
+      assert.equal(await quote(six, 6, 2), 0);
+      assert.equal(await quote(six, 16, 2), 0);
+      assert.equal(await quote(annual, 6, 2), 45.5);
     });
   } finally {
     await db.close();

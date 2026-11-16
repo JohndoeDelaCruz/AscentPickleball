@@ -15,7 +15,6 @@ export function MembershipDiscountEditor({ plan }: { plan: MembershipPlan }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-  const annual = plan.id === "annual";
   const heading = `membership-court-discount-${plan.id}`;
 
   function clearFeedback() {
@@ -33,7 +32,6 @@ export function MembershipDiscountEditor({ plan }: { plan: MembershipPlan }) {
       return;
     }
     const amountCents = Math.round(parsed.value * 100);
-
     startTransition(async () => {
       try {
         const result = await saveMembershipCourtDiscount(plan.id, {
@@ -56,7 +54,7 @@ export function MembershipDiscountEditor({ plan }: { plan: MembershipPlan }) {
         <p>The saved terms apply to eligible new bookings and appear on the Membership page.</p></div>
     </header>
     <form className="settings-card-body" onSubmit={submit}>
-      {!saved ? <p className="small-print">Apply migration 039 to edit court discounts.</p> : <>
+      {!saved ? <p className="small-print">Apply migration {plan.id === "annual" ? "039" : "041"} to edit this booking discount.</p> : <>
         <fieldset className={styles.fields} disabled={pending}>
           <legend className="sr-only">Court discount settings</legend>
           <label className="toggle-field">
@@ -64,16 +62,16 @@ export function MembershipDiscountEditor({ plan }: { plan: MembershipPlan }) {
             <span>Apply to eligible online bookings</span>
           </label>
           <div className="field-grid">
-            <label className="field"><span>{annual ? "Discount per booking (PHP)" : "Evening rate cap per hour (PHP)"}</span>
+            <label className="field"><span>Discount per booking (PHP)</span>
               <input required inputMode="decimal" maxLength={9} value={amount}
                 onChange={(event) => { setAmount(event.target.value); clearFeedback(); }} />
-              <small>{annual ? "Applied once to the court rental." : "Members pay the lower of this cap and the scheduled evening rate."}</small>
+              <small>Applied once to the court rental at any time of day.</small>
             </label>
-            {annual && <label className="field"><span>Minimum booking duration</span>
+            <label className="field"><span>Minimum booking duration</span>
               <select value={minHours} onChange={(event) => { setMinHours(Number(event.target.value)); clearFeedback(); }}>
                 {[1, 2, 3, 4].map((hours) => <option key={hours} value={hours}>{hours} {hours === 1 ? "hour" : "hours"}</option>)}
               </select>
-            </label>}
+            </label>
           </div>
         </fieldset>
         {error && <p className="error-message" role="alert">{error}</p>}
