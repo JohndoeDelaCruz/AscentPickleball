@@ -11,6 +11,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { getMembershipPlans, getVenue } from "@/lib/data";
+import { publishedMembershipDetails } from "@/lib/membership";
 import { activeCourts, courtPhoto } from "@/lib/courts";
 import { Starburst } from "@/components/starburst";
 import { LandingMotion } from "@/components/landing-motion";
@@ -234,10 +235,13 @@ export default async function Home() {
           <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
           <h2 id="membership-home-title">Membership plans</h2>
           <ul className="membership-home-plans">
-            {membershipPlans.map(({ id, details }) => <li key={id}>
-              <strong>{details.plan_name} · {money(details.price_cents / 100)} / {details.price_period}</strong>
-              <p>{details.home_summary}</p>
-            </li>)}
+            {membershipPlans.map((plan) => {
+              const details = publishedMembershipDetails(plan);
+              return <li key={plan.id}>
+                <strong>{details.plan_name} · {money(details.price_cents / 100)} / {details.price_period}</strong>
+                <p>{details.home_summary}</p>
+              </li>;
+            })}
           </ul>
         </div>
         <Link href="/membership" className="button button-lime">

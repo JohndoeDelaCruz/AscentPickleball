@@ -3,10 +3,11 @@
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Plus, Save, Trash2, Trophy } from "lucide-react";
 import { saveMembershipDetails } from "@/app/(workspace)/admin/settings/membership-actions";
-import { maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipPlanLabels, membershipTextLimits, type MembershipDetails, type MembershipPlan } from "@/lib/membership";
+import { isBuiltInCourtDiscountBenefit, maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipPlanLabels, membershipTextLimits, type MembershipDetails, type MembershipPlan } from "@/lib/membership";
 import { parseSettingNumber } from "@/lib/settings-input";
 import { membershipTerms } from "@/lib/membership-applications";
 import { benefitIcons } from "./membership-benefit-icons";
+import { MembershipDiscountEditor } from "./membership-discount-editor";
 import styles from "./membership-editor.module.css";
 
 const pageTextFields = [
@@ -69,7 +70,9 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
 
   const planHeadingId = `membership-editor-heading-${initial.id}`;
   const benefitsHeadingId = `membership-benefits-editor-heading-${initial.id}`;
-  return <form className="venue-settings-form" onSubmit={submit}>
+  return <>
+  <MembershipDiscountEditor plan={initial} />
+  <form className="venue-settings-form" onSubmit={submit}>
     <section className="console-panel settings-card" aria-labelledby={planHeadingId}>
       <header className="settings-card-heading">
         <span className="settings-card-icon"><Trophy size={20} aria-hidden="true" /></span>
@@ -126,8 +129,9 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
           }}><Plus size={16} aria-hidden="true" /> Add benefit</button>
       </header>
       <div className={`settings-card-body ${styles.benefits}`}>
-        {details.benefits.length === 0 && <p className="small-print">No benefits listed.</p>}
+        {details.benefits.every((benefit) => isBuiltInCourtDiscountBenefit(initial, benefit)) && <p className="small-print">No other benefits listed.</p>}
         {details.benefits.map((benefit, index) => {
+          if (isBuiltInCourtDiscountBenefit(initial, benefit)) return null;
           const { id, startOpen } = benefitKeys[index];
           const { Icon } = benefitIcons[benefit.icon];
           return <details key={id} className={`workspace-disclosure ${styles.benefit}`} open={startOpen}>
@@ -174,5 +178,6 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
       </button>
       <span className="small-print">Updates the membership page and homepage.</span>
     </div>
-  </form>;
+  </form>
+  </>;
 }

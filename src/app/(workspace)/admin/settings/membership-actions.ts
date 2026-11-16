@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/data";
-import { membershipDetailsSchema, type MembershipPlanId } from "@/lib/membership";
+import { membershipCourtDiscountStateSchema, membershipDetailsSchema, type MembershipCourtDiscount, type MembershipPlanId } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 
 export async function saveMembershipDetails(plan: MembershipPlanId, input: unknown, revision: number) {
@@ -34,5 +34,39 @@ export async function saveMembershipDetails(plan: MembershipPlanId, input: unkno
     return { revision: data, details: parsed.data };
   } catch {
     return { error: "Membership details couldn’t be saved. Please try again." };
+  }
+}
+
+export async function saveMembershipCourtDiscount(plan: MembershipPlanId, input: unknown): Promise<
+  { discount: MembershipCourtDiscount } | { error: string }
+> {
+  if (plan !== "annual" && plan !== "six-month") return { error: "Choose a membership plan." };
+  const parsed = membershipCourtDiscountStateSchema.safeParse(input);
+  if (!parsed.success || (plan === "six-month" && parsed.data.minHours !== 1)) {
+    return { error: "Enter a valid court discount and minimum duration." };
+  }
+
+  const failed = "The court discount couldn’t be saved. Please try again.";
+  try {
+    const { role, verificationUnavailable } = await getSession();
+    if (verificationUnavailable) return { error: "Sign-in verification is temporarily unavailable. Please try again." };
+    if (role !== "owner" && role !== "manager") return { error: "Manager or owner access is required." };
+
+    const { enabled, amountCents, minHours, revision } = parsed.data;
+    const db = await createClient();
+    const { data, error } = await db.rpc("save_membership_court_discount", {
+      p_plan: plan, p_enabled: enabled, p_amount_cents: amountCents, p_min_hours: minHours, p_expected_revision: revision,
+    });
+    if (error?.code === "PGRST202") return { error: "Apply migration 039 before saving court discounts." };
+    if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
+    if (error || typeof data !== "number") return { error: failed };
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/membership");
+    revalidatePath("/");
+    revalidatePath("/book");
+    return { discount: { ...parsed.data, revision: data } };
+  } catch {
+    return { error: failed };
   }
 }

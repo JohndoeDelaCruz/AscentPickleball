@@ -5,6 +5,7 @@ import { benefitIcons } from "@/components/membership-benefit-icons";
 import { getMembershipPlans, getSession, getVenueSettings } from "@/lib/data";
 import { money } from "@/lib/booking";
 import { membershipApplyPath } from "@/lib/membership-applications";
+import { publishedMembershipDetails } from "@/lib/membership";
 
 export const metadata: Metadata = {
   title: "Membership plans",
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 export default async function MembershipPage() {
   const [plans, venue, { role }] = await Promise.all([getMembershipPlans(), getVenueSettings(), getSession()]);
   const facebook = venue?.facebook_url;
+  const publishedPlans = plans.map((plan) => ({ id: plan.id, details: publishedMembershipDetails(plan) }));
   return (
     <main id="main" className="container membership-page">
       <div className="page-heading">
@@ -25,7 +27,7 @@ export default async function MembershipPage() {
         )}
       </div>
       <div className="membership-layout">
-        {plans.map(({ id, details }) => (
+        {publishedPlans.map(({ id, details }) => (
           <section key={id} className="membership-join panel" aria-labelledby={`${id}-membership-price`}>
             <h2 className="eyebrow" id={`${id}-membership-price`}>{details.plan_name}</h2>
             <p className="membership-price">
@@ -50,7 +52,7 @@ export default async function MembershipPage() {
         </a>
       </p>
       <div className="membership-layout">
-        {plans.map(({ id, details }) => (
+        {publishedPlans.map(({ id, details }) => (
           <section key={id} id={`${id}-membership-benefits`} className="membership-plan-benefits" aria-labelledby={`${id}-membership-heading`}>
             <p className="eyebrow">{details.plan_name}</p>
             <h2 className="membership-section-title" id={`${id}-membership-heading`}>{details.heading}</h2>

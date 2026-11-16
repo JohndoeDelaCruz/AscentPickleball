@@ -3,7 +3,7 @@ import { createClient } from "./supabase/server";
 import { defaultVenue, type VenueResult } from "./types";
 import { defaultCourts, type Court } from "./courts";
 import { readSessionAccess } from "./session-access";
-import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema, membershipPlanIds, type MembershipPlan } from "./membership";
+import { defaultMembership, defaultSixMonthMembership, membershipCourtDiscountStateSchema, membershipDetailsSchema, membershipPlanIds, type MembershipPlan } from "./membership";
 import type { MembershipApplication } from "./membership-applications";
 
 export const getCourtInventory = cache(async () => {
@@ -31,17 +31,20 @@ export const getVenueSettings = cache(async () => {
 
 export const getMembershipPlans = cache(async (): Promise<MembershipPlan[]> => {
   const fallback: MembershipPlan[] = membershipPlanIds.map((id) => ({
-    id, details: id === "annual" ? defaultMembership : defaultSixMonthMembership, revision: null,
+    id, details: id === "annual" ? defaultMembership : defaultSixMonthMembership, revision: null, courtDiscount: null,
   }));
   try {
     const db = await createClient();
-    const { data, error } = await db.from("membership_settings").select("id, details, revision");
+    const { data, error } = await db.from("membership_settings").select("*");
     if (error || !data) return fallback;
     return fallback.map((plan) => {
       const row = data.find(({ id }) => id === (plan.id === "annual"));
       if (!row || !Number.isInteger(row.revision)) return plan;
       const parsed = membershipDetailsSchema.safeParse(row.details ?? plan.details);
-      return parsed.success ? { ...plan, details: parsed.data, revision: row.revision } : plan;
+      const discount = membershipCourtDiscountStateSchema.safeParse({ enabled: row.court_discount_enabled,
+        amountCents: row.court_discount_cents, minHours: row.court_discount_min_hours, revision: row.court_discount_revision });
+      return { ...plan, ...(parsed.success && { details: parsed.data, revision: row.revision }),
+        courtDiscount: discount.success ? discount.data : null };
     });
   } catch {
     return fallback;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { money } from "./booking";
 
 export const maxMembershipPrice = 100_000;
 export const maxMembershipBenefits = 16;
@@ -30,8 +31,32 @@ export const membershipDetailsSchema = z.object({
   benefits: z.array(benefitSchema).max(maxMembershipBenefits),
 });
 
+const membershipCourtDiscountSchema = z.object({
+  enabled: z.boolean(),
+  amountCents: z.number().int().min(1).max(maxMembershipPrice * 100),
+  minHours: z.number().int().min(1).max(4),
+});
+export const membershipCourtDiscountStateSchema = membershipCourtDiscountSchema.extend({ revision: z.number().int().min(0).max(2147483647) });
+
 export type MembershipDetails = z.infer<typeof membershipDetailsSchema>;
-export type MembershipPlan = { id: MembershipPlanId; details: MembershipDetails; revision: number | null };
+export type MembershipCourtDiscount = z.infer<typeof membershipCourtDiscountStateSchema>;
+export type MembershipPlan = { id: MembershipPlanId; details: MembershipDetails; revision: number | null;
+  courtDiscount: MembershipCourtDiscount | null;
+};
+
+type MembershipBenefit = MembershipDetails["benefits"][number];
+const legacyCourtDiscountBenefits = {
+  annual: {
+    icon: "wallet",
+    title: "₱30 off longer court bookings",
+    description: "Get ₱30 off the court rental total when your booking is longer than one hour. The discount applies once per booking, rather than to each additional hour.",
+  },
+  "six-month": {
+    icon: "wallet",
+    title: "₱170 evening private booking",
+    description: "Pay up to ₱170 per court per hour on eligible evening private bookings while your membership is active.",
+  },
+} satisfies Record<MembershipPlanId, MembershipBenefit>;
 
 export const defaultMembership: MembershipDetails = {
   price_cents: 50_000,
@@ -48,11 +73,7 @@ export const defaultMembership: MembershipDetails = {
       title: "Free equipment use",
       description: "Use pickleball paddles and balls for free as an Ascent member.",
     },
-    {
-      icon: "wallet",
-      title: "₱30 off longer court bookings",
-      description: "Get ₱30 off the court rental total when your booking is longer than one hour. The discount applies once per booking, rather than to each additional hour.",
-    },
+    legacyCourtDiscountBenefits.annual,
     {
       icon: "users",
       title: "Discounted open play",
@@ -97,10 +118,42 @@ export const defaultSixMonthMembership: MembershipDetails = {
   home_summary: "Member rates for open play and evening court bookings, free equipment use, and more.",
   benefits: [
     { icon: "users", title: "₱70 member open play", description: "Ask staff which open-play sessions are eligible for the ₱70 per player member rate." },
-    { icon: "wallet", title: "₱170 evening private booking", description: "Pay up to ₱170 per court per hour on eligible evening private bookings while your membership is active." },
+    legacyCourtDiscountBenefits["six-month"],
     { icon: "gift", title: "Birthday free play", description: "Arrange your birthday free play with the Ascent team." },
     { icon: "trophy", title: "Free equipment borrowing", description: "Borrow paddles and balls for free when you play at Ascent." },
     { icon: "coaching", title: "Discounted group training", description: "Ask staff for member rates and available group training sessions." },
     { icon: "calendar", title: "Priority access to event passes", description: "Contact staff about priority access to passes for Ascent events." },
   ],
 };
+
+export function isBuiltInCourtDiscountBenefit(plan: MembershipPlan, benefit: MembershipBenefit) {
+  const legacy = legacyCourtDiscountBenefits[plan.id];
+  return plan.courtDiscount !== null && benefit.title === legacy.title && benefit.description === legacy.description;
+}
+
+function membershipCourtDiscountBenefit(plan: MembershipPlan): MembershipBenefit | null {
+  if (!plan.courtDiscount?.enabled) return null;
+  const icon = plan.details.benefits.find((benefit) => isBuiltInCourtDiscountBenefit(plan, benefit))?.icon ?? "wallet";
+  const amount = money(plan.courtDiscount.amountCents / 100);
+  if (plan.id === "annual") {
+    const minimum = plan.courtDiscount.minHours;
+    return { icon, title: `${amount} off private court bookings`,
+      description: `Save ${amount} once per online private court booking of at least ${minimum} ${minimum === 1 ? "hour" : "hours"}.` };
+  }
+  return { icon, title: `Up to ${amount} per evening court hour`,
+    description: "Your member rate applies automatically to eligible evening hours when you book a private court online." };
+}
+
+export function publishedMembershipDetails(plan: MembershipPlan): MembershipDetails {
+  const { details, courtDiscount } = plan;
+  if (!courtDiscount) return details;
+  const benefit = membershipCourtDiscountBenefit(plan);
+  const benefits = details.benefits.filter((item) => !isBuiltInCourtDiscountBenefit(plan, item));
+  const omitEveningOffer = plan.id === "six-month" && !courtDiscount.enabled;
+  return { ...details, benefits: benefit ? [benefit, ...benefits] : benefits,
+    home_summary: omitEveningOffer && details.home_summary === defaultSixMonthMembership.home_summary
+      ? "Member rates for open play, free equipment use, and more." : details.home_summary,
+    redemption: omitEveningOffer && details.redemption === defaultSixMonthMembership.redemption
+      ? "Contact the Ascent team to redeem your membership perks." : details.redemption,
+  };
+}
