@@ -14,6 +14,7 @@ export type Product = {
   reorder_level: number;
   active: boolean;
   revision: number;
+  photo_version?: string | null;
 };
 export type SaleItem = {
   product_id: string | null;

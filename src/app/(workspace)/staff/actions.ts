@@ -4,6 +4,7 @@ import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { checkoutSchema, productSchema, type Sale } from "@/lib/pos";
+import { productPhotoSchema } from "@/lib/product-photo";
 import { readVerifiedUser } from "@/lib/session-access";
 import { bookingSchema, openPlaySchema } from "@/lib/booking";
 import { bookingError } from "@/lib/customer-request";
@@ -13,7 +14,7 @@ const id = z.uuid();
 const cents = z.int().min(0).max(100000000);
 const schema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("checkout"), payload: checkoutSchema }),
-  z.object({ op: z.literal("product"), payload: productSchema }),
+  z.object({ op: z.literal("product"), payload: productSchema, photo: productPhotoSchema.nullish() }),
   z.object({
     op: z.literal("stock"),
     id,
@@ -131,8 +132,8 @@ export async function posCommand(
         args = { p_request: c.payload };
         break;
       case "product":
-        rpc = "pos_save_product";
-        args = { p_product: c.payload };
+        rpc = c.photo === undefined ? "pos_save_product" : "pos_save_product_with_photo";
+        args = { p_product: c.payload, ...(c.photo !== undefined && { p_photo: c.photo }) };
         break;
       case "stock":
         rpc = "pos_adjust_stock";
@@ -174,6 +175,8 @@ export async function posCommand(
     }
     const { data, error } = await db.rpc(rpc, args);
     if (error) {
+      if (c.op === "product" && c.photo !== undefined && error.code === "PGRST202")
+        return { error: "Apply migration 038 to save product photos." };
       const match = error.message.match(/(?:POS|Booking):\s*([\s\S]+)/);
       return {
         error: match ? posMessage(match[1]) : (c.op === "open" || c.op === "close"

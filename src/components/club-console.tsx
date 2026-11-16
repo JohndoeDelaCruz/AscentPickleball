@@ -47,6 +47,8 @@ import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
 import { OnDutyCard, RegisterStatusCard, RegisterShiftDialog } from "./register-day";
 import { OverviewMetricValue } from "./overview-metric-value";
+import { ProductPhoto, ProductPhotoField } from "./product-photo";
+import { prepareProductPhoto, previewProductPhoto, productPhotoUrl } from "@/lib/product-photo";
 import type { RegisterDay as RegisterData } from "@/lib/register";
 type Modal =
   | "checkout"
@@ -110,6 +112,8 @@ export function ClubConsole({
   );
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [busy, setBusy] = useState(false);
+  const [productPhoto, setProductPhoto] = useState<string | null>();
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [method, setMethod] = useState<"cash" | "gcash">("cash");
@@ -166,6 +170,8 @@ export function ClubConsole({
     };
   }, [modal]);
   const manager = data.role === "owner" || data.role === "manager";
+  const editedProduct = modal === "product" ? selected as Product | null : null;
+  const dialogBusy = busy || preparingPhoto;
   const shift = register ? register.active?.own_shift ?? undefined : data.shifts.find((s) => !s.closed_at);
   const metrics = reportFor(data, date);
   const pending = data.paymentReviews ?? data.bookings.filter(
@@ -231,6 +237,18 @@ export function ClubConsole({
     setError("");
     setMethod("cash");
     setCash("");
+    if (type === "product") setProductPhoto(undefined);
+  }
+  async function chooseProductPhoto(file: File) {
+    setPreparingPhoto(true);
+    setError("");
+    try {
+      setProductPhoto(await prepareProductPhoto(file));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "This photo couldn’t be prepared.");
+    } finally {
+      setPreparingPhoto(false);
+    }
   }
   function add(p: Product) {
     if ((cart[p.id] ?? 0) >= p.stock) {
@@ -305,7 +323,7 @@ export function ClubConsole({
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (modalClosing) return;
+    if (modalClosing || preparingPhoto) return;
     const f = new FormData(event.currentTarget);
     const text = (key: string) => String(f.get(key) ?? "");
     const verified = f.get("verified") === "on";
@@ -339,10 +357,11 @@ export function ClubConsole({
           );
           break;
         case "product": {
-          const p = selected as Product | null;
+          const p = editedProduct;
           await run(
             {
               op: "product",
+              ...(productPhoto !== undefined && { photo: productPhoto }),
               payload: {
                 ...(p ? { id: p.id } : {}),
                 name: text("name"),
@@ -794,7 +813,8 @@ export function ClubConsole({
                         <div
                           className={`product-art product-art-${p.category.toLowerCase()}`}
                         >
-                          <ProductArt category={p.category} index={i} />
+                          <ProductPhoto src={productPhotoUrl(p.photo_version)} className="product-tile-photo"
+                            fallback={<ProductArt category={p.category} index={i} />} />
                           <span className="product-add">
                             <Plus size={16} />
                           </span>
@@ -1103,10 +1123,15 @@ export function ClubConsole({
                         .map((p) => (
                           <tr key={p.id}>
                             <td>
-                              <strong>{p.name}</strong>
-                              <small>
-                                {p.sku} · {p.barcode || "No barcode"}
-                              </small>
+                              <div className="inventory-product">
+                                <div className="product-thumbnail" aria-hidden="true">
+                                  <ProductPhoto src={productPhotoUrl(p.photo_version)} fallback={<Package size={16} />} />
+                                </div>
+                                <div>
+                                  <strong>{p.name}</strong>
+                                  <small>{p.sku} · {p.barcode || "No barcode"}</small>
+                                </div>
+                              </div>
                             </td>
                             <td>{p.category}</td>
                             <td>{peso(p.price_cents)}</td>
@@ -1354,7 +1379,7 @@ export function ClubConsole({
           className={`console-modal-backdrop ${modal === "receipt" ? "receipt-backdrop" : ""}`}
           data-closing={modalClosing || undefined}
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget && !busy && !modalClosing) setModal(null);
+            if (e.target === e.currentTarget && !dialogBusy && !modalClosing) setModal(null);
           }}
         >
           <div
@@ -1367,13 +1392,13 @@ export function ClubConsole({
               modal === "receipt" ? "Transaction receipt" : reviewingPayment ? "Review GCash payment" : `${modal} form`
             }
             onKeyDown={(e) => {
-              if (e.key === "Escape" && !busy) setModal(null);
+              if (e.key === "Escape" && !dialogBusy) setModal(null);
             }}
           >
             <button
               className="modal-close"
               aria-label="Close dialog"
-              disabled={busy}
+              disabled={dialogBusy}
               onClick={() => setModal(null)}
             >
               <X size={20} />
@@ -1533,6 +1558,14 @@ export function ClubConsole({
                 )}
                 {modal === "product" && (
                   <>
+                    <ProductPhotoField
+                      src={productPhoto ? previewProductPhoto(productPhoto)
+                        : productPhoto === null ? undefined : productPhotoUrl(editedProduct?.photo_version)}
+                      preparing={preparingPhoto} disabled={dialogBusy || modalClosing}
+                      onChoose={chooseProductPhoto} onRemove={() => {
+                        setProductPhoto(editedProduct?.photo_version ? null : undefined);
+                        setError("");
+                      }} />
                     <div className="form-two">
                       <label>
                         Product name
@@ -1776,7 +1809,7 @@ export function ClubConsole({
                 )}
                 <button
                   type="submit"
-                  disabled={busy || !data.ready}
+                  disabled={dialogBusy || !data.ready}
                   className={`console-button full-width ${modal === "reject-payment" ? "reject-payment-button" : "primary"}`}
                 >
                   {busy
@@ -1801,7 +1834,7 @@ export function ClubConsole({
                 <button
                   type="button"
                   className="cancel-button"
-                  disabled={busy}
+                  disabled={dialogBusy}
                   onClick={() => modal === "reject-payment" ? open("verify", selected) : setModal(null)}
                 >
                   {modal === "reject-payment" ? "Back to payment review" : "Cancel"}

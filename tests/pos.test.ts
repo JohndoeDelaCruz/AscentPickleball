@@ -1348,6 +1348,57 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.ok(!afterRefund.rows.some((row) => row.id === walkIn.id));
       await call(owner, "pos_close_shift", [shift, 0]);
     });
+
+    await t.test("product photos save with inventory edits and are readable by authorized staff only", async () => {
+      const oldProducts = "select to_jsonb(p) - 'photo_version' as product from public.pos_products p order by id";
+      const before = (await db.query(oldProducts)).rows;
+      await db.exec(await readFile("supabase/migrations/202611160038_inventory_product_photos.sql", "utf8"));
+      assert.deepEqual((await db.query(oldProducts)).rows, before);
+      assert.equal((await db.query("select id from public.pos_products where photo_version is not null")).rows.length, 0);
+
+      const photo = await readFile("public/court-1.jpg", "base64");
+      const replacement = await readFile("public/court-2.jpg", "base64");
+      const details = { name: "Photo test product", sku: "PHOTO-TEST", category: "Gear", price_cents: 5000, cost_cents: 2000,
+        reorder_level: 3, active: true, revision: 0 };
+      const save = (actor: string, product: unknown, image: string | null) =>
+        call<string>(actor, "pos_save_product_with_photo", [JSON.stringify(product), image]);
+      const getPhoto = (actor: string, version: string) => call<string | null>(actor, "pos_product_photo", [version]);
+      await assert.rejects(() => save(cashier, details, photo), /Manager authorization/);
+      await assert.rejects(() => save(owner, details, "data:image/svg+xml,example"), /valid product photo/);
+      await assert.rejects(() => save(owner, details, Buffer.from("not a jpeg").toString("base64")), /valid product photo/);
+      await assert.rejects(() => save(owner, details, Buffer.alloc(524289).toString("base64")), /valid product photo/);
+      assert.equal((await db.query("select id from public.pos_products where sku='PHOTO-TEST'")).rows.length, 0);
+
+      const id = await save(owner, details, photo);
+      const read = async () => (await db.query<{ photo_version: string | null; name: string; stock: number; revision: number }>(
+        "select photo_version,name,stock,revision from public.pos_products where id=$1", [id])).rows[0];
+      const first = await read();
+      assert.ok(first.photo_version);
+      assert.equal((await getPhoto(cashier, first.photo_version))?.replace(/\s/g, ""), photo);
+      await assert.rejects(() => getPhoto(player, first.photo_version!), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select public.pos_product_photo($1)", [first.photo_version]), "anon"), /permission denied/);
+      await assert.rejects(() => as(cashier, () => db.query("select content from private.pos_product_photos")), /permission denied/);
+      assert.equal((await db.query("select id from public.pos_audit where entity_id=$1 and detail ? 'photo'", [id])).rows.length, 0);
+
+      await call(owner, "pos_adjust_stock", [id, 4, "Initial stock"]);
+      await call(owner, "pos_save_product", [JSON.stringify({ ...details, id, name: "Updated product" })]);
+      assert.deepEqual(await read(), { ...first, name: "Updated product", revision: 1, stock: 4 });
+      await assert.rejects(() => save(owner, { ...details, id }, replacement), /product changed/);
+      assert.equal((await getPhoto(owner, first.photo_version))?.replace(/\s/g, ""), photo);
+
+      const manager = (await db.query<{ id: string }>("select id from auth.users where email='membership-manager@example.test'")).rows[0].id;
+      const edited = { ...details, id, name: "Updated product", revision: 1 };
+      assert.equal(await save(manager, edited, replacement), id);
+      const updated = await read();
+      assert.ok(updated.photo_version && updated.photo_version !== first.photo_version);
+      assert.equal(await getPhoto(owner, first.photo_version), null);
+      assert.equal((await getPhoto(cashier, updated.photo_version))?.replace(/\s/g, ""), replacement);
+
+      assert.equal(await save(manager, { ...edited, revision: 2 }, null), id);
+      assert.deepEqual(await read(), { photo_version: null, name: "Updated product", stock: 4, revision: 3 });
+      assert.equal(await getPhoto(cashier, updated.photo_version), null);
+      assert.equal((await db.query("select id from public.pos_products where id=$1", [id])).rows.length, 1);
+    });
   } finally {
     await db.close();
   }
