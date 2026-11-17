@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingBasket, CalendarDays, Package, ReceiptText,
-  ChartNoAxesCombined, Settings2, ListOrdered, Wallet, ShieldCheck, IdCard,
+  ChartNoAxesCombined, Settings2, ListOrdered, Wallet, ShieldCheck, IdCard, ShoppingBag,
 } from "lucide-react";
 import { workspaceTabs, type WorkspaceTab } from "@/lib/workspace";
 import { paddleStackPath } from "@/lib/paddle-stack";
 import { expensesPath } from "@/lib/expenses";
 import { accountRolesPath } from "@/lib/account-roles";
 import { membershipReviewPath } from "@/lib/membership-applications";
+import { pickupOrdersPath } from "@/lib/counter-orders";
 
 const icons = {
   overview: LayoutDashboard, pos: ShoppingBasket, bookings: CalendarDays,
@@ -65,6 +66,14 @@ export function WorkspaceNavigation({
             <Link key={id} {...props} href={`/staff?tab=${id}`} onNavigate={onNavigate}>{content}</Link>
           );
         })}
+        {group.label === "Operations" && (
+          <Link href={pickupOrdersPath} title="Pickup orders" aria-label="Pickup orders"
+            className={path === pickupOrdersPath ? "selected" : ""}
+            aria-current={path === pickupOrdersPath ? "page" : undefined} onNavigate={onNavigate}>
+            <ShoppingBag size={19} aria-hidden="true" />
+            <span className="management-label">Pickup orders</span>
+          </Link>
+        )}
         {group.label === "Operations" && (
           <Link href={membershipReviewPath} title="Memberships" aria-label="Memberships"
             className={path === membershipReviewPath ? "selected" : ""}

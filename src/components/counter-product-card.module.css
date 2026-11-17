@@ -58,7 +58,6 @@
 
 .product {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 3px 9px;
   padding-top: 10px;
@@ -67,6 +66,13 @@
 
 .details {
   margin-inline-start: 6px;
+}
+
+.nameAndPrice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
 }
 
 .product p {
@@ -86,8 +92,6 @@
 }
 
 .price {
-  align-self: end;
-  margin-inline-end: 6px;
   color: var(--lime);
   font-size: 15px;
   font-weight: 650;
@@ -96,10 +100,10 @@
 }
 
 .link {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 6px;
   min-height: 40px;
   margin-top: 9px;
   border-radius: 999px;
@@ -107,16 +111,6 @@
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
-}
-
-.linkLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.linkIcon {
-  display: none;
 }
 
 .link:hover {
@@ -161,13 +155,11 @@
 
   .product {
     grid-area: product;
-    gap: 2px 12px;
+    gap: 3px 10px;
     padding: 0;
   }
 
   .details {
-    grid-area: 1 / 1 / 3 / 2;
-    align-self: center;
     margin-inline-start: 0;
   }
 
@@ -176,35 +168,25 @@
   }
 
   .price {
-    grid-area: 1 / 2;
-    justify-self: end;
-    margin-inline-end: 0;
     color: var(--ink);
-    font-size: clamp(20px, 4vw, 24px);
     font-weight: 750;
     font-variant-numeric: tabular-nums;
   }
 
   .link {
-    grid-area: 2 / 2;
-    justify-self: end;
-    width: 44px;
-    min-height: 44px;
+    width: fit-content;
+    min-height: 32px;
+    padding-inline: 0 6px;
     margin: 0;
-    background: var(--ink);
-    color: var(--cream);
+    background: transparent;
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .link:hover {
-    background: var(--green);
-  }
-
-  .linkLabel {
-    display: none;
-  }
-
-  .linkIcon {
-    display: block;
+    background: transparent;
+    color: var(--green);
   }
 
   .controls {

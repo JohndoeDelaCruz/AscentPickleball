@@ -35,9 +35,12 @@ export default async function MyBookings() {
       )}
       {openShift && <OffDutyCloseout shift={openShift} operator={user.email ?? "Signed-in staff"} />}
       <CurrentMatches />
-      <Link href="/my-bookings/all" prefetch={false} className="button button-outline button-small">
-        See all bookings <ArrowRight size={17} aria-hidden="true" />
-      </Link>
+      <div className="pickup-actions">
+        <Link href="/my-bookings/all" prefetch={false} className="button button-outline button-small">
+          See all bookings <ArrowRight size={17} aria-hidden="true" />
+        </Link>
+        <Link href="/order" prefetch={false} className="button button-outline button-small">My pickup orders</Link>
+      </div>
     </main>
   );
 }

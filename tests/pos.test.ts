@@ -9,6 +9,7 @@ import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema, 
 import { membershipStatus, type ActiveMembershipRow, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
 import { staffNotificationContent, staffNotificationFeedSchema } from "../src/lib/staff-notifications";
 import type { CounterProduct } from "../src/lib/counter-products";
+import { pickupOrderSchema } from "../src/lib/counter-orders";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -1680,6 +1681,69 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.ok(!(await list()).some((row) => row.name === product.name));
       const staffPhoto = await call<string>(cashier, "pos_product_photo", [photoVersion]);
       assert.equal(staffPhoto.replace(/\s/g, ""), photo);
+    });
+
+    await t.test("online pickup orders hold stock and settle once through the register", async () => {
+      const before = await readCurrentData();
+      await db.exec(await readFile("supabase/migrations/202611180044_counter_pickup_orders.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), before);
+      const product = await call<string>(owner, "pos_save_product", [JSON.stringify({
+        name: "ALPRO Official Ball", sku: "PICKUP-BALL", category: "Equipment", price_cents: 14800,
+        cost_cents: 4000, reorder_level: 2, active: true,
+      })]);
+      await call(owner, "pos_adjust_stock", [product, 2, "Pickup test stock"]);
+      const buyer = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'pickup-buyer@example.test')", [buyer]);
+      const id = randomUUID();
+      const save = (actor: string, key: string, quantity: number, price = 14800) =>
+        call<string>(actor, "place_counter_order", [key, product, quantity, price, "Test pickup"]);
+      const order = async (key: string) => pickupOrderSchema.parse(await call(buyer, "get_counter_order", [key]));
+      const stock = async () => (await db.query<{ stock: number }>("select stock from public.pos_products where id=$1", [product])).rows[0].stock;
+      const availability = async () => (await as("", () => db.query<{ max_quantity: number }>(
+        "select max_quantity from public.list_pickup_products($1)", [product]), "anon")).rows[0].max_quantity;
+      const complete = (actor: string, key: string, verified = true) => call<{ id: string; paid_cents: number }>(
+        actor, "complete_counter_order", [key, "cash", "", 30000, verified]);
+
+      assert.equal(await availability(), 2);
+      await assert.rejects(() => save(buyer, id, 2, 1), /price changed/);
+      assert.equal(await save(buyer, id, 2), id);
+      assert.equal(await save(buyer, id, 2), id);
+      assert.equal((await order(id)).status, "pending");
+      assert.equal(await call(player, "get_counter_order", [id]), null);
+      await assert.rejects(() => call(player, "cancel_counter_order", [id]), /Order not found/);
+      await assert.rejects(() => call(player, "list_counter_orders", [1, false]), /Authorized staff/);
+      await assert.rejects(() => complete(player, id), /Authorized staff/);
+      await assert.rejects(() => save(player, randomUUID(), 1), /no longer available/);
+      assert.equal(await availability(), 0);
+      assert.equal(await stock(), 2);
+      assert.deepEqual(await call(owner, "list_counter_orders", [1, false]), { count: 1, rows: [await order(id)] });
+
+      const shift = await call<string>(owner, "pos_open_shift", [0]);
+      await assert.rejects(() => call(owner, "pos_checkout", [JSON.stringify({ key: randomUUID(), method: "cash",
+        verified: true, tendered_cents: 14800, items: [{ product_id: product, quantity: 1, price_cents: 14800 }],
+      })]), /reserved for pickup orders/);
+      await assert.rejects(() => complete(owner, id, false), /confirm the received payment/);
+      assert.equal((await order(id)).status, "pending");
+      const sale = await complete(owner, id);
+      assert.equal(sale.paid_cents, 29600);
+      assert.deepEqual(await complete(owner, id), sale);
+      assert.equal((await order(id)).status, "collected");
+      assert.equal(await stock(), 0);
+      assert.equal((await db.query("select * from public.pos_payments where sale_id=$1", [sale.id])).rows.length, 1);
+      await call(owner, "pos_close_shift", [shift, 29600]);
+
+      await call(owner, "pos_adjust_stock", [product, 1, "Pickup test restock"]);
+      const cancelled = await save(buyer, randomUUID(), 1);
+      await call(buyer, "cancel_counter_order", [cancelled]);
+      assert.equal((await order(cancelled)).status, "cancelled");
+      const expired = await save(buyer, randomUUID(), 1);
+      await db.query("update private.counter_orders set expires_at=now() - interval '1 second' where id=$1", [expired]);
+      assert.equal((await order(expired)).status, "expired");
+      assert.equal(await availability(), 1);
+      await assert.rejects(() => complete(owner, expired), /no longer awaiting pickup/);
+      assert.equal((await call<{ count: number }>(owner, "list_counter_orders", [1, true])).count, 3);
+      assert.ok((await as(buyer, () => db.query("select * from public.list_my_counter_orders()"))).rows.length === 3);
+      await assert.rejects(() => as("", () => db.query("select * from private.counter_orders"), "anon"), /permission denied/);
     });
   } finally {
     await db.close();

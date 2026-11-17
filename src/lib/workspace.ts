@@ -2,6 +2,7 @@ import { paddleStackPath } from "./paddle-stack";
 import { expensesPath } from "./expenses";
 import { accountRolesPath } from "./account-roles";
 import { membershipReviewPath } from "./membership-applications";
+import { pickupOrdersPath } from "./counter-orders";
 
 export const workspaceTabs = [
   { id: "overview", label: "Overview" },
@@ -16,7 +17,7 @@ export type WorkspaceTab = (typeof workspaceTabs)[number]["id"];
 export type WorkspaceView = WorkspaceTab | "calendar" | "finance" | "expenses" | "settings" | "account" | "access" | "memberships";
 
 export function isWorkspacePath(path: string) {
-  return path === "/staff" || path === paddleStackPath || path === expensesPath || path === membershipReviewPath || path === "/admin" || path.startsWith("/admin/") || path === "/account";
+  return path === "/staff" || path === paddleStackPath || path === expensesPath || path === membershipReviewPath || path === pickupOrdersPath || path === "/admin" || path.startsWith("/admin/") || path === "/account";
 }
 
 export function workspaceTab(value: unknown): WorkspaceTab {

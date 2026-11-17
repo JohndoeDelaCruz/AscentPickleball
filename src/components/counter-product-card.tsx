@@ -1,9 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import { money } from "@/lib/booking";
+import { pickupOrderPath } from "@/lib/counter-orders";
 import type { CounterProduct } from "@/lib/counter-products";
 import styles from "./counter-product-card.module.css";
 
@@ -35,13 +37,11 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
     <div className={styles.product}>
       <div className={styles.details}>
         <p>{product.category}</p>
-        <h2>{product.name}</h2>
+        <div className={styles.nameAndPrice}><h2>{product.name}</h2><span className={styles.price}>{price}</span></div>
       </div>
-      <span className={styles.price}>{price}</span>
-      <a href="#visit" className={styles.link} aria-label="Buy at the counter" title="View venue details">
-        <span className={styles.linkLabel}>Buy at the counter <ArrowUpRight size={15} aria-hidden="true" /></span>
-        <ShoppingBag className={styles.linkIcon} size={19} aria-hidden="true" />
-      </a>
+      {product.id && <Link href={pickupOrderPath(product.id)} className={styles.link} prefetch={false} aria-label={`Order ${product.name} for pickup`}>
+        Order <ArrowUpRight size={15} aria-hidden="true" />
+      </Link>}
       {products.length > 1 && <span className="sr-only" role="status">
         {product.name}, {price}. Product {currentIndex + 1} of {products.length}.
       </span>}
