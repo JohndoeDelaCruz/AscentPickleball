@@ -100,10 +100,11 @@ export function ClubConsole({
   const params = useSearchParams();
   const workspace = useWorkspace();
   const tab = workspaceTab(params.get("tab") ?? initialTab);
+  const reservationQuery = tab === "bookings" ? params.get("q")?.slice(0, 100) ?? "" : "";
   const [isNavigating, startNavigation] = useTransition();
   const [selectedDate, setDate] = useState(initialDate);
   const date = isNavigating ? selectedDate : initialDate;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(reservationQuery);
   const [category, setCategory] = useState("All items");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [modal, setModal, modalClosing] = useAnimatedModal<Modal>();
@@ -123,9 +124,9 @@ export function ClubConsole({
     setDate(initialDate);
   }, [initialDate]);
   useEffect(() => {
-    setSearch("");
+    setSearch(reservationQuery);
     setCategory("All items");
-  }, [tab]);
+  }, [tab, reservationQuery]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 5000);
@@ -227,6 +228,7 @@ export function ClubConsole({
   function go(t: Tab, paymentReview = false) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", t);
+    url.searchParams.delete("q");
     if (paymentReview) url.searchParams.set("review", "1");
     else url.searchParams.delete("review");
     window.history.replaceState(null, "", url);

@@ -7,6 +7,7 @@ import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
 import { centavos, cartTotal, collectionsCsv, dayKey, reportFor, type PosData } from "../src/lib/pos";
 import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema, publishedMembershipDetails } from "../src/lib/membership";
 import { membershipStatus, type ActiveMembershipRow, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
+import { staffNotificationContent, staffNotificationFeedSchema } from "../src/lib/staff-notifications";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -1544,6 +1545,99 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(await quote(six, 6, 2), 0);
       assert.equal(await quote(six, 16, 2), 0);
       assert.equal(await quote(annual, 6, 2), 45.5);
+    });
+
+    await t.test("staff notifications follow verified activity, duty access, and per-account read status", async () => {
+      const previous = await readCurrentData();
+      await db.exec(await readFile("supabase/migrations/202611170042_staff_notifications.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), previous);
+      const read = async (actor: string, page = 1) => staffNotificationFeedSchema.parse(await call(actor, "staff_notification_feed", [page]));
+      const mark = (actor: string, id: number | null) => call(actor, "mark_staff_notifications_read", [id]);
+      const userId = async (email: string) => (await db.query<{ id: string }>("select id from auth.users where email=$1", [email])).rows[0].id;
+      const manager = await userId("membership-manager@example.test");
+      const offDuty = await userId("membership-relief@test.example");
+      assert.deepEqual(await read(owner), { unread_count: 0, total_count: 0, rows: [] });
+      await assert.rejects(() => read(player), /Authorized staff/);
+      await assert.rejects(() => read(offDuty), /Authorized staff/);
+      await assert.rejects(() => mark(player, null), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select public.staff_notification_feed(1)"), "anon"), /permission denied/);
+      await assert.rejects(() => as(cashier, () => db.query("select * from private.staff_notifications")), /permission denied/);
+
+      const customer = randomUUID();
+      await db.query("insert into auth.users (id,email,email_confirmed_at) values ($1,'notification-customer@test.example',null)", [customer]);
+      assert.equal((await read(owner)).total_count, 0);
+      await db.query("update auth.users set email_confirmed_at=now() where id=$1", [customer]);
+      await db.query("update auth.users set email_confirmed_at=null where id=$1", [customer]);
+      await db.query("update auth.users set email_confirmed_at=now() where id=$1", [customer]);
+      const account = (await read(owner)).rows[0];
+      assert.equal(account.kind, "account_verified");
+      assert.equal(staffNotificationContent(account).href, "/admin/access?q=notification-customer%40test.example");
+      assert.equal((await read(owner)).total_count, 1);
+      assert.equal((await read(cashier)).total_count, 0);
+
+      const date = dayKey(new Date(Date.now() + 25 * 86400000));
+      const reservation = await call<{ id?: string; error?: string }>(customer, "request_customer_booking_v2", ["reserve_court", JSON.stringify({
+        booking_date: date, customer_name: "Notification Customer", customer_phone: "09171234567",
+        court_id: 2, start_hour: 9, duration: 1, expected_total_cents: 10000,
+      })]);
+      assert.ok(reservation.id, reservation.error);
+      assert.equal((await read(owner)).total_count, 1);
+      assert.deepEqual(await call(customer, "request_customer_booking_v2", ["payment", JSON.stringify({
+        booking_id: reservation.id, reference: "NOTIFY-BOOKING-123456",
+      })]), { success: true });
+      const pending = (await read(cashier)).rows[0];
+      assert.equal(pending.kind, "booking_payment");
+      assert.equal(pending.priority, true);
+      assert.match(staffNotificationContent(pending).href, /\/staff\?tab=bookings&date=\d{4}-\d\d-\d\d&q=AP-/);
+      assert.ok(!JSON.stringify(pending).includes("NOTIFY-BOOKING-123456"));
+      await call(cashier, "pos_verify_booking", [reservation.id]);
+      await db.query("update public.bookings set status='confirmed' where id=$1", [reservation.id]);
+      assert.equal((await read(cashier)).total_count, 2);
+      assert.equal((await read(cashier)).rows.find((row) => row.id === pending.id)?.priority, false);
+      await call(owner, "staff_update_booking", [reservation.id, "cancelled"]);
+      const cancelled = (await read(cashier)).rows[0];
+      assert.equal(cancelled.kind, "booking_cancelled");
+      assert.equal(cancelled.priority, false);
+      await db.query("update public.bookings set booking_date=(now() at time zone 'Asia/Manila')::date where id=$1", [reservation.id]);
+      assert.equal((await read(cashier)).rows[0].priority, true);
+
+      const { revision } = (await db.query<{ revision: number }>("select revision from public.membership_settings where id")).rows[0];
+      const request = (action: string, input: unknown) => call(customer, "request_customer_membership", [action, JSON.stringify(input)]);
+      assert.deepEqual(await request("start", { plan: "annual", revision }), { success: true });
+      assert.equal((await read(owner)).total_count, 4);
+      const { id } = (await db.query<{ id: string }>("select id from public.membership_applications where user_id=$1", [customer])).rows[0];
+      assert.deepEqual(await request("submit", { id, reference: "NOTIFY-MEMBERSHIP-123456" }), { success: true });
+      const membership = (await read(cashier)).rows.find((row) => row.kind === "membership_payment");
+      assert.ok(membership?.priority);
+      assert.equal(staffNotificationContent(membership).href, `/staff/memberships?application=${id}`);
+      const focused = await call<{ row_count: number; rows: MembershipReviewRow[] }>(cashier, "list_membership_applications", [false, 1, id]);
+      assert.equal(focused.row_count, 1);
+      assert.equal(focused.rows[0].id, id);
+      await call(cashier, "review_membership_payment", [id, true, ""]);
+      const cashierFeed = await read(cashier);
+      assert.equal(cashierFeed.total_count, 4);
+      assert.equal((await read(manager)).total_count, 6);
+      const reviewedNotice = cashierFeed.rows.find((row) => row.id === membership.id)!;
+      assert.equal(reviewedNotice.priority, false);
+      assert.equal(staffNotificationContent(reviewedNotice).href, `/staff/memberships?view=reviewed&application=${id}`);
+
+      await mark(cashier, account.id);
+      assert.equal((await db.query("select * from private.staff_notification_reads where user_id=$1", [cashier])).rows.length, 0);
+      await mark(cashier, pending.id);
+      await mark(cashier, pending.id);
+      assert.equal((await read(cashier)).unread_count, 3);
+      assert.equal((await read(owner)).unread_count, 6);
+      await mark(owner, null);
+      assert.equal((await read(owner)).unread_count, 0);
+      assert.equal((await read(manager)).unread_count, 6);
+      await db.query(`insert into private.staff_notifications(kind,subject_id)
+        select 'booking_confirmed',$1 from generate_series(1,16)`, [reservation.id]);
+      const first = await read(owner);
+      const second = await read(owner, 2);
+      assert.equal(first.unread_count,16);
+      assert.equal(first.rows.length,15);
+      assert.equal(second.rows.length,7);
+      assert.equal(new Set([...first.rows,...second.rows].map((row)=>row.id)).size,22);
     });
   } finally {
     await db.close();

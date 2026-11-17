@@ -56,9 +56,10 @@ export function membershipStatus(application: Pick<MembershipApplication, "statu
   return "Awaiting payment";
 }
 
-export function membershipReviewHref(view: MembershipView, page = 1) {
+export function membershipReviewHref(view: MembershipView, page = 1, application?: string) {
   const params = new URLSearchParams();
   if (view !== "pending") params.set("view", view);
   if (page > 1) params.set("page", String(page));
+  if (application) params.set("application", application);
   return params.size ? `${membershipReviewPath}?${params}` : membershipReviewPath;
 }

@@ -1021,6 +1021,64 @@
 .club-app .workspace-page-heading h1 { margin: 0; font-size: 28px; line-height: 1.3; font-weight: 650; letter-spacing: -.9px; }
 .club-app .workspace-page-heading p { margin: 8px 0 0; color: var(--console-muted); }
 .club-app .heading-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.club-app .workspace-page-heading:has(.staff-notifications) .workspace-heading-title { margin-inline-end: auto; }
+.staff-notifications { flex: none; }
+.staff-notification-bell { position: relative; }
+.staff-notification-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border-radius: 10px;
+  background: #24543f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 18px;
+  text-align: center;
+}
+.modal.staff-notifications-dialog {
+  width: min(510px, calc(100% - 30px));
+  max-width: none;
+  padding: 20px;
+}
+.staff-notification-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--console-muted);
+  font-size: 13px;
+}
+.staff-notification-message { padding: 20px 0; color: var(--console-muted); }
+.staff-notification-list {
+  max-height: min(52svh, 470px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 12px -4px 0;
+  padding: 0 4px;
+}
+.staff-notification-list li + li { border-top: 1px solid var(--line); }
+.staff-notification-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 8px;
+  color: inherit;
+  text-decoration: none;
+}
+.staff-notification-row:hover, .staff-notification-row:focus-visible { background: #f3f7ee; }
+.staff-notification-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 8px; }
+.staff-notification-row[data-unread] .staff-notification-dot { background: #438263; }
+.staff-notification-copy { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.staff-notification-copy > span, .staff-notification-arrow { color: var(--console-muted); font-size: 13px; }
+.staff-notification-copy > small { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; color: var(--console-muted); }
+.staff-notification-priority { background: #f7ebd4; color: #69481c; border-radius: 4px; padding: 2px 5px; }
+.staff-notification-pager { margin-top: 12px; }
 .club-app :is(.console-button, .button, .icon-button) { min-height: 42px; border-radius: 7px; font-size: 14px; font-weight: 550; box-shadow: none; }
 .club-app :is(.console-button.primary, .button-dark) { background: #24543f; border-color: #24543f; color: #fff; }
 .club-app :is(.console-button.primary, .button-dark):hover { background: #193e2f; border-color: #193e2f; }
@@ -1154,6 +1212,13 @@
   .club-app .console-page-heading { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 22px; }
   .club-app .workspace-page-heading h1 { font-size: 25px; }
   .club-app .heading-actions { width: 100%; justify-content: flex-start; gap: 8px; }
+  .club-app .workspace-page-heading:has(.staff-notifications) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .club-app .workspace-page-heading:has(.staff-notifications) .heading-actions { grid-area: 2 / 1 / 3 / -1; }
+  .club-app .workspace-page-heading .staff-notifications { grid-area: 1 / 2; }
   .club-app .heading-actions > .console-date { flex: 1; }
   .club-app :is(.metric-card, .stat-card) { padding: 16px; }
   .club-app .metric-card > strong,

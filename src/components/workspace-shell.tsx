@@ -24,6 +24,7 @@ export function WorkspaceShell({ children, role, roleLoading = false, courtCount
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
     url.searchParams.delete("review");
+    url.searchParams.delete("q");
     window.history.replaceState(null, "", url);
     setMobile(false);
   }
