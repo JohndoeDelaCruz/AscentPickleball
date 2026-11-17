@@ -140,31 +140,26 @@ export default async function Home() {
           </div>
         </div>
         <div className="court-cards">
-          {courts.map(({ id: court, name }, index) => (
+          {courts.map(({ id: court, name }) => (
             <Link
               href={`/book?court=${court}`}
               className="court-card"
+              aria-labelledby={`court-${court}-title`}
               data-reveal=""
               key={court}
             >
-              <div className={`court-card-art court-art-${court}`}>
-                <Image
-                  src={courtPhoto(court)}
-                  alt=""
-                  fill
-                  loading="eager"
-                  sizes="(max-width: 700px) 100vw, 50vw"
-                />
-                <span className="court-number">{String(index + 1).padStart(2, "0")}</span>
-              </div>
+              <Image
+                src={courtPhoto(court)}
+                alt=""
+                fill
+                loading="eager"
+                sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1280px) 50vw, 627px"
+              />
               <div className="court-card-copy">
                 <div>
-                  <h3>{name}</h3>
+                  <h3 id={`court-${court}-title`}><span className="sr-only">Book </span>{name}</h3>
                   {venue.schedule_config ? (
-                    <p className="small-print">
-                      Private hours and rates vary by day. Choose a date to see
-                      available court time.
-                    </p>
+                    <p>Private hours and rates vary by day. Choose a date to see availability.</p>
                   ) : (
                     <dl className="court-rates">
                       {ratePeriods.map((period) => (
@@ -180,17 +175,17 @@ export default async function Home() {
                       ))}
                     </dl>
                   )}
-                  <p className="court-rental">
+                  <p>
                     Optional rental: {money(venue.equipment_rental_price)} ·{" "}
                     {equipmentPackageLabel(venue.equipment_ball_count)}
                   </p>
-                  <p className="small-print">
+                  <p>
                     {venue.schedule_config
                       ? "Player limits are listed for each booking period."
                       : `Up to ${venue.private_court_capacity} players per private court.`}
                   </p>
                 </div>
-                <span className="circle-arrow">
+                <span className="circle-arrow" aria-hidden="true">
                   <ArrowUpRight size={22} />
                 </span>
               </div>

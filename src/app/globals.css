@@ -447,59 +447,71 @@ img {
 }
 .court-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 27px;
 }
-.court-card-art {
-  height: 260px;
+.court-card {
+  display: flex;
+  align-items: end;
+  min-height: 260px;
   position: relative;
   overflow: hidden;
-  background: #426046;
+  background: var(--ink);
+  color: var(--cream);
   border-radius: 10px;
 }
-.court-card-art img {
+.court-card img {
   object-fit: cover;
   object-position: 50% 43%;
   transition: transform 0.5s;
 }
-.court-card:hover .court-card-art img {
+.court-card:hover img {
   transform: scale(1.04);
 }
-.court-number {
-  position: absolute;
-  top: 18px;
-  left: 22px;
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: 50px;
-  font-weight: 600;
-  color: #fff9df;
-  line-height: 1;
-}
 .court-card-copy {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
-  padding: 21px 1px 0;
+  align-items: end;
+  gap: 12px;
+  padding: 16px clamp(16px, 2vw, 24px);
+}
+.court-card-copy::before {
+  content: "";
+  position: absolute;
+  inset: -3rem 0 0;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent, rgb(14 29 22 / 80%) 3rem, rgb(14 29 22 / 95%));
 }
 .court-card-copy > div {
-  flex: 1;
+  display: grid;
+  gap: 4px;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+.court-card-copy h3 {
+  font-family: var(--font-display), Impact, sans-serif;
+  font-size: 30px;
+  line-height: 1.05;
+  margin: 0 0 2px;
+}
+.court-card-copy p,
+.court-rates {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin: 0;
 }
 .court-rates {
   display: grid;
-  gap: 9px;
-  margin: 14px 0 0;
-  font-size: 14px;
+  gap: 4px;
 }
 .court-rates > div {
   display: flex;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: 2px 12px;
   flex-wrap: wrap;
-}
-.court-rates dt {
-  color: var(--muted);
 }
 .court-rates dd {
   margin: 0;
@@ -508,17 +520,6 @@ img {
 .court-rates dd strong {
   font-weight: 600;
 }
-.court-rental {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 14px;
-  line-height: 1.8;
-}
-.court-rental > span {
-  color: var(--muted);
-  font-size: 14px;
-}
 .callout-details .court-hours-line {
   display: block;
   font: inherit;
@@ -526,27 +527,19 @@ img {
   letter-spacing: inherit;
   line-height: 1.8;
 }
-.court-card-copy h3 {
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: 30px;
-  margin: 0 0 4px;
-}
-.court-card-copy div > span {
-  color: var(--muted);
-  font-size: 14px;
-}
 .circle-arrow {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border: 1px solid #cdd5c6;
+  border: 1px solid rgb(248 249 243 / 65%);
   border-radius: 50%;
   display: grid;
   place-items: center;
 }
-.court-card:hover .circle-arrow {
+.court-card:is(:hover, :focus-visible) .circle-arrow {
   background: var(--lime);
   border-color: var(--lime);
+  color: var(--ink);
 }
 .booking-callout {
   background: var(--ink);
@@ -2899,9 +2892,6 @@ img {
   .section {
     padding-block: 65px;
   }
-  .court-card-art {
-    height: 215px;
-  }
   .steps {
     gap: 25px;
   }
@@ -3036,14 +3026,11 @@ img {
     margin-top: 22px;
   }
   .court-cards {
-    grid-template-columns: 1fr;
-    gap: 29px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
   }
-  .court-card-art {
-    height: 240px;
-  }
-  .court-card-copy {
-    padding-top: 16px;
+  .court-card {
+    min-height: 240px;
   }
   .court-card-copy h3 {
     font-size: 28px;
