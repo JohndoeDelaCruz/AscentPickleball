@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDown, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { benefitIcons } from "@/components/membership-benefit-icons";
 import { getMembershipPlans, getSession, getVenueSettings } from "@/lib/data";
 import { money } from "@/lib/booking";
 import { membershipApplyPath } from "@/lib/membership-applications";
 import { publishedMembershipDetails } from "@/lib/membership";
+import styles from "./membership.module.css";
 
 export const metadata: Metadata = {
   title: "Membership plans",
@@ -17,60 +18,58 @@ export default async function MembershipPage() {
   const facebook = venue?.facebook_url;
   const publishedPlans = plans.map((plan) => ({ id: plan.id, details: publishedMembershipDetails(plan) }));
   return (
-    <main id="main" className="container membership-page">
-      <div className="page-heading">
+    <main id="main" className={styles.page}>
+      <header className={styles.heading}>
         <h1>Membership plans</h1>
         {(role === "owner" || role === "manager") && (
           <Link href="/admin/settings#venue-membership" className="text-link">
-            Edit membership details <ArrowUpRight size={16} />
+            Edit membership details <ArrowUpRight size={16} aria-hidden="true" />
           </Link>
         )}
-      </div>
-      <div className="membership-layout">
+      </header>
+      <div className={styles.plans}>
         {publishedPlans.map(({ id, details }) => (
-          <section key={id} className="membership-join panel" aria-labelledby={`${id}-membership-price`}>
-            <h2 className="eyebrow" id={`${id}-membership-price`}>{details.plan_name}</h2>
-            <p className="membership-price">
-              {money(details.price_cents / 100)}<span>/ {details.price_period}</span>
-            </p>
-            <p>{details.validity}</p>
-            <div className="membership-plan-actions">
-              <Link href={`${membershipApplyPath}?plan=${id}`} className="button button-lime">
-                Apply for {details.plan_name} <ArrowUpRight size={18} />
-              </Link>
-              <a href={`#${id}-membership-benefits`} className="text-link" aria-label={`View benefits for ${details.plan_name}`}>
-                View benefits <ArrowDown size={16} />
-              </a>
+          <section key={id} className={styles.plan} data-annual={id === "annual" || undefined} aria-labelledby={`${id}-membership-price`}>
+            <h2 id={`${id}-membership-price`}>{details.plan_name}</h2>
+            <p className={styles.price}><strong>{money(details.price_cents / 100)}</strong><span>/ {details.price_period}</span></p>
+            <Link href={`${membershipApplyPath}?plan=${id}`} className={`${styles.apply} button button-small ${id === "annual" ? "button-dark" : "button-outline"}`}
+              aria-label={`Apply now for ${details.plan_name}`}>
+              Apply now <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+            <div className={styles.benefits} id={`${id}-membership-benefits`}>
+              {details.benefits.length > 0 && <>
+                <h3>What’s included</h3>
+                <ul role="list">
+                  {details.benefits.map(({ icon, title, description }, index) => {
+                    const { Icon } = benefitIcons[icon];
+                    return <li key={index}>
+                      <details className={styles.benefit}>
+                        <summary><Icon size={18} aria-hidden="true" /> <span>{title}</span> <ChevronDown size={15} aria-hidden="true" /></summary>
+                        <p>{description}</p>
+                      </details>
+                    </li>;
+                  })}
+                </ul>
+              </>}
             </div>
+            <details className={styles.terms}>
+              <summary>Plan details <ChevronDown size={16} aria-hidden="true" /></summary>
+              <h3 id={`${id}-membership-heading`}>{details.heading}</h3>
+              <p>{details.introduction}</p>
+              <p>{details.validity}</p>
+              <p>{details.redemption}</p>
+            </details>
           </section>
         ))}
       </div>
-      <p className="membership-contact-note">
-        Have questions about enrollment?{" "}
-        <a href={facebook || "/#visit"} target={facebook ? "_blank" : undefined} rel={facebook ? "noreferrer" : undefined} className="text-link">
-          Contact the Ascent team <ArrowUpRight size={16} />
-        </a>
-      </p>
-      <div className="membership-layout">
-        {publishedPlans.map(({ id, details }) => (
-          <section key={id} id={`${id}-membership-benefits`} className="membership-plan-benefits" aria-labelledby={`${id}-membership-heading`}>
-            <p className="eyebrow">{details.plan_name}</p>
-            <h2 className="membership-section-title" id={`${id}-membership-heading`}>{details.heading}</h2>
-            <p>{details.introduction}</p>
-            <div className="membership-benefits">
-              {details.benefits.map(({ icon, title, description }, index) => {
-                const { Icon } = benefitIcons[icon];
-                return <article key={index} className="panel membership-benefit">
-                  <Icon size={22} aria-hidden="true" />
-                  <div><h3>{title}</h3><p>{description}</p></div>
-                </article>;
-              })}
-            </div>
-            <p className="membership-contact-note">{details.redemption}</p>
-          </section>
-        ))}
+      <div className={styles.help}>
+        <p>Questions about enrollment?{" "}
+          <a href={facebook || "/#visit"} target={facebook ? "_blank" : undefined} rel={facebook ? "noreferrer" : undefined} className="text-link">
+            Contact the Ascent team <ArrowUpRight size={14} aria-hidden="true" />
+          </a>
+        </p>
+        <Link href="/court-rules" className="text-link">Read the court rules <ArrowUpRight size={14} aria-hidden="true" /></Link>
       </div>
-      <Link href="/court-rules" className="text-link">Read the court rules <ArrowUpRight size={16} /></Link>
     </main>
   );
 }

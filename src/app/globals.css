@@ -2559,72 +2559,8 @@ img {
 .membership-home > .button {
   flex-shrink: 0;
 }
-.membership-page,
 .rules-page {
   padding-bottom: 72px;
-}
-.membership-page {
-  overflow-wrap: anywhere;
-}
-.membership-page .page-heading > .text-link {
-  margin-top: 12px;
-}
-.membership-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
-}
-.membership-plan-benefits {
-  scroll-margin-top: calc(var(--header-height) + 24px);
-}
-.membership-section-title {
-  font-family: var(--font-body), Arial, sans-serif;
-  font-size: 25px;
-  line-height: 1.3;
-  margin: 8px 0;
-}
-.membership-benefits {
-  display: grid;
-  gap: 10px;
-}
-.membership-benefit {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  padding: 16px;
-}
-.membership-benefit > svg {
-  color: #66823e;
-  margin-top: 2px;
-}
-.membership-benefit h3 {
-  font-size: 16px;
-  line-height: 1.4;
-}
-.membership-benefit p {
-  margin-bottom: 0;
-  color: var(--muted);
-}
-.membership-join {
-  display: flex;
-  flex-direction: column;
-  background: var(--green);
-  color: var(--cream);
-}
-.membership-join > .eyebrow {
-  font-family: var(--font-body), Arial, sans-serif;
-  text-transform: uppercase;
-}
-.membership-price {
-  margin: 16px 0;
-  font-size: clamp(36px, 5vw, 56px);
-  font-weight: 700;
-  line-height: 1.2;
-}
-.membership-price span {
-  font-size: 17px;
-  font-weight: 400;
-  margin-left: 8px;
 }
 .membership-plan-actions {
   display: flex;
@@ -2632,14 +2568,6 @@ img {
   flex-wrap: wrap;
   gap: 16px;
   margin-top: auto;
-}
-.membership-contact-note {
-  font-size: 14px;
-  color: var(--muted);
-  margin: 18px 0;
-}
-.membership-page > .membership-contact-note {
-  margin-bottom: 32px;
 }
 .membership-apply-page {
   max-width: 620px;
@@ -2780,7 +2708,6 @@ img {
     width: 100%;
     gap: 16px;
   }
-  .membership-layout,
   .rules-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2789,7 +2716,6 @@ img {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
-  .membership-page,
   .rules-page {
     padding-bottom: 48px;
   }
