@@ -20,10 +20,12 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
   }
 
   return <section className={styles.card} aria-label="Products at the counter" data-hero="">
-    <div className={styles.photo}>
-      {photo && photo !== failedPhoto ? (
-        <Image key={photo} src={`/product-photo/${photo}.jpg`} alt="" fill unoptimized onError={() => setFailedPhoto(photo)} />
-      ) : <ShoppingBag size={34} aria-hidden="true" />}
+    <div className={styles.media}>
+      <div className={styles.photo}>
+        {photo && photo !== failedPhoto ? (
+          <Image key={photo} src={`/product-photo/${photo}.jpg`} alt="" fill unoptimized onError={() => setFailedPhoto(photo)} />
+        ) : <ShoppingBag size={34} aria-hidden="true" />}
+      </div>
       {products.length > 1 && <div className={styles.controls}>
         <button type="button" onClick={() => move(-1)} aria-label="Previous product"><ChevronLeft size={19} aria-hidden="true" /></button>
         <button type="button" onClick={() => move(1)} aria-label="Next product"><ChevronRight size={19} aria-hidden="true" /></button>

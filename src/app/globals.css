@@ -257,12 +257,19 @@ img {
 .mobile-nav {
   display: none;
 }
+.hero-layout {
+  position: relative;
+  margin-block: 28px 36px;
+}
+.hero-layout--with-products {
+  --hero-product-width: clamp(218px, 22vw, 268px);
+  --hero-product-inset: clamp(20px, 3vw, 36px);
+}
 .hero {
   position: relative;
   isolation: isolate;
   display: block;
   min-height: 640px;
-  margin-block: 28px 36px;
   padding: 0;
   overflow: hidden;
   border-radius: 14px;
@@ -280,14 +287,8 @@ img {
   min-height: 640px;
   padding: 66px 60px;
 }
-.hero--with-products {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: clamp(12px, 2vw, 28px);
-  padding-right: clamp(20px, 3vw, 36px);
-}
-.hero--with-products .hero-copy {
-  width: 100%;
+.hero-layout--with-products .hero-copy {
+  width: calc(100% - var(--hero-product-width) - var(--hero-product-inset) - clamp(12px, 2vw, 28px));
   padding-right: 0;
 }
 .hero h1 {
@@ -3146,16 +3147,28 @@ img {
     font-size: 14px;
   }
 }
+@media (max-width: 780px) {
+  .hero,
+  .hero-copy {
+    min-height: 0;
+  }
+  .hero-copy,
+  .hero-layout--with-products .hero-copy {
+    width: 100%;
+    padding-block: 74px 36px;
+    padding-right: 35px;
+  }
+}
 @media (max-width: 650px) {
-  .hero {
-    min-height: 600px;
+  .hero-layout {
     margin-block: 18px 24px;
+  }
+  .hero {
     border-radius: 11px;
   }
-  .hero-copy {
-    width: 100%;
-    min-height: 600px;
-    padding: 74px 24px 145px;
+  .hero-copy,
+  .hero-layout--with-products .hero-copy {
+    padding-inline: 24px;
   }
   .hero h1 {
     font-size: clamp(46px, 14.5vw, 68px);
@@ -3189,16 +3202,6 @@ img {
     left: 24px;
     font-size: 14px;
     letter-spacing: 2px;
-  }
-}
-@media (max-width: 780px) {
-  .hero--with-products {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-  }
-  .hero--with-products .hero-copy {
-    min-height: auto;
-    padding-block: 74px 0;
   }
 }
 @media (max-width: 380px) {

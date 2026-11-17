@@ -54,52 +54,54 @@ export default async function Home() {
   ];
   return (
     <LandingMotion>
-      <section className={`container hero${products.length ? " hero--with-products" : ""}`} aria-label="Ascent Pickleball courts">
-        <div className="hero-copy">
-          <h1 data-hero="">
-            PLAY HIGHER.
-            <br />
-            <span className="hero-ascent">
-              PLAY <span className="text-outline">ASCENT.</span>
-              <svg viewBox="0 0 410 20" aria-hidden="true">
-                <path
-                  d="M3 13Q190-3 405 9M35 19Q220 4 380 13"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-          </h1>
-          <p className="hero-description" data-hero="">
-            A place to play, a reason to connect. Get your crew together and
-            make your next game an Ascent game.
-          </p>
-          <div className="hero-buttons" data-hero="">
-            <Link href="/book" className="button button-dark">
-              Find your court <ArrowUpRight size={19} />
-            </Link>
-            <a href="#courts" className="text-link">
-              Meet Ascent <ArrowDown size={16} />
-            </a>
+      <div className={`container hero-layout${products.length ? " hero-layout--with-products" : ""}`}>
+        <section className="hero" aria-label="Ascent Pickleball courts">
+          <div className="hero-copy">
+            <h1 data-hero="">
+              PLAY HIGHER.
+              <br />
+              <span className="hero-ascent">
+                PLAY <span className="text-outline">ASCENT.</span>
+                <svg viewBox="0 0 410 20" aria-hidden="true">
+                  <path
+                    d="M3 13Q190-3 405 9M35 19Q220 4 380 13"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            </h1>
+            <p className="hero-description" data-hero="">
+              A place to play, a reason to connect. Get your crew together and
+              make your next game an Ascent game.
+            </p>
+            <div className="hero-buttons" data-hero="">
+              <Link href="/book" className="button button-dark">
+                Find your court <ArrowUpRight size={19} />
+              </Link>
+              <a href="#courts" className="text-link">
+                Meet Ascent <ArrowDown size={16} />
+              </a>
+            </div>
           </div>
-        </div>
-        <div className="hero-visual">
-          <Image
-            src="/ascent-courts-panorama.jpg"
-            alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
-            unoptimized
-            fill
-            sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), 1280px"
-            loading="eager"
-            fetchPriority="high"
-            className="hero-art"
-          />
-          <div className="vertical-word">LET’S PLAY.</div>
-        </div>
+          <div className="hero-visual">
+            <Image
+              src="/ascent-courts-panorama.jpg"
+              alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
+              unoptimized
+              fill
+              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), 1280px"
+              loading="eager"
+              fetchPriority="high"
+              className="hero-art"
+            />
+            <div className="vertical-word">LET’S PLAY.</div>
+          </div>
+        </section>
         <CounterProductCard products={products} />
-      </section>
+      </div>
       <div
         className="marquee-band"
         aria-label="Play more. Connect more. Rise together."
