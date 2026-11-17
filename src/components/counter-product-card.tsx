@@ -15,6 +15,7 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
   if (!product) return null;
 
   const photo = product.photo_version;
+  const price = money(product.price_cents / 100);
   function move(step: number) {
     setIndex((currentIndex + step + products.length) % products.length);
   }
@@ -31,12 +32,19 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
         <button type="button" onClick={() => move(1)} aria-label="Next product"><ChevronRight size={19} aria-hidden="true" /></button>
       </div>}
     </div>
-    <div className={styles.product} aria-live="polite" aria-atomic="true">
-      <p>{product.category}</p>
-      <h2>{product.name}</h2>
-      <span className={styles.price}>{money(product.price_cents / 100)}</span>
-      {products.length > 1 && <span className="sr-only">Product {currentIndex + 1} of {products.length}</span>}
+    <div className={styles.product}>
+      <div className={styles.details}>
+        <p>{product.category}</p>
+        <h2>{product.name}</h2>
+      </div>
+      <span className={styles.price}>{price}</span>
+      <a href="#visit" className={styles.link} aria-label="Buy at the counter" title="View venue details">
+        <span className={styles.linkLabel}>Buy at the counter <ArrowUpRight size={15} aria-hidden="true" /></span>
+        <ShoppingBag className={styles.linkIcon} size={19} aria-hidden="true" />
+      </a>
+      {products.length > 1 && <span className="sr-only" role="status">
+        {product.name}, {price}. Product {currentIndex + 1} of {products.length}.
+      </span>}
     </div>
-    <a href="#visit" className={styles.link}>Buy at the counter <ArrowUpRight size={15} aria-hidden="true" /></a>
   </section>;
 }
