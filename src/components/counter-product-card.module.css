@@ -145,17 +145,22 @@
 
   .product {
     grid-area: product;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+    gap: 2px 12px;
     padding: 0;
   }
 
   .product p {
+    grid-column: 1;
     color: var(--muted);
   }
 
   .price {
-    color: #3a634b;
+    grid-area: 1 / 2 / 3 / 3;
+    align-self: center;
+    color: var(--ink);
+    font-size: clamp(20px, 4vw, 24px);
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
   }
 
   .link {
