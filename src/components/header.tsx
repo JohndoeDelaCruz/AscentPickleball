@@ -31,7 +31,6 @@ export function Header({
   const links = [
     { href: "/#courts", label: "The courts" },
     { href: "/membership", label: "Membership" },
-    { href: "/#how-it-works", label: "How it works" },
     { href: "/#visit", label: "Find us" },
   ];
   return (

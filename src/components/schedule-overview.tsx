@@ -53,10 +53,6 @@ export function ScheduleOverview({ config, courtCount }: { config: ScheduleConfi
           <ScheduleRows blocks={upcoming.blocks} courtCount={courtCount} label={upcoming.name} />
         </details>
       )}
-      <p className="small-print">
-        All times are Philippine Time. Open-play passes cover one selected
-        session. Hours without a time block are closed.
-      </p>
     </section>
   );
 }

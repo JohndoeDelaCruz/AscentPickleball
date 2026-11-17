@@ -4,7 +4,6 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  Check,
   Clock3,
   MapPin,
   QrCode,
@@ -227,7 +226,6 @@ export default async function Home() {
         data-reveal=""
       >
         <div>
-          <span className="eyebrow">MORE GAMES. MORE BENEFITS.</span>
           <h2 id="membership-home-title">Membership plans</h2>
           <ul className="membership-home-plans">
             {membershipPlans.map((plan) => {
@@ -252,11 +250,6 @@ export default async function Home() {
               <br />
               IS CALLING.
             </h2>
-            <p>
-              {open
-                ? "Pick your time. Round up your crew. We’ll see you on court."
-                : "We’re getting ready for you. Explore the booking calendar while we put the finishing touches in place."}
-            </p>
             <Link href="/book" className="button button-lime">
               {open ? "Book your next game" : "Explore the calendar"}
               <ArrowUpRight size={18} />
@@ -298,53 +291,6 @@ export default async function Home() {
               {open ? "Reservations are open" : "Reservations opening soon"}
             </div>
           </div>
-        </div>
-      </section>
-      <section className="container section" id="how-it-works">
-        <div className="section-heading" data-reveal="">
-          <div>
-            <span className="eyebrow">FROM LET’S PLAY TO GAME ON</span>
-            <h2>
-              THREE STEPS.
-              <br />
-              THEN YOU’RE ON.
-            </h2>
-          </div>
-          <Link href="/book" className="text-link">
-            Find a time <ArrowUpRight size={18} />
-          </Link>
-        </div>
-        <div className="steps">
-          <article data-reveal="">
-            <span className="step-number">
-              01 <CalendarDays size={23} />
-            </span>
-            <h3>Pick your play.</h3>
-            <p>
-              Find a date, choose a court, and grab a time that works for your
-              crew.
-            </p>
-          </article>
-          <article data-reveal="">
-            <span className="step-number">
-              02 <QrCode size={23} />
-            </span>
-            <h3>Make it yours.</h3>
-            <p>
-              Reserve your slot, pay through our GCash QR, and send your
-              reference number.
-            </p>
-          </article>
-          <article data-reveal="">
-            <span className="step-number">
-              03 <Check size={25} />
-            </span>
-            <h3>Show up. Play on.</h3>
-            <p>
-              Once our team confirms your payment, your court is ready for your
-              next great game.
-            </p>
-          </article>
         </div>
       </section>
       <section className="visit-section" id="visit">
