@@ -10,9 +10,11 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { getMembershipPlans, getVenue } from "@/lib/data";
+import { getCounterProducts } from "@/lib/counter-products";
 import { publishedMembershipDetails } from "@/lib/membership";
 import { activeCourts, courtPhoto } from "@/lib/courts";
 import { Starburst } from "@/components/starburst";
+import { CounterProductCard } from "@/components/counter-product-card";
 import { LandingMotion } from "@/components/landing-motion";
 import { ScheduleOverview } from "@/components/schedule-overview";
 import {
@@ -25,7 +27,7 @@ import {
 } from "@/lib/booking";
 
 export default async function Home() {
-  const [{ venue }, membershipPlans] = await Promise.all([getVenue(), getMembershipPlans()]);
+  const [{ venue }, membershipPlans, products] = await Promise.all([getVenue(), getMembershipPlans(), getCounterProducts()]);
   const courts = activeCourts(venue.courts);
   const open = canBook(venue);
   const ratePeriods = getRatePeriods(venue);
@@ -52,7 +54,7 @@ export default async function Home() {
   ];
   return (
     <LandingMotion>
-      <section className="container hero" aria-label="Ascent Pickleball courts">
+      <section className={`container hero${products.length ? " hero--with-products" : ""}`} aria-label="Ascent Pickleball courts">
         <div className="hero-copy">
           <h1 data-hero="">
             PLAY HIGHER.
@@ -95,17 +97,8 @@ export default async function Home() {
             className="hero-art"
           />
           <div className="vertical-word">LET’S PLAY.</div>
-          <div className="hero-image-caption" data-hero="">
-            <div>
-              <strong>
-                Find your people.
-                <br />
-                Find your game.
-              </strong>
-              <span>WELCOME TO YOUR NEXT CHAPTER</span>
-            </div>
-          </div>
         </div>
+        <CounterProductCard products={products} />
       </section>
       <div
         className="marquee-band"

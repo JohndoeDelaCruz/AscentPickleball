@@ -8,6 +8,7 @@ import { centavos, cartTotal, collectionsCsv, dayKey, reportFor, type PosData } 
 import { defaultMembership, defaultSixMonthMembership, membershipDetailsSchema, publishedMembershipDetails } from "../src/lib/membership";
 import { membershipStatus, type ActiveMembershipRow, type MembershipApplication, type MembershipReviewRow } from "../src/lib/membership-applications";
 import { staffNotificationContent, staffNotificationFeedSchema } from "../src/lib/staff-notifications";
+import type { CounterProduct } from "../src/lib/counter-products";
 
 test("centavo arithmetic and payment-date reports preserve deposits and refunds", () => {
   assert.equal(centavos("175.25"), 17525);
@@ -1638,6 +1639,47 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(first.rows.length,15);
       assert.equal(second.rows.length,7);
       assert.equal(new Set([...first.rows,...second.rows].map((row)=>row.id)).size,22);
+    });
+
+    await t.test("the public counter catalog exposes current sale items and eligible photos only", async () => {
+      const inventory = "select * from public.pos_products order by id";
+      const before = (await db.query(inventory)).rows;
+      await db.exec(await readFile("supabase/migrations/202611170043_public_counter_products.sql", "utf8"));
+      assert.deepEqual((await db.query(inventory)).rows, before);
+
+      const photo = await readFile("public/court-1.jpg", "base64");
+      const product = { name: "Catalog paddle", sku: "CATALOG-PADDLE", barcode: "8039377", category: "Equipment",
+        price_cents: 12900, cost_cents: 5000, reorder_level: 3, active: true, revision: 0 };
+      const save = (details: typeof product, image: string | null) =>
+        call<string>(owner, "pos_save_product_with_photo", [JSON.stringify(details), image]);
+      const featured = await save(product, photo);
+      const hidden = await save({ ...product, sku: "CATALOG-HIDDEN", barcode: "", name: "Hidden paddle", active: false }, photo);
+      const plain = await save({ ...product, sku: "CATALOG-PLAIN", barcode: "", name: "Catalog ball" }, null);
+      const version = async (id: string) => (await db.query<{ photo_version: string }>(
+        "select photo_version from public.pos_products where id=$1", [id])).rows[0].photo_version;
+      const photoVersion = await version(featured);
+      const list = () => as("", () => db.query<CounterProduct>("select * from public.list_counter_products()"), "anon").then((r) => r.rows);
+      const getPhoto = (version: string) => as("", () => db.query<{ data: string | null }>(
+        "select public.counter_product_photo($1) as data", [version]), "anon").then((r) => r.rows[0].data?.replace(/\s/g, "") ?? null);
+
+      assert.equal(await getPhoto(photoVersion), null);
+      assert.ok(!(await list()).some((row) => row.name === product.name));
+      for (const id of [featured, hidden, plain]) await call(owner, "pos_adjust_stock", [id, 1, "Catalog stock"]);
+      const rows = await list();
+      assert.deepEqual(rows[0], { name: product.name, category: "Equipment", price_cents: 12900, photo_version: photoVersion });
+      assert.ok(rows.some((row) => row.name === "Catalog ball" && row.photo_version === null));
+      assert.ok(!rows.some((row) => row.name === "Hidden paddle"));
+      assert.equal(await getPhoto(photoVersion), photo);
+      assert.equal(await getPhoto(await version(hidden)), null);
+      await assert.rejects(() => as("", () => db.query(inventory), "anon"), /permission denied/);
+      assert.deepEqual((await as(player, () => db.query(inventory))).rows, []);
+      await assert.rejects(() => as("", () => db.query("select * from private.pos_product_photos"), "anon"), /permission denied/);
+
+      await call(owner, "pos_adjust_stock", [featured, -1, "Sold out"]);
+      assert.equal(await getPhoto(photoVersion), null);
+      assert.ok(!(await list()).some((row) => row.name === product.name));
+      const staffPhoto = await call<string>(cashier, "pos_product_photo", [photoVersion]);
+      assert.equal(staffPhoto.replace(/\s/g, ""), photo);
     });
   } finally {
     await db.close();

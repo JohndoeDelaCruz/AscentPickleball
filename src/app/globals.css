@@ -280,6 +280,16 @@ img {
   min-height: 640px;
   padding: 66px 60px;
 }
+.hero--with-products {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(12px, 2vw, 28px);
+  padding-right: clamp(20px, 3vw, 36px);
+}
+.hero--with-products .hero-copy {
+  width: 100%;
+  padding-right: 0;
+}
 .hero h1 {
   margin: 0 0 29px;
   font-size: clamp(78px, 7.4vw, 108px);
@@ -349,29 +359,6 @@ img {
   font-size: 14px;
   letter-spacing: 3px;
   z-index: 2;
-}
-.hero-image-caption {
-  position: absolute;
-  z-index: 2;
-  right: 35px;
-  bottom: 35px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  color: #f3f6e6;
-}
-.hero-image-caption strong {
-  font-size: 22px;
-  letter-spacing: -0.5px;
-  font-weight: 500;
-  line-height: 1.2;
-}
-.hero-image-caption div > span {
-  display: block;
-  font-size: 14px;
-  letter-spacing: 1.7px;
-  margin-top: 12px;
-  color: #d6e2c9;
 }
 .hero-buttons .button-dark {
   background: var(--lime);
@@ -3158,9 +3145,6 @@ img {
     max-width: 300px;
     font-size: 14px;
   }
-  .hero-image-caption strong {
-    font-size: 19px;
-  }
 }
 @media (max-width: 650px) {
   .hero {
@@ -3206,19 +3190,15 @@ img {
     font-size: 14px;
     letter-spacing: 2px;
   }
-  .hero-image-caption {
-    right: 24px;
-    bottom: 27px;
-    left: auto;
-    gap: 12px;
+}
+@media (max-width: 780px) {
+  .hero--with-products {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
   }
-  .hero-image-caption strong {
-    font-size: 19px;
-  }
-  .hero-image-caption div > span {
-    font-size: 14px;
-    letter-spacing: 1.2px;
-    margin-top: 9px;
+  .hero--with-products .hero-copy {
+    min-height: auto;
+    padding-block: 74px 0;
   }
 }
 @media (max-width: 380px) {
@@ -3598,15 +3578,8 @@ img {
 .nav-mobile-primary {
   display: none;
 }
-.vertical-word,
-.hero-image-caption div > span {
+.vertical-word {
   font-size: 12px;
-}
-.hero-image-caption {
-  max-width: calc(100% - 48px);
-}
-.hero-image-caption div {
-  min-width: 0;
 }
 .account-page {
   max-width: 760px;

@@ -1,0 +1,117 @@
+.card {
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  justify-self: end;
+  width: clamp(218px, 22vw, 268px);
+  max-width: 100%;
+  margin-bottom: clamp(20px, 3vw, 36px);
+  padding: 8px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #29362d, #151b17);
+  color: var(--cream);
+  box-shadow: 0 12px 32px rgb(9 18 13 / 36%);
+}
+
+.photo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 15px;
+  background: #34473a;
+  color: #bfceb8;
+}
+
+.photo img {
+  object-fit: cover;
+}
+
+.controls {
+  position: absolute;
+  inset: auto 6px 6px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.controls button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 50%;
+  background: rgb(16 25 19 / 86%);
+  color: var(--white);
+  pointer-events: auto;
+}
+
+.controls button:hover {
+  background: var(--green);
+}
+
+.product {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 3px 9px;
+  padding: 10px 6px 12px;
+  overflow-wrap: anywhere;
+}
+
+.product p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #c4d0bf;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.product h2 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+
+.price {
+  color: var(--lime);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.link {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.link:hover {
+  background: var(--lime);
+}
+
+@media (max-width: 780px) {
+  .card {
+    margin-top: 10px;
+  }
+
+  .controls button {
+    width: 38px;
+    height: 38px;
+  }
+}
