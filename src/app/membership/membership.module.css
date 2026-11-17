@@ -80,12 +80,13 @@
   border-radius: 999px;
 }
 
-.apply:global(.button-outline) {
-  border-color: #aebdae;
+.plan:not([data-annual]) .apply {
+  background: #000;
+  color: var(--white);
 }
 
-.apply:global(.button-outline):hover {
-  background: #f0f4ed;
+.plan:not([data-annual]) .apply:hover {
+  background: #252525;
 }
 
 .benefits {

@@ -32,7 +32,7 @@ export default async function MembershipPage() {
           <section key={id} className={styles.plan} data-annual={id === "annual" || undefined} aria-labelledby={`${id}-membership-price`}>
             <h2 id={`${id}-membership-price`}>{details.plan_name}</h2>
             <p className={styles.price}><strong>{money(details.price_cents / 100)}</strong><span>/ {details.price_period}</span></p>
-            <Link href={`${membershipApplyPath}?plan=${id}`} className={`${styles.apply} button button-small ${id === "annual" ? "button-dark" : "button-outline"}`}
+            <Link href={`${membershipApplyPath}?plan=${id}`} className={`${styles.apply} button button-small button-dark`}
               aria-label={`Apply now for ${details.plan_name}`}>
               Apply now <ArrowUpRight size={16} aria-hidden="true" />
             </Link>
