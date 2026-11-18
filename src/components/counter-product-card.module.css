@@ -217,3 +217,11 @@
     background: #e9efde;
   }
 }
+
+@media (max-width: 650px) {
+  .card {
+    margin: -14px 8px 0;
+    border-radius: 16px;
+    box-shadow: 0 5px 16px rgb(20 42 30 / 10%);
+  }
+}

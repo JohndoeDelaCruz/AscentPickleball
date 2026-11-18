@@ -3218,47 +3218,66 @@ img {
 }
 @media (max-width: 650px) {
   .hero-layout {
-    margin-block: 18px 24px;
+    width: calc(100% - 24px);
+    margin-block: 12px 24px;
   }
   .hero {
-    border-radius: 11px;
+    border-radius: 24px;
   }
   .hero-copy,
   .hero-layout--with-products .hero-copy {
-    padding-inline: 24px;
+    justify-content: flex-end;
+    min-height: clamp(450px, 64svh, 560px);
+    padding: clamp(145px, 28svh, 210px) clamp(18px, 5vw, 30px) 38px;
   }
   .hero h1 {
-    font-size: clamp(46px, 14.5vw, 68px);
-    margin-bottom: 24px;
+    margin-bottom: 16px;
+    font-size: clamp(47px, 14vw, 76px);
+    font-weight: 800;
+    line-height: 0.9;
+  }
+  .hero-ascent {
+    margin-top: 3px;
+    padding-bottom: 0;
+  }
+  .hero-ascent .text-outline {
+    color: var(--lime);
+    -webkit-text-stroke: 0;
+  }
+  .hero-ascent > svg {
+    display: none;
   }
   .hero-description {
-    max-width: 280px;
-    margin-bottom: 24px;
-    font-size: 14px;
+    max-width: 34ch;
+    margin: 0 0 20px;
+    line-height: 1.55;
+  }
+  .hero-art {
+    object-position: 52% 48%;
   }
   .hero-visual:after {
-    background:
-      linear-gradient(90deg, rgba(10, 26, 18, 0.7), rgba(10, 26, 18, 0.28)),
-      linear-gradient(0deg, rgba(10, 26, 18, 0.76), transparent 70%);
+    background: linear-gradient(180deg, transparent 18%, rgb(10 22 15 / 12%) 32%, rgb(10 22 15 / 78%) 65%, #0a160f 100%);
   }
   .hero-buttons {
-    gap: 16px;
+    gap: 9px;
     flex-wrap: wrap;
   }
-  .hero-buttons .button {
-    gap: 12px;
-    padding: 14px 17px;
-    font-size: 14px;
+  .hero-buttons .button,
+  .hero-buttons .text-link {
+    justify-content: center;
+    min-height: 46px;
+    gap: 7px;
+    padding: 10px 13px;
+    border-radius: 999px;
+    font-size: 13px;
+    white-space: nowrap;
   }
   .hero-buttons .text-link {
-    gap: 8px;
-    font-size: 14px;
+    border: 1px solid rgb(248 249 243 / 45%);
+    background: rgb(10 22 15 / 24%);
   }
   .vertical-word {
-    top: 29px;
-    left: 24px;
-    font-size: 14px;
-    letter-spacing: 2px;
+    display: none;
   }
 }
 @media (max-width: 380px) {
@@ -3797,9 +3816,6 @@ img {
   }
   .mobile-menu {
     width: 32px;
-  }
-  .vertical-word {
-    font-size: 10px;
   }
 }
 :root:has(.site-header--admin) {

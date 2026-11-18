@@ -20,30 +20,32 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         {
           desktop: "(min-width: 851px)",
           mobile: "(max-width: 850px)",
+          portraitHero: "(max-width: 650px)",
           reducedMotion: "(prefers-reduced-motion: reduce)",
         },
         (context) => {
           if (context.conditions?.reducedMotion) return;
 
           const mobile = context.conditions?.mobile;
+          const portraitHero = context.conditions?.portraitHero;
           const animations = new Map<HTMLElement, gsap.core.Tween>();
           const hero = root.querySelector<HTMLElement>(".hero");
 
           if (hero && hero.getBoundingClientRect().bottom > 0) {
             const elements = root.querySelectorAll<HTMLElement>("[data-hero]");
             const entrance = gsap.from(elements, {
-              y: mobile ? 12 : 20,
+              y: mobile && !portraitHero ? 12 : 20,
               opacity: 0,
               duration: 0.65,
-              stagger: 0.1,
+              stagger: portraitHero ? 0.13 : 0.1,
               ease: "power2.out",
               clearProps: "opacity,transform",
             });
             elements.forEach((element) => animations.set(element, entrance));
 
             gsap.from(root.querySelector(".hero-art"), {
-              scale: 1.035,
-              duration: 1.2,
+              scale: portraitHero ? 1.09 : 1.035,
+              duration: portraitHero ? 2.1 : 1.2,
               ease: "power2.out",
               clearProps: "transform",
             });
