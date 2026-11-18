@@ -87,19 +87,16 @@ export default async function Home() {
             </div>
           </div>
           <div className="hero-visual">
-            <picture>
-              <source media="(max-width: 650px)" srcSet="/ascent-courts-hero.png" />
-              <Image
-                src="/ascent-courts-panorama.jpg"
-                alt="Ascent Pickleball’s red and gray courts"
-                unoptimized
-                fill
-                sizes="(max-width: 650px) calc(100vw - 24px), (max-width: 1100px) calc(100vw - 64px), 1280px"
-                loading="eager"
-                fetchPriority="high"
-                className="hero-art"
-              />
-            </picture>
+            <Image
+              src="/ascent-courts-panorama.jpg"
+              alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
+              unoptimized
+              fill
+              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), 1280px"
+              loading="eager"
+              fetchPriority="high"
+              className="hero-art"
+            />
             <div className="vertical-word">LET’S PLAY.</div>
           </div>
         </section>
