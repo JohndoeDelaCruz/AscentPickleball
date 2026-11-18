@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, Check, ClipboardList } from "lucide-react";
+import { Banknote, Check, ClipboardList, UserRound } from "lucide-react";
 import { assignCashier } from "@/app/(workspace)/staff/register-actions";
 import { posCommand } from "@/app/(workspace)/staff/actions";
 import { addDays, formatDate, localDate } from "@/lib/booking";
@@ -12,15 +12,7 @@ import { Modal } from "./modal";
 import { useAnimatedModal } from "./use-animated-modal";
 import styles from "./register-day.module.css";
 
-export function RegisterStatusCard({ data, shift, operator, ready }: {
-  data: RegisterData | null; shift?: Shift; operator: string; ready: boolean;
-}) {
-  return <section className={`console-panel ${styles.register}`} aria-label="Register status">
-    <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
-  </section>;
-}
-
-export function OnDutyCard({ data, date, manager, followToday }: {
+export function OnDutyControl({ data, date, manager, followToday }: {
   data: RegisterData | null; date: string; manager: boolean; followToday: boolean;
 }) {
   const router = useRouter();
@@ -49,31 +41,24 @@ export function OnDutyCard({ data, date, manager, followToday }: {
 
   const waiting = followToday && expired;
   const assignment = data?.assignment;
-  return <section className="console-panel" aria-label="On duty">
-    <div className="panel-heading">
-      <h2>On duty</h2>
-      {data && manager && !waiting && <button type="button" onClick={() => { setStatus(""); setEditing(true); }}>
-        {assignment ? "Edit assignment" : "Assign staff"}
-      </button>}
+  return <div className={styles.row} role="group" aria-label="Staff on duty">
+    <span className={styles.rowIcon}><UserRound size={16} aria-hidden="true" /></span>
+    <div className={styles.identity}>
+      <h2>Staff on duty</h2>
+      {data && !waiting ? <>
+        <p>{assignment?.name || assignment?.label || "Unassigned"}</p>
+        {assignment && !assignment.eligible && <small>No longer eligible</small>}
+        {data.operators.length > 0 && <small>Opened register: {data.operators.join(", ")}</small>}
+        {status && <small className={styles.saved} role="status">{status}</small>}
+      </> : <p role="status">{waiting ? "Checking the new day’s assignment…" : "Staff assignment unavailable"}</p>}
     </div>
-    {data && !waiting ? <>
-      <table className={`console-table ${styles.dutyTable}`} aria-label="Staff assignment for selected date">
-        <thead><tr><th scope="col">Name</th><th scope="col">Date</th></tr></thead>
-        <tbody><tr>
-          <td>
-            <strong>{assignment?.name || assignment?.label || "Unassigned"}</strong>
-            {assignment?.name && assignment.name !== assignment.label && <small>{assignment.label}</small>}
-            {assignment && !assignment.eligible && <small>No longer eligible</small>}
-          </td>
-          <td><time dateTime={date}>{formatDate(date, { month: "short", day: "numeric", year: "numeric" })}</time></td>
-        </tr></tbody>
-      </table>
-      {data.operators.length > 0 && <p className={styles.dutyNote}>Opened register: {data.operators.join(", ")}</p>}
-      {status && <p className={styles.dutyNote} role="status">{status}</p>}
-    </> : <p className="panel-empty-note" role="status">{waiting ? "Checking the new day’s assignment…" : "Staff assignment unavailable"}</p>}
+    {data && manager && !waiting && <button type="button" className="console-button small" aria-haspopup="dialog"
+      onClick={() => { setStatus(""); setEditing(true); }}>
+      {assignment ? "Edit assignment" : "Assign staff"}
+    </button>}
     {data && !waiting && editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
       onSaved={(message) => { setStatus(message); setEditing(null); }} />}
-  </section>;
+  </div>;
 }
 
 function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
@@ -132,6 +117,7 @@ export function RegisterControl({ data, shift, operator, ready, compact = false 
   const [status, setStatus] = useState("");
   const someoneElse = shift ? null : data?.active;
   return <div className={compact ? styles.compact : styles.row} role="group" aria-label="Front desk register">
+    {!compact && <span className={styles.rowIcon}><Banknote size={16} aria-hidden="true" /></span>}
     <div className={styles.identity}>
       {!compact && <h2>Front desk register</h2>}
       <p><span className={`${styles.dot} ${shift || someoneElse ? styles.active : ""}`} />
@@ -139,7 +125,7 @@ export function RegisterControl({ data, shift, operator, ready, compact = false 
           : someoneElse ? `Open · ${someoneElse.label}` : compact ? "Register closed" : "Shift closed"}</p>
       {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
-    {!someoneElse && <button type="button" className={compact ? "console-button small" : "button button-dark button-small"} disabled={!ready}
+    {!someoneElse && <button type="button" className="console-button small" disabled={!ready} aria-haspopup="dialog"
       onClick={() => { setStatus(""); setDialog(true); }}>
       {shift ? "Close shift" : "Open shift"}
     </button>}

@@ -21,8 +21,10 @@ function Heading() {
     <Block className={styles.action} />
   </div>;
 }
-function Stats({ count = 4, settings = false, finance = false }: { count?: number; settings?: boolean; finance?: boolean }) {
-  return <div className={settings ? "settings-metrics" : finance ? "finance-stats" : count === 3 ? "admin-stats" : "metrics-grid"}>
+function Stats({ count = 4, settings = false, finance = false, overview = false }: {
+  count?: number; settings?: boolean; finance?: boolean; overview?: boolean;
+}) {
+  return <div className={settings ? "settings-metrics" : finance ? "finance-stats" : count === 3 ? "admin-stats" : overview ? "metrics-grid overview-metrics" : "metrics-grid"}>
     {Array.from({ length: count }, (_, index) => <div className={`metric-card ${tones[settings ? (index + 3) % 4 : finance ? index % 3 : index % 4]} ${styles.metric}`} key={index}>
       <Block className={styles.label} /><Block className={styles.value} /><Block className={styles.hint} />
     </div>)}
@@ -46,11 +48,19 @@ function Fields({ count = 4 }: { count?: number }) {
   return <div className={`field-grid ${styles.fields}`}>{Array.from({ length: count }, (_, index) => <div className={styles.field} key={index}><Block className={styles.label} /><Block className={styles.input} /></div>)}</div>;
 }
 function Overview({ courtCount = 2 }: { courtCount?: number }) {
-  return <><Stats /><div className="overview-grid overview-operations">
-    <Panel>{Array.from({ length: Math.min(4, courtCount) }, (_, index) => <div className={styles.timeline} key={index}><Block className={styles.square} /><Block className={styles.label} /><Block className={styles.session} /></div>)}</Panel>
-    <Panel><Block className={styles.line} /><Block className={styles.line} /><Block className={styles.line} /></Panel>
-    <Panel><Block className={styles.line} /><Block className={styles.line} /></Panel>
-  </div><Table rows={3} /></>;
+  return <div className={`overview-content ${styles.overview}`}>
+    <div className="console-panel overview-register">
+      {["register", "staff"].map((key) => <div className={styles.registerRow} key={key}>
+        <Block className={styles.square} /><Block className={styles.label} /><Block className={styles.registerAction} />
+      </div>)}
+    </div>
+    <div className="overview-operations">
+      <Panel><Block className={styles.line} /><Block className={styles.line} /></Panel>
+      <Panel>{Array.from({ length: Math.min(4, courtCount) }, (_, index) => <div className={styles.timeline} key={index}><Block className={styles.label} /><Block className={styles.session} /></div>)}</Panel>
+    </div>
+    <Stats overview />
+    <Table rows={3} />
+  </div>;
 }
 function PointOfSale() {
   return <div className="pos-layout">

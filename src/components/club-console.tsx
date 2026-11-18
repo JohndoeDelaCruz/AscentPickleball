@@ -29,6 +29,7 @@ import { WorkspacePageHeading } from "./workspace-page-heading";
 import { useWorkspace } from "./workspace-context";
 import { reservationsForDateHref, workspaceTab, workspaceTabs, type WorkspaceTab as Tab } from "@/lib/workspace";
 import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
+import { formatHour } from "@/lib/booking";
 import {
   cartTotal,
   centavos,
@@ -45,7 +46,7 @@ import { toCsv } from "@/lib/finance";
 import { posCommand, type PosCommand } from "@/app/(workspace)/staff/actions";
 import { useAnimatedModal } from "./use-animated-modal";
 import { TablePagination, useTablePage } from "./table-pagination";
-import { OnDutyCard, RegisterStatusCard, RegisterShiftDialog } from "./register-day";
+import { OnDutyControl, RegisterControl, RegisterShiftDialog } from "./register-day";
 import { OverviewMetricValue } from "./overview-metric-value";
 import { ProductPhoto, ProductPhotoField } from "./product-photo";
 import { prepareProductPhoto, previewProductPhoto, productPhotoUrl } from "@/lib/product-photo";
@@ -216,6 +217,10 @@ export function ClubConsole({
     return () => setPendingCount?.(0);
   }, [pending.length, setPendingCount]);
   const todayBookings = data.bookings.filter((b) => b.booking_date === date);
+  const courtBookings = todayBookings.filter((b) =>
+    b.booking_type === "court" && b.status !== "cancelled" && b.status !== "expired",
+  );
+  const scheduledCourts = calendarCourts(data.courts ?? defaultCourts, courtBookings);
   const lowStock = data.products.filter(
     (p) => p.active && p.stock <= p.reorder_level,
   );
@@ -450,6 +455,21 @@ export function ClubConsole({
       setError(e instanceof Error ? e.message : "Please check the form.");
     }
   }
+  const saleStatus = (s: Sale) => s.status === "refunded" ? "Refunded" : s.paid_cents < s.total_cents ? "Part-paid" : "Paid";
+  const saleActions = (s: Sale) => (
+    <div className="row-actions">
+      <button type="button" title="View receipt" aria-label={`View receipt ${s.number}`}
+        onClick={() => {
+          setReceipt(s);
+          open("receipt");
+        }}>
+        <ReceiptText size={17} />
+      </button>
+      {manager && s.refunded_cents === 0 && s.paid_cents > 0 && (
+        <button type="button" className="refund-link" onClick={() => open("refund", s)}>Refund</button>
+      )}
+    </div>
+  );
   const tableSales = (list: Sale[], anchorId: string, label: string) => (
     <div id={anchorId} className="console-table-wrap" tabIndex={-1} role="region" aria-label={label}>
       <table className="console-table">
@@ -488,35 +508,10 @@ export function ClubConsole({
                 <span
                   className={`status-pill ${s.status === "refunded" ? "status-muted" : "status-ok"}`}
                 >
-                  {s.status === "refunded"
-                    ? "Refunded"
-                    : s.paid_cents < s.total_cents
-                      ? "Part-paid"
-                      : "Paid"}
+                  {saleStatus(s)}
                 </span>
               </td>
-              <td>
-                <div className="row-actions">
-                  <button
-                    title="View receipt"
-                    aria-label={`View receipt ${s.number}`}
-                    onClick={() => {
-                      setReceipt(s);
-                      open("receipt");
-                    }}
-                  >
-                    <ReceiptText size={17} />
-                  </button>
-                  {manager && s.refunded_cents === 0 && s.paid_cents > 0 && (
-                    <button
-                      className="refund-link"
-                      onClick={() => open("refund", s)}
-                    >
-                      Refund
-                    </button>
-                  )}
-                </div>
-              </td>
+              <td>{saleActions(s)}</td>
             </tr>
           ))}
         </tbody>
@@ -603,9 +598,76 @@ export function ClubConsole({
             courtCount={activeCourts(data.courts).length} />}
           <div hidden={isNavigating}>
           {tab === "overview" && (
-            <>
-              <RegisterStatusCard data={register} shift={shift} operator={operator} ready={data.ready} />
-              <div className="metrics-grid">
+            <div className="overview-content">
+              <div className="console-panel overview-register">
+                <RegisterControl data={register} shift={shift} operator={operator} ready={data.ready} />
+                <OnDutyControl key={initialDate} data={register} date={initialDate} manager={canAssign} followToday={followToday} />
+              </div>
+              <div className="overview-operations">
+                <section className="console-panel">
+                  <div className="panel-heading">
+                    <h2>Needs attention</h2>
+                    <span className="attention-count">{pending.length + lowStock.length}</span>
+                  </div>
+                  <button type="button" className="attention-row" onClick={() => go("bookings", true)}>
+                    <span className="attention-icon peach"><QrCode size={17} aria-hidden="true" /></span>
+                    <span>
+                      <strong>Payments to verify</strong>
+                      {overdue > 0 && <small className="review-overdue">{overdue} overdue</small>}
+                    </span>
+                    <b>{pending.length}</b>
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </button>
+                  <button type="button" className="attention-row" onClick={() => go("inventory")}>
+                    <span className="attention-icon lime"><Package size={17} aria-hidden="true" /></span>
+                    <span><strong>Low stock</strong></span>
+                    <b>{lowStock.length}</b>
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </button>
+                </section>
+                <section className="console-panel">
+                  <div className="panel-heading">
+                    <h2>Court schedule</h2>
+                    <Link href={`/admin?date=${date}`} className="overview-panel-link">
+                      Court calendar <ArrowUpRight size={15} aria-hidden="true" />
+                    </Link>
+                  </div>
+                  <div className="court-timeline">
+                    {scheduledCourts.map(({ id, name }) => {
+                      const bookings = courtBookings.filter((b) => b.court_id === id);
+                      return <div className="timeline-row" key={id}>
+                        <div className="timeline-court"><strong>{name}</strong></div>
+                        <div className="timeline-blocks">
+                          {bookings.map((b) => (
+                            <Link key={b.id}
+                              className={b.status === "confirmed" ? "block-confirmed" : b.status === "blocked" ? "block-closed" : "block-pending"}
+                              href={b.status === "blocked" ? `/admin?date=${date}` : reservationsForDateHref(date, b.reference)}>
+                              <strong>{formatHour(b.start_hour)}–{formatHour(b.start_hour + b.duration)}</strong>
+                              <span>{b.customer_name} · {statusName(b.status)}</span>
+                            </Link>
+                          ))}
+                          {!bookings.length && <span className="timeline-empty">No bookings</span>}
+                        </div>
+                      </div>;
+                    })}
+                    {data.openPlaySessions?.map(({ start, end, players, capacity }) => (
+                      <div className="timeline-row" key={`${start}:${end}`}>
+                        <div className="timeline-court">
+                          <strong>Open play</strong>
+                          <small>{formatHour(start)}–{formatHour(end)}</small>
+                        </div>
+                        <span className="overview-player-count">
+                          {capacity === null ? `${players} reserved` : `${players} / ${capacity} players`}
+                        </span>
+                      </div>
+                    ))}
+                    {!data.openPlaySessions && data.ready && <p className="overview-schedule-note">Open-play schedule unavailable.</p>}
+                    {scheduledCourts.length === 0 && data.openPlaySessions?.length === 0 &&
+                      <p className="overview-schedule-note">No courts scheduled for this date.</p>}
+                  </div>
+                </section>
+              </div>
+              <div className="metrics-grid overview-metrics">
                 <Metric
                   label="NET COLLECTIONS"
                   value={<OverviewMetricValue value={metrics.net} currency animate={!isNavigating}
@@ -618,7 +680,7 @@ export function ClubConsole({
                   label="COURT RESERVATIONS"
                   value={<OverviewMetricValue value={todayBookings.filter((b) => b.status === "confirmed").length} animate={!isNavigating}
                     trend={data.overviewTrends && { values: data.overviewTrends.reservations, label: "Daily confirmed reservations over the seven days ending on the selected date" }} />}
-                  hint={`${pending.length} payment${pending.length === 1 ? "" : "s"} to verify`}
+                  hint="Confirmed for the selected play date"
                   icon={<CalendarDays size={19} />}
                   tone="lavender"
                 />
@@ -639,133 +701,35 @@ export function ClubConsole({
                   tone="blue"
                 />
               </div>
-              <div className="overview-grid overview-operations">
-                <section className="console-panel">
-                  <div className="panel-heading">
-                    <h2>
-                      Court schedule{" "}
-                      <span className="subtle-pill">
-                        {todayBookings.length}
-                      </span>
-                    </h2>
-                    <button onClick={() => go("bookings")}>
-                      All reservations <ArrowUpRight size={15} />
-                    </button>
-                  </div>
-                  <div className="court-timeline">
-                    {calendarCourts(data.courts ?? defaultCourts, todayBookings).map(({ id: n, name }, index) => (
-                      <div className="timeline-row" key={n}>
-                        <div className={`court-icon court-icon-${index % 2 + 1}`}>
-                          <span />
-                          <b>{String(n).padStart(2, "0")}</b>
-                        </div>
-                        <div className="timeline-court">
-                          <strong>{name}</strong>
-                          <small>
-                            {
-                              todayBookings.filter(
-                                (b) =>
-                                  b.court_id === n && b.status === "confirmed",
-                              ).length
-                            }{" "}
-                            confirmed sessions
-                          </small>
-                        </div>
-                        <div className="timeline-blocks">
-                          {todayBookings
-                            .filter(
-                              (b) =>
-                                b.court_id === n &&
-                                !["cancelled", "expired"].includes(b.status),
-                            )
-                            .map((b) => (
-                              <button
-                                key={b.id}
-                                className={
-                                  b.status === "confirmed"
-                                    ? "block-confirmed"
-                                    : "block-pending"
-                                }
-                                onClick={() => {
-                                  go("bookings");
-                                  setSearch(b.customer_name);
-                                }}
-                              >
-                                <strong>
-                                  {hourLabel(b.start_hour)}–
-                                  {hourLabel(b.start_hour + b.duration)}
-                                </strong>
-                                <span>{b.customer_name}</span>
-                              </button>
-                            ))}
-                          {!todayBookings.some((b) => b.court_id === n) && (
-                            <span className="timeline-empty">
-                              No bookings
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="timeline-legend">
-                    <span>
-                      <i />
-                      Confirmed
-                    </span>
-                    <span>
-                      <i />
-                      Payment pending
-                    </span>
-                  </div>
-                </section>
-                <section className="console-panel review-panel">
-                  <div className="panel-heading">
-                    <h2>Needs attention</h2>
-                    <span className="attention-count">
-                      {pending.length + lowStock.length}
-                    </span>
-                  </div>
-                  <button
-                    className="attention-row"
-                    onClick={() => go("bookings", true)}
-                  >
-                    <span className="attention-icon lavender">
-                      <QrCode size={20} />
-                    </span>
-                    <span>
-                      <strong>Payments to verify</strong>
-                      {overdue > 0 && <small className="review-overdue">{overdue} overdue</small>}
-                    </span>
-                    <b>{pending.length}</b>
-                    <ChevronRight size={15} />
-                  </button>
-                  <button
-                    className="attention-row"
-                    onClick={() => go("inventory")}
-                  >
-                    <span className="attention-icon peach">
-                      <Package size={20} />
-                    </span>
-                    <span>
-                      <strong>Low stock</strong>
-                    </span>
-                    <b>{lowStock.length}</b>
-                    <ChevronRight size={15} />
-                  </button>
-                </section>
-                <OnDutyCard key={initialDate} data={register} date={initialDate} manager={canAssign} followToday={followToday} />
-              </div>
               <section className="console-panel">
                 <div className="panel-heading">
                   <h2>Recent transactions</h2>
-                  <button onClick={() => go("transactions")}>
-                    View all <ArrowUpRight size={15} />
+                  <button type="button" className="overview-panel-link" onClick={() => go("transactions")}>
+                    View all <ArrowUpRight size={15} aria-hidden="true" />
                   </button>
                 </div>
-                {tableSales(data.sales.slice(recentTransactions.start, recentTransactions.end), "recent-transactions", "Recent transactions")}
+                <div id="recent-transactions" tabIndex={-1} role="region" aria-label="Recent transactions">
+                  {data.sales.length ? (
+                    <ul className="overview-transactions">
+                      {data.sales.slice(recentTransactions.start, recentTransactions.end).map((s) => (
+                        <li key={s.id}>
+                          <div>
+                            <strong>{s.kind === "retail" ? "Counter sale" : s.kind === "membership" ? "Membership" : "Court booking"}</strong>
+                            <small>{s.customer_name} · {s.number}</small>
+                          </div>
+                          <div className="overview-transaction-amount">
+                            <strong>{peso(s.total_cents)}</strong>
+                            <small>{saleStatus(s)}{s.paid_cents < s.total_cents && ` · ${peso(s.total_cents - s.paid_cents)} outstanding`}</small>
+                          </div>
+                          {saleActions(s)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="overview-schedule-note">No transactions for this date.</p>}
+                </div>
                 <TablePagination {...recentTransactions} label="Recent transaction pages" anchorId="recent-transactions" />
               </section>
-            </>
+            </div>
           )}
           {tab === "pos" && (
             <div className="pos-layout">

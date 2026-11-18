@@ -1939,9 +1939,6 @@
   .review-panel {
     display: block;
   }
-  .attention-row {
-    padding: 17px 16px 0 !important;
-  }
   .attention-row strong {
     font-size: 14px;
   }

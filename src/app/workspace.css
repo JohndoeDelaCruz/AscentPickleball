@@ -1153,11 +1153,84 @@
 .club-app .panel-heading h2 { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
 .club-app .panel-heading > button { font-size: 13px; }
 .club-app .overview-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; }
-.club-app .overview-operations { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr) minmax(0, 1.3fr); }
-.club-app .attention-row { padding-block: 24px; }
-.club-app .attention-row strong { font-size: 14px; font-weight: 500; }
-.club-app .timeline-empty { color: #6f7b73; font-size: 13px; }
-.club-app .timeline-legend { padding-bottom: 18px; font-size: 12px; }
+.overview-content { container: staff-overview / inline-size; display: grid; gap: 14px; min-width: 0; }
+.overview-register, .overview-operations { display: grid; grid-template-columns: minmax(0, 1fr); }
+.overview-register > :nth-child(2) { border-block-start: 1px solid var(--line); }
+.overview-operations { gap: 14px; }
+.club-app .overview-content .panel-heading { min-height: 46px; padding: 10px 14px; gap: 8px; }
+.overview-content .overview-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green);
+  font-size: 13px;
+}
+.overview-panel-link:hover { text-decoration: underline; }
+.club-app .overview-content .attention-row { padding: 9px 14px; }
+.overview-content .attention-row + .attention-row { border-block-start: 1px solid var(--line); }
+.overview-content .attention-row:hover { background: #f7faf6; }
+.overview-content .attention-icon { width: 30px; height: 30px; }
+.overview-content .attention-row strong { font-size: 14px; }
+.overview-content .attention-row small { margin-top: 2px; }
+.overview-content .court-timeline { padding: 0 14px; }
+.overview-content .timeline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px;
+  padding: 8px 0;
+  min-height: 46px;
+}
+.overview-content .timeline-row:last-child { border-bottom: 0; }
+.overview-content .timeline-court { min-width: 0; overflow-wrap: anywhere; }
+.overview-content .timeline-court strong { font-weight: 600; }
+.overview-content .timeline-court small { margin: 0; }
+.overview-content .timeline-blocks { display: grid; gap: 5px; min-height: 0; overflow: visible; }
+.overview-content .timeline-blocks > a {
+  display: block;
+  padding: 6px 9px;
+  border-radius: 5px;
+  background: #eaf2e7;
+  color: var(--console-ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.overview-content .timeline-blocks > a:hover { text-decoration: underline; }
+.overview-content .timeline-blocks > .block-pending { background: #faf0df; }
+.overview-content .timeline-blocks > .block-closed { background: #eef1ee; }
+.overview-content .timeline-blocks span { margin-top: 0; }
+.overview-player-count { font-size: 13px; font-variant-numeric: tabular-nums; }
+.overview-schedule-note { padding: 12px 14px; margin: 0; color: var(--console-muted); font-size: 13px; }
+.overview-content .court-timeline .overview-schedule-note { padding-inline: 0; }
+.club-app .overview-content .overview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0; gap: 12px; }
+.club-app .overview-metrics .metric-card { padding: 11px 13px; }
+.club-app .overview-metrics .metric-card > div > svg { display: none; }
+.club-app .overview-metrics .metric-card > div > span { color: var(--console-ink); font-weight: 600; }
+.club-app .overview-metrics .metric-card > strong { margin-top: 4px; font-size: clamp(17px, 4cqi, 23px); }
+.club-app .overview-metrics .metric-card > p { margin: 4px 0 0; min-height: 0; line-height: 1.45; }
+.overview-metrics .overview-sparkline { width: clamp(20px, 24%, 62px); }
+.overview-transactions { list-style: none; margin: 0; padding: 0; }
+.overview-transactions > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 9px 14px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.overview-transactions > li + li { border-block-start: 1px solid var(--line); }
+.overview-transactions > li > div:first-child { flex: 1 1 120px; }
+.overview-transaction-amount { text-align: end; }
+.overview-transactions small { display: block; color: var(--console-muted); font-size: 12px; }
+.overview-transactions .row-actions { flex: none; }
+@container staff-overview (min-width: 550px) {
+  .overview-register { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-register > :nth-child(2) { border-block-start: 0; border-inline-start: 1px solid var(--line); }
+}
+@container staff-overview (min-width: 740px) {
+  .overview-operations { grid-template-columns: minmax(0, 3fr) minmax(0, 5fr); }
+  .club-app .overview-content .overview-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 .club-app :is(.console-table, .admin-table) { font-size: 14px; }
 .club-app :is(.console-table, .admin-table) th { padding: 13px 18px; font-size: 12px; font-weight: 550; color: #69786e; background: #f8faf8; letter-spacing: .025em; border-color: #e9eeea; }
 .club-app :is(.console-table, .admin-table) td { padding: 16px 18px; border-color: #e9eeea; font-size: 14px; }
@@ -1251,10 +1324,6 @@
   .club-app .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .club-app .overview-grid { grid-template-columns: minmax(0, 1fr); }
   .club-app .workspace-account-grid { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
-}
-@media (min-width: 1101px) and (max-width: 1299px) {
-  .club-app .overview-operations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .club-app .overview-operations > :last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 650px) {
   .club-app .management-sidebar { padding-top: 22px; }

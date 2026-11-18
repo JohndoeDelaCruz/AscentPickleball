@@ -1,11 +1,7 @@
-.register { margin-bottom: 14px; }
-.dutyTable { table-layout: fixed; }
-.dutyTable :is(th, td):first-child { width: 60%; overflow-wrap: anywhere; }
-.dutyTable td { vertical-align: top; }
-.dutyNote { margin: 0; padding: 12px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .row, .context { display: flex; gap: 12px; align-items: center; }
-.row { min-width: 0; padding: 10px clamp(12px, 2vw, 16px); }
+.row { min-width: 0; flex-wrap: wrap; padding: 10px 14px; }
 .row > button { flex: none; }
+.rowIcon { display: grid; place-items: center; width: 32px; height: 32px; flex: none; color: var(--green); background: #edf3e8; border-radius: 6px; }
 .compact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .compact .identity { flex: 0 1 auto; }
 .compact .identity p { color: var(--console-muted); font-size: 13px; }
@@ -13,6 +9,9 @@
 .identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .identity h2 { font: 600 15px/1.35 var(--font-body), sans-serif; margin: 0 0 3px; }
 .identity p { margin: 0; color: var(--ink); font-size: 14px; }
+.row .identity { flex-basis: 110px; }
+.row .identity h2 { margin-bottom: 1px; font-size: 14px; }
+.row .identity p { color: var(--console-muted); font-size: 13px; }
 .identity small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
 .identity .saved { color: var(--green); font-weight: 550; }
 .dot { display: inline-block; vertical-align: 2px; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; background: #88918a; }

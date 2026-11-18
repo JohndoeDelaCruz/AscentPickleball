@@ -97,6 +97,12 @@ export type OverviewTrends = {
   retail: number[];
   balances: number[];
 };
+export type OverviewOpenPlaySession = {
+  start: number;
+  end: number;
+  players: number;
+  capacity: number | null;
+};
 export type PosData = {
   courts?: Court[];
   products: Product[];
@@ -108,6 +114,7 @@ export type PosData = {
   bookings: PosBooking[];
   paymentReviews?: PosPaymentReview[];
   overviewTrends?: OverviewTrends;
+  openPlaySessions?: OverviewOpenPlaySession[];
   role: string;
   ready: boolean;
   error?: string;
