@@ -27,7 +27,7 @@ import {
 import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { WorkspacePageHeading } from "./workspace-page-heading";
 import { useWorkspace } from "./workspace-context";
-import { workspaceTab, workspaceTabs, type WorkspaceTab as Tab } from "@/lib/workspace";
+import { reservationsForDateHref, workspaceTab, workspaceTabs, type WorkspaceTab as Tab } from "@/lib/workspace";
 import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
 import {
   cartTotal,
@@ -50,6 +50,8 @@ import { OverviewMetricValue } from "./overview-metric-value";
 import { ProductPhoto, ProductPhotoField } from "./product-photo";
 import { prepareProductPhoto, previewProductPhoto, productPhotoUrl } from "@/lib/product-photo";
 import type { RegisterDay as RegisterData } from "@/lib/register";
+import { BalancePaymentModal } from "./balance-payment-modal";
+import { StaffCancelBookingModal } from "./staff-cancel-booking-modal";
 type Modal =
   | "checkout"
   | "product"
@@ -108,6 +110,8 @@ export function ClubConsole({
   const [category, setCategory] = useState("All items");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [modal, setModal, modalClosing] = useAnimatedModal<Modal>();
+  const [reservationAction, setReservationAction, reservationActionClosing] =
+    useAnimatedModal<{ kind: "cancel" | "balance"; booking: PosBooking }>();
   const [selected, setSelected] = useState<Product | Sale | PosBooking | null>(
     null,
   );
@@ -180,8 +184,10 @@ export function ClubConsole({
   );
   const overdue = data.paymentReviews?.filter((b) => b.overdue).length ?? 0;
   const reviewOnly = params.get("review") === "1";
+  const dayOnly = tab === "bookings" && params.get("scope") === "day";
   const reviewingPayment = modal === "verify" || modal === "reject-payment";
   const reservationRows = (reviewOnly ? pending : data.bookings).filter((b) =>
+    (reviewOnly || !dayOnly || b.booking_date === initialDate) &&
     `${b.customer_name} ${b.reference}`.toLowerCase().includes(search.toLowerCase()),
   );
   const products = data.products.filter((p) =>
@@ -191,19 +197,19 @@ export function ClubConsole({
     `${s.number} ${s.customer_name}`.toLowerCase().includes(search.toLowerCase()),
   );
   const dailySales = data.sales.filter((s) => dayKey(s.created_at) === date);
-  const reservations = useTablePage(reservationRows.length, `${initialDate}:${tab}:${reviewOnly}:${search}`);
+  const reservations = useTablePage(reservationRows.length, `${initialDate}:${tab}:${reviewOnly}:${dayOnly}:${search}`);
   const inventory = useTablePage(products.length, `${tab}:${search}`);
   const transactions = useTablePage(transactionRows.length, `${initialDate}:${tab}:${search}`);
   const recentTransactions = useTablePage(data.sales.length, `${initialDate}:${tab}`, 5);
   const collections = useTablePage(dailySales.length, `${initialDate}:${tab}`);
   const paymentReviews = new Map(data.paymentReviews?.map((b) => [b.id, b]));
   useEffect(() => {
-    if ((tab !== "overview" && tab !== "bookings") || modal || isNavigating || !data.ready) return;
+    if ((tab !== "overview" && tab !== "bookings") || modal || reservationAction || isNavigating || !data.ready) return;
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") router.refresh();
     }, 60000);
     return () => clearInterval(interval);
-  }, [tab, modal, isNavigating, data.ready, router]);
+  }, [tab, modal, reservationAction, isNavigating, data.ready, router]);
   const setPendingCount = workspace?.setPendingCount;
   useEffect(() => {
     setPendingCount?.(pending.length);
@@ -229,6 +235,7 @@ export function ClubConsole({
     const url = new URL(window.location.href);
     url.searchParams.set("tab", t);
     url.searchParams.delete("q");
+    if (t !== "bookings") url.searchParams.delete("scope");
     if (paymentReview) url.searchParams.set("review", "1");
     else url.searchParams.delete("review");
     window.history.replaceState(null, "", url);
@@ -555,7 +562,8 @@ export function ClubConsole({
                     onChange={(e) => {
                       if (!e.target.value) return;
                       setDate(e.target.value);
-                      startNavigation(() => router.push(`/staff?date=${e.target.value}&tab=${tab}`));
+                      const nextDate = e.target.value;
+                      startNavigation(() => router.push(dayOnly ? reservationsForDateHref(nextDate) : `/staff?date=${nextDate}&tab=${tab}`));
                     }}
                   />
                 </label>
@@ -963,11 +971,14 @@ export function ClubConsole({
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
+                {dayOnly && !reviewOnly && <Link className="text-link" href={`/staff?tab=bookings&date=${date}`}>
+                  Show upcoming reservations
+                </Link>}
               </div>
               <div className="category-tabs payment-review-tabs" role="group" aria-label="Reservation views">
                 <button type="button" aria-pressed={!reviewOnly} className={!reviewOnly ? "active" : ""}
                   onClick={() => go("bookings")}>
-                  All reservations
+                  {dayOnly ? "Reservations for this date" : "All reservations"}
                 </button>
                 <button type="button" aria-pressed={reviewOnly} className={reviewOnly ? "active" : ""}
                   onClick={() => go("bookings", true)}>
@@ -1002,7 +1013,9 @@ export function ClubConsole({
                         <tr key={b.id}>
                           <td>
                             <strong>{b.customer_name}</strong>
-                            <small>{b.reference}</small>
+                            <small>{manager && b.status !== "blocked"
+                              ? <Link className="text-link" href={`/booking/${b.id}`}>{b.reference}</Link>
+                              : b.reference}</small>
                           </td>
                           <td>
                             {b.booking_type === "open_play"
@@ -1035,6 +1048,7 @@ export function ClubConsole({
                             )}
                           </td>
                           <td>
+                            <div className="reservation-row-actions">
                             {b.status === "awaiting_verification" ? (
                               <button
                                 className="console-button small primary"
@@ -1046,7 +1060,7 @@ export function ClubConsole({
                               Number(b.paid_amount) < Number(b.total_amount) ? (
                               <button
                                 className="console-button small"
-                                onClick={() => open("balance", b)}
+                                onClick={() => manager ? setReservationAction({ kind: "balance", booking: b }) : open("balance", b)}
                               >
                                 Collect balance
                               </button>
@@ -1055,6 +1069,11 @@ export function ClubConsole({
                                 {b.status === "confirmed" ? "Fully paid" : "—"}
                               </span>
                             )}
+                            {manager && ["awaiting_payment", "awaiting_verification", "confirmed"].includes(b.status) &&
+                              <button type="button" className="console-button small"
+                                aria-label={`Cancel reservation ${b.reference}`}
+                                onClick={() => setReservationAction({ kind: "cancel", booking: b })}>Cancel reservation</button>}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1368,6 +1387,17 @@ export function ClubConsole({
             <X size={15} />
           </button>
         </div>
+      )}
+      {reservationAction?.kind === "balance" && (
+        <BalancePaymentModal booking={reservationAction.booking} closing={reservationActionClosing}
+          onClose={() => setReservationAction(null)} />
+      )}
+      {reservationAction?.kind === "cancel" && (
+        <StaffCancelBookingModal booking={reservationAction.booking} closing={reservationActionClosing}
+          onClose={() => setReservationAction(null)} onSaved={() => {
+            setReservationAction(null);
+            setToast("Reservation cancelled.");
+          }} />
       )}
       {(modal === "open" || modal === "close") && (
         <RegisterShiftDialog key={modal} shift={modal === "close" ? shift : undefined} operator={operator}

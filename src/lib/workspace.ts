@@ -24,6 +24,12 @@ export function workspaceTab(value: unknown): WorkspaceTab {
   return workspaceTabs.find((tab) => tab.id === value)?.id ?? "overview";
 }
 
+export function reservationsForDateHref(date: string, reference?: string) {
+  const query = new URLSearchParams({ tab: "bookings", date, scope: "day" });
+  if (reference) query.set("q", reference);
+  return `/staff?${query}`;
+}
+
 export function workspaceView(path: string, tab?: unknown): WorkspaceView {
   if (path === "/admin/settings") return "settings";
   if (path === "/admin/finance") return "finance";

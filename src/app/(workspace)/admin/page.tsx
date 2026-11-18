@@ -52,7 +52,6 @@ async function CalendarData({ date }: { date: string }) {
       venue={venue}
       manager={manager}
       register={register}
-      canAssign={role === "manager" || role === "owner"}
       operator={user?.email ?? "Signed-in staff"}
     />
   );
@@ -67,7 +66,7 @@ async function readCalendarBookings(
   const bookings: CalendarBooking[] = [];
   let lastId: string | undefined;
 
-  // The grid, totals, and review table all need the full day, even past the API row limit.
+  // The grid and session counts need the full day, even past the API row limit.
   for (;;) {
     const base = manager
       ? supabase.from("bookings").select("*").eq("booking_date", date)

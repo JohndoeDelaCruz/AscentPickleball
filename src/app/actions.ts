@@ -288,6 +288,7 @@ export async function staffSetStatus(
     });
     if (error) return { error: bookingError(error) };
     revalidatePath("/admin");
+    revalidatePath("/staff");
     revalidatePath("/my-bookings/all");
     revalidatePath(`/booking/${id}`);
     revalidatePath("/admin/finance");

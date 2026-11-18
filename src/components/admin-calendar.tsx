@@ -1,475 +1,170 @@
 "use client";
-import { WorkspacePageHeading } from "./workspace-page-heading";
-import type { CSSProperties } from "react";
-import { activeCourts, calendarCourts, courtName, defaultCourts } from "@/lib/courts";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { CalendarDays, Check, Plus, X, Wallet } from "lucide-react";
-import {
-  addDays,
-  formatDate,
-  formatHour,
-  localDate,
-  money,
-  courtScheduleLabel,
-  openPlayCapacityLabel,
-  equipmentBookingLabel,
-} from "@/lib/booking";
-import { bookingStatusLabel, type CalendarBooking, type VenueSettings } from "@/lib/types";
-import { staffSetStatus } from "@/app/actions";
-import { Modal } from "./modal";
-import { useAnimatedModal } from "./use-animated-modal";
-import { bookingPayments } from "@/lib/payment";
-import { BalancePaymentModal } from "./balance-payment-modal";
-import { resolveSchedule, scheduleHours } from "@/lib/schedule";
-import { TablePagination, useTablePage } from "./table-pagination";
-import { CreateBookingModal } from "./create-booking-modal";
-import { RegisterPanel } from "./register-day";
-import type { RegisterDay as RegisterData } from "@/lib/register";
 
-export function AdminCalendar({
-  bookings,
-  date,
-  venue,
-  manager,
-  register,
-  canAssign,
-  operator,
-}: {
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight, CalendarDays, Plus } from "lucide-react";
+import { addDays, courtScheduleLabel, formatDate, formatHour, isPastSlot, localDate, money } from "@/lib/booking";
+import { activeCourts, calendarCourts, defaultCourts } from "@/lib/courts";
+import type { RegisterDay as RegisterData } from "@/lib/register";
+import { resolveSchedule, scheduleHours, type ScheduleBlock } from "@/lib/schedule";
+import { bookingStatusLabel, type CalendarBooking, type VenueSettings } from "@/lib/types";
+import { reservationsForDateHref } from "@/lib/workspace";
+import { CreateBookingModal } from "./create-booking-modal";
+import { RegisterControl } from "./register-day";
+import { StaffCancelBookingModal } from "./staff-cancel-booking-modal";
+import { TablePagination, useTablePage } from "./table-pagination";
+import { useAnimatedModal } from "./use-animated-modal";
+import { WorkspacePageHeading } from "./workspace-page-heading";
+import styles from "./admin-calendar.module.css";
+
+type CalendarRow = { hour: number; session?: ScheduleBlock };
+
+export function AdminCalendar({ bookings, date, venue, manager, register, operator }: {
   bookings: CalendarBooking[];
   date: string;
   venue: VenueSettings;
   manager: boolean;
   register: RegisterData | null;
-  canAssign: boolean;
   operator: string;
 }) {
-  const [createOpen, setCreateOpen, createClosing] = useAnimatedModal<true>();
-  const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
-  const [balanceBooking, setBalanceBooking, balanceClosing] = useAnimatedModal<CalendarBooking>();
-  const [action, setAction, actionClosing] = useAnimatedModal<{
-    booking: CalendarBooking;
-    status: "confirmed" | "cancelled";
-  }>();
-  const [error, setError] = useState("");
-  const [walkInSaved, setWalkInSaved] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const reservations = useTablePage(bookings.length, date);
   const router = useRouter();
-  const active = bookings.filter(
-    (b) => !["cancelled", "expired"].includes(b.status),
-  );
+  const [createOpen, setCreateOpen, createClosing] = useAnimatedModal<true>();
+  const [blockedBooking, setBlockedBooking, releaseClosing] = useAnimatedModal<CalendarBooking>();
+  const [walkInSaved, setWalkInSaved] = useState(false);
+  const courts = calendarCourts(venue.courts ?? defaultCourts, bookings);
+  const activeCourtCount = activeCourts(venue.courts).length;
+  const activeBookings = bookings.filter(({ status }) => status !== "cancelled" && status !== "expired");
+  const privateBookings = activeBookings.filter(({ booking_type }) => booking_type === "court");
   const schedule = resolveSchedule(venue, date);
-  const sessions = schedule.blocks.filter(
-    (block) => block.kind === "open_play",
-  );
-  const hours = [
-    ...new Set([
-      ...scheduleHours(schedule.blocks),
-      ...active.flatMap((b) =>
-        Array.from({ length: b.duration }, (_, i) => b.start_hour + i),
-      ),
-    ]),
-  ].sort((a, b) => a - b);
-  const courtHours = useTablePage(hours.length, date);
+  const sessions = schedule.blocks.filter(({ kind }) => kind === "open_play");
+  const hours = [...new Set([
+    ...scheduleHours(schedule.blocks),
+    ...activeBookings.flatMap(({ start_hour, duration }) =>
+      Array.from({ length: duration }, (_, offset) => start_hour + offset)),
+  ])].sort((a, b) => a - b);
+  const rows = hours.flatMap<CalendarRow>((hour) => {
+    const session = sessions.find(({ start, end }) => start <= hour && hour < end);
+    if (!session) return [{ hour }];
+    const entries: CalendarRow[] = hour === session.start ? [{ hour, session }] : [];
+    // A court block can close an open-play session. Keep affected court slots visible.
+    if (privateBookings.some((booking) => overlaps(booking, hour, hour + 1))) entries.push({ hour });
+    return entries;
+  });
+  const pagination = useTablePage(rows.length, date);
 
-  function update() {
-    if (!action) return;
-    setError("");
-    startTransition(async () => {
-      const result = await staffSetStatus(action.booking.id, action.status);
-      if (result.error) setError(result.error);
-      else {
-        setAction(null);
-        router.refresh();
-      }
-    });
-  }
-  return (
-    <>
-      <WorkspacePageHeading title="Court calendar" actions={
-        <button
-          className="button button-dark button-small"
-          onClick={() => {
-            setWalkInSaved(false);
-            setCreateOpen(true);
-          }}
-        >
-          <Plus size={16} />
-          {manager ? "Add booking or block" : "Add walk-in"}
-        </button>
-      } />
-      {walkInSaved && <p className="success-message" role="status">Walk-in booking saved.</p>}
-      <div className="admin-stats">
-        <div className="panel stat-card">
-          <span>Active reservations</span>
-          <strong>{active.filter((b) => b.status !== "blocked").length}</strong>
-        </div>
-        <div className="panel stat-card">
-          <span>Payments to review</span>
-          <strong>
-            {active.filter((b) => b.status === "awaiting_verification").length}
-          </strong>
-          <Link className="text-link" href="/staff?tab=bookings&review=1">
-            Open GCash review queue
-          </Link>
-        </div>
-        <div className="panel stat-card">
-          <span>Confirmed booking value</span>
-          <strong>
-            {money(
-              active
-                .filter((b) => b.status === "confirmed")
-                .reduce((sum, b) => sum + Number(b.total_amount), 0),
-            )}
-          </strong>
-        </div>
+  return <div className={styles.calendar}>
+    <WorkspacePageHeading title="Court calendar" actions={<>
+      <label className="console-date">
+        <CalendarDays size={16} aria-hidden="true" />
+        <input type="date" aria-label="View date" value={date}
+          min={addDays(localDate(), -365)} max={addDays(localDate(), 30)}
+          onChange={(event) => event.target.value && router.push(`/admin?date=${event.target.value}`)} />
+      </label>
+      <button type="button" className="console-button primary" onClick={() => {
+        setWalkInSaved(false);
+        setCreateOpen(true);
+      }}>
+        <Plus size={16} aria-hidden="true" /> {manager ? "Add booking or block" : "Add walk-in"}
+      </button>
+    </>} />
+    <div className={styles.dayBar}>
+      <div>
+        <h2><time dateTime={date}>{formatDate(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</time></h2>
+        <span>Philippine time</span>
       </div>
-      <div className="admin-toolbar">
-        <h2>
-          {formatDate(date, {
-            weekday: "short",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </h2>
-        <label className="field">
-          <span>View date</span>
-          <input
-            type="date"
-            value={date}
-            min={addDays(localDate(), -365)}
-            max={addDays(localDate(), 30)}
-            onChange={(e) =>
-              e.target.value && router.push(`/admin?date=${e.target.value}`)
+      {register && <RegisterControl compact data={register} shift={register.active?.own_shift ?? undefined} operator={operator} ready />}
+    </div>
+    {walkInSaved && <p className="success-message" role="status">Walk-in booking saved.</p>}
+    {schedule.override && <p className={styles.override}>
+      {schedule.override.name} · through {formatDate(schedule.override.end_date)}.
+      {" "}Regular hours resume {formatDate(addDays(schedule.override.end_date, 1))}.
+    </p>}
+    {courts.length > 0 && rows.length > 0 ? <section className="console-panel">
+      <div id="calendar-court-slots" tabIndex={-1} role="region" aria-label="Court calendar time slots" className={styles.schedule}>
+        <table className={styles.table} style={courts.length > 2 ? { minWidth: 72 + courts.length * 136 } : undefined}>
+          <colgroup><col className={styles.timeColumn} />{courts.map(({ id }) => <col key={id} />)}</colgroup>
+          <thead><tr>
+            <th scope="col">Time</th>
+            {courts.map(({ id, name, active }) => <th scope="col" key={id}>{name}{!active && <small>Inactive</small>}</th>)}
+          </tr></thead>
+          <tbody>{rows.slice(pagination.start, pagination.end).map(({ hour, session }) => {
+            if (session) {
+              const players = activeBookings
+                .filter((b) => b.booking_type === "open_play" && b.start_hour === session.start && b.start_hour + b.duration === session.end)
+                .reduce((sum, b) => sum + b.participant_count, 0);
+              const conflict = privateBookings.some((b) => overlaps(b, session.start, session.end));
+              return <tr key={session.id}>
+                <th scope="row">{formatHour(hour)}</th>
+                <td colSpan={courts.length}>
+                  <div className={`${styles.slot} ${styles.openPlay}`}>
+                    <div>
+                      <strong>{activeCourtCount === 2 ? "Open play · both courts" : "Open play"}</strong>
+                      <small>{formatHour(session.start)}–{formatHour(session.end)} · {money(session.rate)} / person</small>
+                    </div>
+                    <div className={styles.capacity}>
+                      <strong>{session.capacity === null ? `${players} reserved` : `${players} / ${session.capacity} players`}</strong>
+                      {session.capacity === null && <small>No player limit</small>}
+                      {conflict && <small>Court reserved or blocked</small>}
+                    </div>
+                  </div>
+                </td>
+              </tr>;
             }
-          />
-        </label>
+            const available = schedule.blocks.some((block) => block.kind === "court" && hour >= block.start && hour < block.end);
+            const emptyLabel = sessions.some(({ start, end }) => start <= hour && hour < end) ? "Unavailable" : available
+              ? isPastSlot(date, hour) ? "Past time" : "Available"
+              : courtScheduleLabel(venue, date, hour) ?? "Closed";
+            return <tr key={hour}>
+              <th scope="row">{formatHour(hour)}</th>
+              {courts.map(({ id, name, active }) => {
+                const booking = privateBookings.find((b) => b.court_id === id && overlaps(b, hour, hour + 1));
+                return <td key={id}>
+                  {booking ? <CalendarSlot booking={booking} date={date} manager={manager}
+                    court={name} onRelease={() => setBlockedBooking(booking)} />
+                    : <span className={styles.emptySlot}>{active ? emptyLabel : "Inactive"}</span>}
+                </td>;
+              })}
+            </tr>;
+          })}</tbody>
+        </table>
       </div>
-      {register && <RegisterPanel data={register} date={date} manager={canAssign} shift={register.active?.own_shift ?? undefined} operator={operator} ready />}
-      {schedule.override && (
-        <div className="notice" style={{ marginBottom: 20 }}>
-          {schedule.override.name} · through{" "}
-          {formatDate(schedule.override.end_date)}. Regular hours resume{" "}
-          {formatDate(addDays(schedule.override.end_date, 1))}.
-        </div>
-      )}
-      {!hours.length && (
-        <div className="notice" style={{ marginBottom: 20 }}>
-          No scheduled court time on this date.
-        </div>
-      )}
-      <div style={{ marginBottom: 28 }}>
-      <div id="calendar-court-slots" tabIndex={-1} role="region" aria-label="Court calendar time slots"
-        className="availability-grid dynamic-court-grid" style={{ "--court-columns": Math.max(1, courts.length) } as CSSProperties}>
-        <div className="availability-header">
-          <div>PHT / UTC+8</div>
-          {courts.map((court) => <div key={court.id}>{court.name}{!court.active && " · Inactive"}</div>)}
-        </div>
-        {hours.slice(courtHours.start, courtHours.end).map((hour) => (
-          <div className="availability-row" key={hour}>
-            <div className="time-label">{formatHour(hour)}</div>
-            {courts.map(({ id: court }) => {
-              const b = active.find(
-                (b) =>
-                  b.court_id === court &&
-                  hour >= b.start_hour &&
-                  hour < b.start_hour + b.duration,
-              );
-              return (
-                <div className="slot-cell" key={court}>
-                  {b ? (
-                    <span
-                      className={`status-badge status-${b.status}`}
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        minHeight: 34,
-                        borderRadius: 4,
-                        fontSize: 14,
-                      }}
-                    >
-                      {b.status === "blocked"
-                        ? b.customer_name
-                        : `${b.customer_name} · ${bookingStatusLabel(b)}`}
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        height: 34,
-                        fontSize: 14,
-                        color: "var(--muted)",
-                      }}
-                    >
-                      {courtScheduleLabel(venue, date, hour) || "—"}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-        <TablePagination {...courtHours} label="Court calendar time slot pages" anchorId="calendar-court-slots" />
-      </div>
-      {sessions.map((session) => (
-        <div className="notice" style={{ marginBottom: 24 }} key={session.id}>
-          <span>
-            <strong>
-              Open play · {formatHour(session.start)}–{formatHour(session.end)}
-            </strong>
-            <br />
-            {active
-              .filter(
-                (b) =>
-                  b.booking_type === "open_play" &&
-                  b.start_hour === session.start &&
-                  b.duration === session.end - session.start,
-              )
-              .reduce((sum, b) => sum + b.participant_count, 0)}{" "}
-            players held or confirmed · {money(session.rate)} per person ·{" "}
-            {openPlayCapacityLabel(session.capacity, activeCourts(venue.courts).length)}
-          </span>
-        </div>
-      ))}
-      <section className="panel" aria-labelledby="calendar-reservation-review" style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "22px 24px" }}>
-          <h3 id="calendar-reservation-review" tabIndex={-1} style={{ fontSize: 17, margin: 0 }}>
-            Reservations & payment review
-          </h3>
-          <p className="small-print">
-            {manager
-              ? "Check incoming transactions in GCash before confirming. Cancelling a paid booking does not issue a refund."
-              : <Link className="text-link" href={`/staff?tab=bookings&date=${date}`}>Review payments and collect balances in Reservations</Link>}
-          </p>
-        </div>
-        {!bookings.length ? (
-          <div className="empty-state" style={{ border: 0 }}>
-            <CalendarDays />
-            <h2>No reservations</h2>
-            <p>There are no bookings for this date.</p>
-          </div>
-        ) : (
-          <div className="table-scroll">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Player / reference</th>
-                  <th>Court & time</th>
-                  <th>Amount</th>
-                  <th>GCash reference</th>
-                  <th>Status</th>
-                  {manager && <th>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.slice(reservations.start, reservations.end).map((b) => (
-                  <tr key={b.id}>
-                    <td>
-                      <strong>{b.customer_name}</strong>
-                      <small>
-                        {b.reference}
-                        {b.customer_phone && (
-                          <>
-                            {" "}
-                            ·{" "}
-                            <a href={`tel:${b.customer_phone}`}>
-                              {b.customer_phone}
-                            </a>
-                          </>
-                        )}
-                      </small>
-                    </td>
-                    <td>
-                      {b.booking_type === "open_play"
-                        ? `Open play · ${b.participant_count} ${b.participant_count === 1 ? "player" : "players"}`
-                        : courtName(venue.courts, b.court_id)}
-                      <small>
-                        {formatHour(b.start_hour)} –{" "}
-                        {formatHour(b.start_hour + b.duration)}
-                      </small>
-                      {b.equipment_rental && (
-                        <small>
-                          Equipment: {equipmentBookingLabel(b)} ·{" "}
-                          {money(b.equipment_amount)}
-                        </small>
-                      )}
-                    </td>
-                    <td>
-                      {money(b.total_amount)}
-                      {b.status !== "blocked" && (
-                        <>
-                          <small>
-                            {b.payment_option === "reservation_fee"
-                              ? "50% reservation fee"
-                              : "Full payment"}
-                          </small>
-                          <small>Paid: {money(bookingPayments(b).paid)}</small>
-                          {b.status === "confirmed" ? (
-                            <small>
-                              {bookingPayments(b).balance > 0
-                                ? `Balance: ${money(bookingPayments(b).balance)}`
-                                : "Fully paid"}
-                            </small>
-                          ) : (
-                            [
-                              "awaiting_payment",
-                              "awaiting_verification",
-                            ].includes(b.status) && (
-                              <small>
-                                Due now: {money(bookingPayments(b).initial)}
-                              </small>
-                            )
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td>{b.payment_reference || "—"}</td>
-                    <td>
-                      <span className={`status-badge status-${b.status}`}>
-                        {bookingStatusLabel(b)}
-                      </span>
-                    </td>
-                    {manager && <td>
-                      <div className="table-actions">
-                        {b.status === "confirmed" &&
-                          bookingPayments(b).balance > 0 && (
-                            <button
-                              aria-label={`Record balance for ${b.reference}`}
-                              title="Record balance payment"
-                              onClick={() => setBalanceBooking(b)}
-                            >
-                              <Wallet size={16} />
-                            </button>
-                          )}
-                        {["awaiting_payment", "awaiting_verification"].includes(
-                          b.status,
-                        ) && (
-                          <button
-                            aria-label={`Confirm ${b.reference}`}
-                            title="Confirm after verifying payment"
-                            onClick={() => {
-                              setAction({ booking: b, status: "confirmed" });
-                              setError("");
-                            }}
-                          >
-                            <Check size={15} />
-                          </button>
-                        )}
-                        {!["cancelled", "expired"].includes(b.status) && (
-                          <button
-                            className="danger"
-                            aria-label={`Cancel ${b.reference}`}
-                            title="Cancel / release court"
-                            onClick={() => {
-                              setAction({ booking: b, status: "cancelled" });
-                              setError("");
-                            }}
-                          >
-                            <X size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <TablePagination {...reservations} label="Reservation pages" anchorId="calendar-reservation-review" />
-      </section>
-      {createOpen && (
-        <CreateBookingModal
-          date={date}
-          venue={venue}
-          manager={manager}
-          onClose={() => setCreateOpen(null)}
-          onWalkInSaved={() => setWalkInSaved(true)}
-          closing={createClosing}
-        />
-      )}
-      {balanceBooking && (
-        <BalancePaymentModal
-          booking={balanceBooking}
-          onClose={() => setBalanceBooking(null)}
-          closing={balanceClosing}
-        />
-      )}
-      {action && (
-        <Modal
-          closing={actionClosing}
-          title={
-            action.status === "confirmed"
-              ? "Verify & confirm reservation"
-              : "Cancel this reservation?"
-          }
-          onClose={() => !pending && setAction(null)}
-        >
-          <p style={{ fontSize: 14, lineHeight: 1.8 }}>
-            <strong>
-              {action.booking.reference} · {action.booking.customer_name}
-            </strong>
-            <br />
-            {action.booking.booking_type === "open_play"
-              ? `Open play · ${action.booking.participant_count} players`
-              : `Court ${action.booking.court_id}`}{" "}
-            · {formatHour(action.booking.start_hour)} ·{" "}
-            {money(action.booking.total_amount)}
-          </p>
-          {action.status === "confirmed" && (
-            <p>
-              <strong>
-                Verify {money(bookingPayments(action.booking).initial)}
-              </strong>
-              {action.booking.payment_option === "reservation_fee"
-                ? ` reservation fee. Balance at venue: ${money(bookingPayments(action.booking).later)}.`
-                : " full payment."}
-            </p>
-          )}
-          <div className="notice notice-warning">
-            <span>
-              {action.status === "confirmed"
-                ? "Confirm only after you have checked that the payment reached your GCash account. A submitted reference alone is not payment verification."
-                : "This releases the court. If the customer already paid, arrange any refund directly through GCash according to your policy. This website will not send money."}
-            </span>
-          </div>
-          {error && (
-            <div
-              className="error-message"
-              style={{ marginTop: 15 }}
-              role="alert"
-            >
-              {error}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-            <button
-              className="button button-dark"
-              onClick={update}
-              disabled={pending}
-            >
-              {pending
-                ? "Updating…"
-                : action.status === "confirmed"
-                  ? "Payment checked — confirm"
-                  : "Cancel reservation"}
-            </button>
-            <button
-              className="button button-outline"
-              onClick={() => setAction(null)}
-              disabled={pending}
-            >
-              Go back
-            </button>
-          </div>
-        </Modal>
-      )}
-    </>
-  );
+      <TablePagination {...pagination} label="Court calendar time slot pages" anchorId="calendar-court-slots" />
+    </section> : <p className="notice">No scheduled court time on this date.</p>}
+    <footer className={styles.footer}>
+      <Link className="text-link" href={reservationsForDateHref(date)}>
+        View reservations for this date <ArrowUpRight size={16} aria-hidden="true" />
+      </Link>
+    </footer>
+    {createOpen && <CreateBookingModal date={date} venue={venue} manager={manager}
+      onClose={() => setCreateOpen(null)} onWalkInSaved={() => setWalkInSaved(true)} closing={createClosing} />}
+    {blockedBooking && <StaffCancelBookingModal booking={blockedBooking} releaseBlock closing={releaseClosing}
+      onClose={() => setBlockedBooking(null)} onSaved={() => setBlockedBooking(null)} />}
+  </div>;
+}
+
+function overlaps(booking: CalendarBooking, start: number, end: number) {
+  return booking.start_hour < end && booking.start_hour + booking.duration > start;
+}
+
+function CalendarSlot({ booking, date, manager, court, onRelease }: {
+  booking: CalendarBooking;
+  date: string;
+  manager: boolean;
+  court: string;
+  onRelease: () => void;
+}) {
+  const slot = <>
+    <strong>{booking.customer_name}</strong>
+    <small>{bookingStatusLabel(booking)} · {formatHour(booking.start_hour)}–{formatHour(booking.start_hour + booking.duration)}</small>
+  </>;
+  if (booking.status === "blocked") {
+    return <div className={`${styles.slot} ${styles.blocked}`}>
+      <div>{slot}</div>
+      {manager && <button type="button" className={styles.release} onClick={onRelease}
+        aria-label={`Release block on ${court} at ${formatHour(booking.start_hour)}`}>Release block</button>}
+    </div>;
+  }
+  return <Link className={`${styles.slot} ${booking.status === "confirmed" ? styles.confirmed : styles.pending}`}
+    href={reservationsForDateHref(date, booking.reference)}>{slot}</Link>;
 }

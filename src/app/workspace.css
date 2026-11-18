@@ -1200,6 +1200,7 @@
 .membership-sections [data-needs-review] > .panel-heading { background: #fffbf3; }
 .membership-sections [data-needs-review] .membership-section-count { background: #f5e6c8; color: #6c4c21; }
 .membership-review-message { margin: 12px 18px; }
+.reservation-row-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
 .club-app .settings-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; font-size: 13px; color: var(--console-muted); }
 .club-app .settings-status-bar > span:first-child { display: inline-flex; align-items: center; gap: 8px; }
 .club-app .settings-status-bar .settings-unsaved { color: #98672d; }

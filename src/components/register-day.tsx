@@ -12,17 +12,6 @@ import { Modal } from "./modal";
 import { useAnimatedModal } from "./use-animated-modal";
 import styles from "./register-day.module.css";
 
-export function RegisterPanel({ data, date, manager, shift, operator, ready }: {
-  data: RegisterData | null; date: string; manager: boolean; shift?: Shift; operator: string; ready: boolean;
-}) {
-  return <section className={`console-panel ${styles.register}`} aria-label="Register and staff assignment">
-    <div className={styles.rows} data-has-assignment={Boolean(data)}>
-      <RegisterControl data={data} shift={shift} operator={operator} ready={ready} />
-      {data && <CashierAssignment key={date} data={data} date={date} manager={manager} />}
-    </div>
-  </section>;
-}
-
 export function RegisterStatusCard({ data, shift, operator, ready }: {
   data: RegisterData | null; shift?: Shift; operator: string; ready: boolean;
 }) {
@@ -87,27 +76,6 @@ export function OnDutyCard({ data, date, manager, followToday }: {
   </section>;
 }
 
-function CashierAssignment({ data, date, manager }: {
-  data: RegisterData; date: string; manager: boolean;
-}) {
-  const [editing, setEditing, editClosing] = useAnimatedModal<true>();
-  const [status, setStatus] = useState("");
-  const assignment = data.assignment;
-  return <div className={styles.row} role="group" aria-label="Staff assignment">
-    <div className={styles.identity}>
-      <h2>Staff on duty</h2>
-      <p>{assignment?.name || assignment?.label || "Unassigned"}{assignment && !assignment.eligible && <span> · No longer eligible</span>}</p>
-      <small>{data.operators.length ? `Opened register: ${data.operators.join(", ")}` : "No shift started on this date"}</small>
-      {status && <small className={styles.saved} role="status">{status}</small>}
-    </div>
-    {manager && <button type="button" className="button button-outline button-small" onClick={() => { setStatus(""); setEditing(true); }}>
-      {assignment ? "Edit assignment" : "Assign staff"}
-    </button>}
-    {editing && <AssignmentDialog data={data} date={date} closing={editClosing} onClose={() => setEditing(null)}
-      onSaved={(message) => { setStatus(message); setEditing(null); }} />}
-  </div>;
-}
-
 function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
   data: RegisterData; date: string; closing: boolean; onClose: () => void; onSaved: (message: string) => void;
 }) {
@@ -157,20 +125,21 @@ function AssignmentDialog({ data, date, closing, onClose, onSaved }: {
   </Modal>;
 }
 
-function RegisterControl({ data, shift, operator, ready }: {
-  data: RegisterData | null; shift?: Shift; operator: string; ready: boolean;
+export function RegisterControl({ data, shift, operator, ready, compact = false }: {
+  data: RegisterData | null; shift?: Shift; operator: string; ready: boolean; compact?: boolean;
 }) {
   const [dialog, setDialog, closing] = useAnimatedModal<true>();
   const [status, setStatus] = useState("");
   const someoneElse = shift ? null : data?.active;
-  return <div className={styles.row} role="group" aria-label="Front desk register">
+  return <div className={compact ? styles.compact : styles.row} role="group" aria-label="Front desk register">
     <div className={styles.identity}>
-      <h2>Front desk register</h2>
+      {!compact && <h2>Front desk register</h2>}
       <p><span className={`${styles.dot} ${shift || someoneElse ? styles.active : ""}`} />
-        {shift ? "Shift open" : someoneElse ? `Open · ${someoneElse.label}` : "Shift closed"}</p>
+        {shift ? (compact ? "Register open" : "Shift open")
+          : someoneElse ? `Open · ${someoneElse.label}` : compact ? "Register closed" : "Shift closed"}</p>
       {status && <small className={styles.saved} role="status">{status}</small>}
     </div>
-    {!someoneElse && <button type="button" className="button button-dark button-small" disabled={!ready}
+    {!someoneElse && <button type="button" className={compact ? "console-button small" : "button button-dark button-small"} disabled={!ready}
       onClick={() => { setStatus(""); setDialog(true); }}>
       {shift ? "Close shift" : "Open shift"}
     </button>}

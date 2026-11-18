@@ -14,8 +14,7 @@ export function BalancePaymentModal({
   onClose,
   closing,
 }: {
-  booking: Pick<Booking, "id" | "customer_name" | "reference" | "total_amount" | "status"
-    | "payment_option" | "initial_payment_amount" | "paid_amount">;
+  booking: Pick<Booking, "id" | "customer_name" | "reference" | "total_amount" | "paid_amount">;
   onClose: () => void;
   closing: boolean;
 }) {
@@ -24,7 +23,7 @@ export function BalancePaymentModal({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
-  const balance = bookingPayments(booking).balance;
+  const balance = bookingPayments({ ...booking, status: "confirmed" }).balance;
   return (
     <Modal title="Record balance payment" closing={closing} onClose={() => !pending && onClose()}>
       <p>
