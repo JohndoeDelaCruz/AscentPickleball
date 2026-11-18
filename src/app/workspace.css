@@ -554,6 +554,42 @@
 .court-time-fields .field :is(input, select, textarea) {
   min-width: 0;
 }
+.walk-in-account-lookup {
+  display: grid;
+  gap: 10px;
+}
+.walk-in-account-lookup p {
+  margin: 0;
+}
+.walk-in-account-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.walk-in-account-search button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.walk-in-member-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.walk-in-account-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.walk-in-account-summary > div {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
 .court-time-modal .field textarea {
   min-height: 62px;
 }

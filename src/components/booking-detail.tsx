@@ -151,10 +151,10 @@ export function BookingDetail({
               <dt>Player</dt>
               <dd>{b.customer_name}</dd>
             </div>
-            <div>
+            {b.customer_phone && <div>
               <dt>Mobile</dt>
               <dd>{b.customer_phone}</dd>
-            </div>
+            </div>}
             {b.payment_reference && (
               <div>
                 <dt>GCash reference</dt>

@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { reserveOpenPlay, staffCreateBooking } from "@/app/actions";
-import { bookMemberWalkIn, bookWalkIn, quoteMemberWalkIn, type MemberWalkInQuote } from "@/app/(workspace)/staff/actions";
-import type { MembershipCustomer } from "@/app/(workspace)/staff/memberships/actions";
+import { bookAccountWalkIn, bookWalkIn, quoteMemberWalkIn, type MemberWalkInQuote, type WalkInCustomer } from "@/app/(workspace)/staff/actions";
 import {
   addDays, bookingSchema, calculateCourtTotal, calculateReservationTotal, formatDate,
   formatHour, isPastSlot, localDate, money, privateEquipmentLimit,
@@ -45,7 +44,8 @@ export function CreateBookingModal({
   const [people, setPeople] = useState("1");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [member, setMember] = useState<MembershipCustomer | null>(null);
+  const [member, setMember] = useState<WalkInCustomer | null>(null);
+  const [guestWalkIn, setGuestWalkIn] = useState(false);
   const [memberQuote, setMemberQuote] = useState<MemberWalkInQuote | null>(null);
   const [blockReason, setBlockReason] = useState("");
   const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
@@ -112,7 +112,11 @@ export function CreateBookingModal({
       return;
     }
 
-    if (step === 1) {
+    if (step === 1 && !blocked && !memberId && !guestWalkIn) {
+      setError("Select a customer account or choose Book as guest.");
+      return;
+    }
+    if (step === 1 && (blocked || guestWalkIn)) {
       const details = blocked
         ? blockDetails.safeParse({ customer_name: blockReason })
         : customerDetails.safeParse({ customer_name: customerName, customer_phone: customerPhone });
@@ -153,8 +157,10 @@ export function CreateBookingModal({
       start_hour: openPlay ? session?.start : selectedHour,
       duration,
       participant_count: playerCount,
-      customer_name: (blocked ? blockReason : customerName).trim(),
-      customer_phone: blocked ? "" : customerPhone.trim(),
+      ...(!memberId && {
+        customer_name: (blocked ? blockReason : customerName).trim(),
+        customer_phone: blocked ? "" : customerPhone.trim(),
+      }),
       equipment_rental: equipmentQuantity > 0,
       equipment_quantity: equipmentQuantity,
       payment_option: blocked ? "full" : paymentOption,
@@ -178,7 +184,7 @@ export function CreateBookingModal({
             walkInRequest.current = { payload, key: crypto.randomUUID() };
           }
           const request = { ...payment, key: walkInRequest.current.key };
-          const result = memberId ? await bookMemberWalkIn(request, openPlay) : await bookWalkIn(request, openPlay);
+          const result = memberId ? await bookAccountWalkIn(request, openPlay) : await bookWalkIn(request, openPlay);
           if (result.error) {
             setError(result.error);
             if (memberId) setVerified(false);
@@ -229,6 +235,7 @@ export function CreateBookingModal({
                     setType(value === "open_play" || (value === "block" && manager) ? value : "court");
                     setMember(null);
                     setMemberQuote(null);
+                    setGuestWalkIn(false);
                     setError("");
                   }}>
                     <option value="court">Private court booking</option>
@@ -240,7 +247,11 @@ export function CreateBookingModal({
                   <label className="field">
                     <span>Date</span>
                     <input type="date" required value={bookingDate} min={today} max={addDays(today, 30)}
-                      onChange={(event) => setBookingDate(event.target.value)} />
+                      onChange={(event) => {
+                        setBookingDate(event.target.value);
+                        setMember(null);
+                        setMemberQuote(null);
+                      }} />
                   </label>
                   {openPlay ? (
                     <label className="field">
@@ -304,21 +315,30 @@ export function CreateBookingModal({
               </>
             ) : (
               <>
-                <WalkInCustomerLookup customer={member} onChange={(customer) => {
-                  setMember(customer);
-                  setMemberQuote(null);
-                  if (customer?.full_name && customer.full_name.length >= 2) setCustomerName(customer.full_name);
-                }} />
-                <label className="field">
-                  <span>Customer name</span>
-                  <input required minLength={2} maxLength={100} value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)} />
-                </label>
-                <label className="field">
-                  <span>Customer mobile</span>
-                  <input type="tel" required value={customerPhone} placeholder="09171234567"
-                    onChange={(event) => setCustomerPhone(event.target.value)} />
-                </label>
+                {guestWalkIn ? <>
+                  <label className="field">
+                    <span>Guest name</span>
+                    <input required minLength={2} maxLength={100} value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>Guest mobile</span>
+                    <input type="tel" required value={customerPhone} placeholder="09171234567"
+                      onChange={(event) => setCustomerPhone(event.target.value)} />
+                  </label>
+                  <div><button type="button" className="text-link" onClick={() => { setGuestWalkIn(false); setError(""); }}>
+                    Look up a customer account
+                  </button></div>
+                </> : <>
+                  <WalkInCustomerLookup date={bookingDate} customer={member} onChange={(customer) => {
+                    setMember(customer);
+                    setMemberQuote(null);
+                    setError("");
+                  }} />
+                  {!member && <div><button type="button" className="text-link" onClick={() => { setGuestWalkIn(true); setError(""); }}>
+                    Book as guest
+                  </button></div>}
+                </>}
                 <EquipmentRental price={venue.equipment_rental_price} ballCount={venue.equipment_ball_count}
                   quantity={equipmentQuantity} maxQuantity={equipmentLimit} onChange={setEquipmentQuantity} />
               </>
@@ -398,7 +418,9 @@ export function CreateBookingModal({
               {step === 0 ? "Cancel" : "Back"}
             </button>
             <button type="submit" className="button button-dark"
-              disabled={pending || closing || (step === 0 && base === null) || (step === lastStep && requiresPaymentConfirmation && !verified)}>
+              disabled={pending || closing || (step === 0 && base === null) ||
+                (step === 1 && !blocked && !memberId && !guestWalkIn) ||
+                (step === lastStep && requiresPaymentConfirmation && !verified)}>
               {pending ? (step === 1 && memberId ? "Checking price…" : "Saving…") : step < lastStep ? "Next" : blocked ? "Block court time" : "Confirm booking"}
             </button>
           </div>

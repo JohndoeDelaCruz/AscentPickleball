@@ -105,6 +105,35 @@ export async function bookWalkIn(input: unknown, openPlay: boolean): Promise<{ i
   }
 }
 
+const walkInCustomerSchema = z.object({
+  id, full_name: z.string().nullable(), email: z.string(), active_membership: z.boolean(),
+});
+export type WalkInCustomer = z.infer<typeof walkInCustomerSchema>;
+
+const walkInSearchSchema = z.object({
+  query: z.string().trim().min(2).max(254),
+  date: z.iso.date(),
+  activeOnly: z.boolean(),
+});
+
+export async function findWalkInCustomers(input: unknown): Promise<{ customers: WalkInCustomer[] } | { error: string }> {
+  const parsed = walkInSearchSchema.safeParse(input);
+  if (!parsed.success) return { error: "Enter at least two characters of a name or the full email address." };
+  const failed = "Account lookup is temporarily unavailable. Try again.";
+  try {
+    if (!(await getSession()).staff) return { error: "Staff access is required." };
+    const { query, date, activeOnly } = parsed.data;
+    const db = await createClient();
+    const { data, error } = await db.rpc("pos_find_walk_in_customers", { p_query: query, p_date: date, p_active_only: activeOnly });
+    if (error) return { error: error.code === "PGRST202"
+      ? "Apply migration 047 to enable walk-in account lookup." : bookingError(error) };
+    const result = z.array(walkInCustomerSchema).safeParse(data);
+    return result.success ? { customers: result.data } : { error: failed };
+  } catch {
+    return { error: failed };
+  }
+}
+
 const memberQuoteFields = z.object({
   customerId: id,
   bookingDate: z.iso.date(),
@@ -148,27 +177,27 @@ const memberWalkInPayment = financeBookingSchema.and(z.object({
   collectedCents: z.int().nonnegative().max(9_999_999_999), expected_total_cents: z.int().nonnegative().max(9_999_999_999),
 }));
 
-export async function bookMemberWalkIn(input: unknown, openPlay: boolean): Promise<{ id?: string; error?: string }> {
-  const schedule = openPlay ? openPlaySchema.omit({ expected_total_cents: true }) : bookingSchema.omit({ expected_total_cents: true });
+export async function bookAccountWalkIn(input: unknown, openPlay: boolean): Promise<{ id?: string; error?: string }> {
+  const omit = { expected_total_cents: true, customer_name: true, customer_phone: true } as const;
+  const schedule = openPlay ? openPlaySchema.omit(omit) : bookingSchema.omit(omit);
   const parsed = schedule.and(memberWalkInPayment).safeParse(input);
   if (!parsed.success || parsed.data.start_hour === undefined) return { error: "Check the customer, booking, and payment details." };
   try {
     if (!(await getSession()).staff) return { error: "Staff access is required." };
     const booking = parsed.data;
     const db = await createClient();
-    const args = {
+    const passes = "participant_count" in booking;
+    const { data, error } = await db.rpc("pos_book_account_walk_in", {
       p_key: booking.key, p_customer: booking.member_id, p_date: booking.booking_date,
-      p_name: booking.customer_name, p_phone: booking.customer_phone, p_start: booking.start_hour,
+      p_kind: passes ? "open_play" : "court", p_start: booking.start_hour, p_court: passes ? null : booking.court_id,
+      p_duration: passes ? 1 : booking.duration, p_people: passes ? booking.participant_count : 1,
       p_quantity: booking.equipment_quantity ?? Number(booking.equipment_rental), p_payment_option: booking.payment_option,
       p_method: booking.payment_method, p_reference: booking.reference, p_verified: booking.verified,
       p_collected_cents: booking.collectedCents, p_expected_total_cents: booking.expected_total_cents,
       p_notes: booking.finance_notes,
-    };
-    const { data, error } = "participant_count" in booking
-      ? await db.rpc("pos_book_member_open_play_walk_in", { ...args, p_people: booking.participant_count })
-      : await db.rpc("pos_book_member_walk_in", { ...args, p_court: booking.court_id, p_duration: booking.duration });
+    });
     if (error) return { error: error.code === "PGRST202"
-      ? `Apply migration ${openPlay ? "046" : "045"} to enable this member walk-in.` : bookingError(error) };
+      ? "Apply migration 047 to book a linked walk-in." : bookingError(error) };
     const saved = id.safeParse(data);
     if (!saved.success) return { error: "Couldn’t confirm the walk-in. Check Reservations before starting another booking." };
     for (const path of ["/staff", "/admin", "/book", "/admin/finance", "/my-bookings/all"])

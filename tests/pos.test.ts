@@ -1894,6 +1894,53 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal(await edit(owner, false, 3550, 6000, 1), 2);
       assert.equal(await onlineQuote(annual), 0);
     });
+
+    await t.test("walk-in account lookup filters active members and saves verified account details", async () => {
+      const before = await readCurrentData();
+      await db.exec("alter table auth.users add column phone text, add column phone_confirmed_at timestamptz");
+      await db.exec(await readFile("supabase/migrations/202611180047_account_first_walk_ins.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), before);
+
+      const date = dayKey(new Date(Date.now() + 29 * 86400000));
+      const active = (await db.query<{ id: string }>("select id from auth.users where email='daytime-rate@test.example'")).rows[0].id;
+      const existingAccount = randomUUID();
+      await db.query(`update auth.users set raw_user_meta_data='{"full_name":"Jules Member"}',
+        phone='639171234567' where id=$1`, [active]);
+      await db.query(`insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data,phone,phone_confirmed_at) values
+        ($1,'jules-player@example.test',now(),'{"full_name":"Jules Player"}','639178765432',now()),
+        ($2,'jules-unconfirmed@example.test',null,'{"full_name":"Jules Unconfirmed"}',null,null)`, [existingAccount, randomUUID()]);
+
+      const find = (actor: string, query: string, activeOnly?: boolean) => as(actor, () =>
+        db.query("select * from public.pos_find_walk_in_customers($1,$2" + (activeOnly === undefined ? ")" : ",$3)"),
+          activeOnly === undefined ? [query, date] : [query, date, activeOnly])).then(({ rows }) => rows);
+      const foundMember = { id: active, full_name: "Jules Member", email: "d•••@t•••", active_membership: true };
+      assert.deepEqual(await find(cashier, "Jules"), [foundMember]);
+      assert.deepEqual(await find(cashier, "Jules", false), [foundMember, {
+        id: existingAccount, full_name: "Jules Player", email: "j•••@e•••", active_membership: false,
+      }]);
+      assert.deepEqual(await find(owner, "daytime-rate@test.example"), [{ ...foundMember, email: "daytime-rate@test.example" }]);
+      await assert.rejects(() => find(player, "Jules"), /Authorized staff/);
+      await assert.rejects(() => find("", "Jules", true), /Authorized staff/);
+
+      const walkIn = [randomUUID(), active, "open_play", date, null, 12, 1, 2, 0,
+        "full", "gcash", "ACCOUNT-WALK-IN-REFERENCE", true, 17000, 17000, ""];
+      const book = (actor: string, input: unknown[]) => call<string>(actor, "pos_book_account_walk_in", input);
+      await assert.rejects(() => book(player, walkIn), /Authorized staff/);
+      const booked = await book(cashier, walkIn);
+      await db.query("update auth.users set raw_user_meta_data='{\"full_name\":\"Updated profile\"}' where id=$1", [active]);
+      assert.equal(await book(cashier, walkIn), booked);
+      const read = (actor: string, id: string) => as(actor, () => db.query(`select customer_name,customer_phone,
+        total_amount,membership_discount_amount,account_linked_walk_in from public.bookings where id=$1`, [id]));
+      assert.deepEqual((await read(active, booked)).rows, [{ customer_name: "Jules Member", customer_phone: "",
+        total_amount: "170.00", membership_discount_amount: "30.00", account_linked_walk_in: true }]);
+
+      const court = await book(owner, [randomUUID(), existingAccount, "court", date, 1, 6, 1, 1, 0,
+        "full", "bank_transfer", "", true, 10000, 10000, ""]);
+      assert.deepEqual((await read(existingAccount, court)).rows, [{ customer_name: "Jules Player", customer_phone: "+639178765432",
+        total_amount: "100.00", membership_discount_amount: "0.00", account_linked_walk_in: true }]);
+      await assert.rejects(() => call(cashier, "pos_book_walk_in", [randomUUID(), "court", date, "Walk-in Guest", null,
+        2, 6, 1, 1, 0, "full", "gcash", "GUEST-WALK-IN-REFERENCE", true, 10000]), /valid Philippine mobile/);
+    });
   } finally {
     await db.close();
   }
