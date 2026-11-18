@@ -1183,6 +1183,22 @@
 .club-app .workspace-tabs > button:focus-visible { outline-offset: -4px; }
 .club-app [role="tabpanel"] { min-width: 0; }
 .membership-review-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.membership-sections { display: grid; gap: 20px; min-width: 0; }
+.membership-sections > section { scroll-margin-top: 76px; }
+.membership-section-count {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eef2ed;
+  color: #50665a;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  text-align: center;
+}
+.membership-sections [data-needs-review] > .panel-heading { background: #fffbf3; }
+.membership-sections [data-needs-review] .membership-section-count { background: #f5e6c8; color: #6c4c21; }
 .membership-review-message { margin: 12px 18px; }
 .club-app .settings-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; font-size: 13px; color: var(--console-muted); }
 .club-app .settings-status-bar > span:first-child { display: inline-flex; align-items: center; gap: 8px; }

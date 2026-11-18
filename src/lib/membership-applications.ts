@@ -5,12 +5,14 @@ import { membershipPlanIds, type MembershipPlanId } from "./membership";
 export const membershipApplyPath = "/membership/apply";
 export const membershipReviewPath = "/staff/memberships";
 export const membershipReviewPageSize = 10;
-export const membershipViews = [
-  { id: "pending", label: "Pending verification" },
-  { id: "active", label: "Active members" },
-  { id: "reviewed", label: "Reviewed" },
-] as const;
-export type MembershipView = typeof membershipViews[number]["id"];
+export const membershipSections = {
+  pending: { id: "pending-verification", label: "Pending verification" },
+  active: { id: "active-members", label: "Active members" },
+  reviewed: { id: "review-history", label: "Review history" },
+} as const;
+export type MembershipSection = keyof typeof membershipSections;
+export type MembershipPages = Record<MembershipSection, number>;
+export type MembershipApplicationFocus = { section: Exclude<MembershipSection, "active">; id: string };
 export const membershipPlanIdSchema = z.enum(membershipPlanIds);
 export const membershipTerms = { annual: "1 year", "six-month": "6 months" } satisfies Record<MembershipPlanId, string>;
 export const membershipReferenceSchema = z.string().trim()
@@ -56,10 +58,17 @@ export function membershipStatus(application: Pick<MembershipApplication, "statu
   return "Awaiting payment";
 }
 
-export function membershipReviewHref(view: MembershipView, page = 1, application?: string) {
+export function membershipSectionHref(section: MembershipSection, state: {
+  pages?: Partial<MembershipPages>;
+  application?: MembershipApplicationFocus;
+} = {}) {
   const params = new URLSearchParams();
-  if (view !== "pending") params.set("view", view);
-  if (page > 1) params.set("page", String(page));
-  if (application) params.set("application", application);
-  return params.size ? `${membershipReviewPath}?${params}` : membershipReviewPath;
+  for (const [key, page] of Object.entries(state.pages ?? {})) {
+    if (page > 1) params.set(`${key}Page`, String(page));
+  }
+  if (state.application) {
+    if (state.application.section === "reviewed") params.set("view", "reviewed");
+    params.set("application", state.application.id);
+  }
+  return `${membershipReviewPath}${params.size ? `?${params}` : ""}#${membershipSections[section].id}`;
 }

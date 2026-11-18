@@ -3,24 +3,28 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { membershipApplicationAction } from "@/app/membership/apply/actions";
 import { formatDate, localDate, money } from "@/lib/booking";
-import { membershipReviewHref, membershipReviewPageSize, membershipStatus, type MembershipReviewRow } from "@/lib/membership-applications";
+import { membershipSectionHref, membershipSections, membershipReviewPageSize, membershipStatus,
+  type MembershipApplicationFocus, type MembershipPages, type MembershipReviewRow } from "@/lib/membership-applications";
 import { Modal } from "./modal";
 import { TablePagination } from "./table-pagination";
 import { useAnimatedModal } from "./use-animated-modal";
 
-export function MembershipReviewTable({ rows, count, page, reviewed }: {
-  rows: MembershipReviewRow[]; count: number; page: number; reviewed: boolean;
+export function MembershipReviewTable({ rows, count, pages, focus, reviewed }: {
+  rows: MembershipReviewRow[]; count: number; pages: MembershipPages; focus?: MembershipApplicationFocus; reviewed: boolean;
 }) {
   const [application, setApplication, closing] = useAnimatedModal<MembershipReviewRow>();
   const [message, setMessage] = useState("");
+  const section = reviewed ? "reviewed" : "pending";
+  const emptyMessage = focus?.section === section ? "This application is no longer available in this section."
+    : reviewed ? "No applications have been reviewed." : "No applications are waiting for verification.";
 
-  return <section className="console-panel" aria-labelledby="membership-queue-heading">
-    <div className="panel-heading"><h2 id="membership-queue-heading">{reviewed ? "Reviewed applications" : "GCash payment review"}</h2></div>
+  return <>
     {message && <p className="success-message membership-review-message" role="status">{message}</p>}
-    {rows.length === 0 ? <p className="panel-empty-note">{reviewed ? "No applications have been reviewed." : "No applications are waiting for verification."}</p> : <>
-      <TablePagination count={count} page={page} pageSize={membershipReviewPageSize} label="Application pages"
-        href={(next) => membershipReviewHref(reviewed ? "reviewed" : "pending", next)} />
-      <div className="console-table-wrap" role="region" aria-labelledby="membership-queue-heading" tabIndex={0}>
+    {rows.length === 0 ? <p className="panel-empty-note">{emptyMessage}</p> : <>
+      <TablePagination count={count} page={pages[section]} pageSize={membershipReviewPageSize}
+        label={reviewed ? "Review history pages" : "Pending verification pages"}
+        href={(next) => membershipSectionHref(section, { pages: { ...pages, [section]: next }, application: focus })} />
+      <div className="console-table-wrap" role="region" aria-labelledby={`${membershipSections[section].id}-heading`} tabIndex={0}>
         <table className="console-table">
           <thead><tr><th scope="col">{reviewed ? "Customer" : "Applicant"}</th><th scope="col">Plan</th>
             <th scope="col">{reviewed ? "Payment" : "GCash reference"}</th>
@@ -48,7 +52,7 @@ export function MembershipReviewTable({ rows, count, page, reviewed }: {
         setMessage(approved ? "Payment verified and membership activated." : "Payment rejected. The applicant can view the reason in their account.");
         setApplication(null);
       }} />}
-  </section>;
+  </>;
 }
 
 function ReviewMembershipPayment({ row, closing, onClose, onReviewed }: {

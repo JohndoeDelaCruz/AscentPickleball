@@ -1,16 +1,18 @@
 "use client";
 
 import { formatDate } from "@/lib/booking";
-import { membershipReviewHref, membershipReviewPageSize, type ActiveMembershipRow } from "@/lib/membership-applications";
+import { membershipSectionHref, membershipSections, membershipReviewPageSize,
+  type ActiveMembershipRow, type MembershipApplicationFocus, type MembershipPages } from "@/lib/membership-applications";
 import { TablePagination } from "./table-pagination";
 
-export function ActiveMembersTable({ rows, count, page }: { rows: ActiveMembershipRow[]; count: number; page: number }) {
-  return <section className="console-panel" aria-labelledby="active-members-heading">
-    <div className="panel-heading"><h2 id="active-members-heading">Active members</h2></div>
+export function ActiveMembersTable({ rows, count, pages, application }: {
+  rows: ActiveMembershipRow[]; count: number; pages: MembershipPages; application?: MembershipApplicationFocus;
+}) {
+  return <>
     {rows.length === 0 ? <p className="panel-empty-note">There are no active members yet.</p> : <>
-      <TablePagination count={count} page={page} pageSize={membershipReviewPageSize} label="Active member pages"
-        href={(next) => membershipReviewHref("active", next)} />
-      <div className="console-table-wrap" role="region" aria-labelledby="active-members-heading" tabIndex={0}>
+      <TablePagination count={count} page={pages.active} pageSize={membershipReviewPageSize} label="Active member pages"
+        href={(next) => membershipSectionHref("active", { pages: { ...pages, active: next }, application })} />
+      <div className="console-table-wrap" role="region" aria-labelledby={`${membershipSections.active.id}-heading`} tabIndex={0}>
         <table className="console-table">
           <thead><tr><th scope="col">Member</th><th scope="col">Plan</th><th scope="col">Starts on</th><th scope="col">Expires on</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.id}>
@@ -22,5 +24,5 @@ export function ActiveMembersTable({ rows, count, page }: { rows: ActiveMembersh
         </table>
       </div>
     </>}
-  </section>;
+  </>;
 }

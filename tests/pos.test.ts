@@ -1611,7 +1611,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.deepEqual(await request("submit", { id, reference: "NOTIFY-MEMBERSHIP-123456" }), { success: true });
       const membership = (await read(cashier)).rows.find((row) => row.kind === "membership_payment");
       assert.ok(membership?.priority);
-      assert.equal(staffNotificationContent(membership).href, `/staff/memberships?application=${id}`);
+      assert.equal(staffNotificationContent(membership).href, `/staff/memberships?application=${id}#pending-verification`);
       const focused = await call<{ row_count: number; rows: MembershipReviewRow[] }>(cashier, "list_membership_applications", [false, 1, id]);
       assert.equal(focused.row_count, 1);
       assert.equal(focused.rows[0].id, id);
@@ -1621,7 +1621,7 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.equal((await read(manager)).total_count, 6);
       const reviewedNotice = cashierFeed.rows.find((row) => row.id === membership.id)!;
       assert.equal(reviewedNotice.priority, false);
-      assert.equal(staffNotificationContent(reviewedNotice).href, `/staff/memberships?view=reviewed&application=${id}`);
+      assert.equal(staffNotificationContent(reviewedNotice).href, `/staff/memberships?view=reviewed&application=${id}#review-history`);
 
       await mark(cashier, account.id);
       assert.equal((await db.query("select * from private.staff_notification_reads where user_id=$1", [cashier])).rows.length, 0);

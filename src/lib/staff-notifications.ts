@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { accountRolesHref } from "./account-roles";
 import { formatDate, formatHour } from "./booking";
-import { membershipReviewHref } from "./membership-applications";
+import { membershipSectionHref } from "./membership-applications";
 
 export const notificationsPerPage = 15;
 
@@ -44,8 +44,9 @@ export function staffNotificationContent(row: StaffNotification) {
   const title = titles[row.kind];
   if (row.kind === "account_verified") return { title, detail: row.account_email, href: accountRolesHref(row.account_email ?? "") };
   if (row.kind === "membership_payment" || row.kind === "membership_activated") {
-    const pending = row.kind === "membership_payment" && row.membership_status === "pending";
-    return { title, detail: row.plan_name, href: membershipReviewHref(pending ? "pending" : "reviewed", 1, row.subject_id) };
+    const section = row.kind === "membership_payment" && row.membership_status === "pending" ? "pending" : "reviewed";
+    return { title, detail: row.plan_name,
+      href: membershipSectionHref(section, { application: { section, id: row.subject_id } }) };
   }
 
   const params = new URLSearchParams({ tab: "bookings" });
