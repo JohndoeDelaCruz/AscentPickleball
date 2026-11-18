@@ -3,11 +3,12 @@
 import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Plus, Save, Trash2, Trophy } from "lucide-react";
 import { saveMembershipDetails } from "@/app/(workspace)/admin/settings/membership-actions";
-import { isBuiltInCourtDiscountBenefit, maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipPlanLabels, membershipTextLimits, type MembershipDetails, type MembershipPlan } from "@/lib/membership";
+import { isBuiltInCourtDiscountBenefit, isBuiltInOpenPlayDiscountBenefit, maxMembershipBenefits, maxMembershipPrice, membershipBenefitIcons, membershipPlanLabels, membershipTextLimits, type MembershipDetails, type MembershipPlan } from "@/lib/membership";
 import { parseSettingNumber } from "@/lib/settings-input";
 import { membershipTerms } from "@/lib/membership-applications";
 import { benefitIcons } from "./membership-benefit-icons";
 import { MembershipDiscountEditor } from "./membership-discount-editor";
+import { MembershipOpenPlayDiscountEditor } from "./membership-open-play-discount-editor";
 import styles from "./membership-editor.module.css";
 
 const pageTextFields = [
@@ -70,8 +71,11 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
 
   const planHeadingId = `membership-editor-heading-${initial.id}`;
   const benefitsHeadingId = `membership-benefits-editor-heading-${initial.id}`;
+  const isAutomaticBenefit = (benefit: Benefit) =>
+    isBuiltInCourtDiscountBenefit(initial, benefit) || isBuiltInOpenPlayDiscountBenefit(initial, benefit);
   return <>
   <MembershipDiscountEditor plan={initial} />
+  <MembershipOpenPlayDiscountEditor plan={initial} />
   <form className="venue-settings-form" onSubmit={submit}>
     <section className="console-panel settings-card" aria-labelledby={planHeadingId}>
       <header className="settings-card-heading">
@@ -129,9 +133,9 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
           }}><Plus size={16} aria-hidden="true" /> Add benefit</button>
       </header>
       <div className={`settings-card-body ${styles.benefits}`}>
-        {details.benefits.every((benefit) => isBuiltInCourtDiscountBenefit(initial, benefit)) && <p className="small-print">No other benefits listed.</p>}
+        {details.benefits.every(isAutomaticBenefit) && <p className="small-print">No other benefits listed.</p>}
         {details.benefits.map((benefit, index) => {
-          if (isBuiltInCourtDiscountBenefit(initial, benefit)) return null;
+          if (isAutomaticBenefit(benefit)) return null;
           const { id, startOpen } = benefitKeys[index];
           const { Icon } = benefitIcons[benefit.icon];
           return <details key={id} className={`workspace-disclosure ${styles.benefit}`} open={startOpen}>

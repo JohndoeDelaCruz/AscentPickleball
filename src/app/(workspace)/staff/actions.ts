@@ -105,13 +105,16 @@ export async function bookWalkIn(input: unknown, openPlay: boolean): Promise<{ i
   }
 }
 
-const memberQuoteRequest = z.object({
+const memberQuoteFields = z.object({
   customerId: id,
   bookingDate: z.iso.date(),
   startHour: z.int().min(0).max(23),
-  duration: z.int().min(1).max(4),
   equipmentQuantity: z.int().min(0).max(100),
 });
+const memberQuoteRequest = z.discriminatedUnion("kind", [
+  memberQuoteFields.extend({ kind: z.literal("court"), duration: z.int().min(1).max(4) }),
+  memberQuoteFields.extend({ kind: z.literal("open_play"), people: z.int().min(1).max(20) }),
+]);
 const memberQuoteSchema = z.object({
   regularCents: z.int().nonnegative(), discountCents: z.int().nonnegative(), totalCents: z.int().nonnegative(),
 });
@@ -119,16 +122,20 @@ export type MemberWalkInQuote = z.infer<typeof memberQuoteSchema>;
 
 export async function quoteMemberWalkIn(input: unknown): Promise<{ quote: MemberWalkInQuote } | { error: string }> {
   const parsed = memberQuoteRequest.safeParse(input);
-  if (!parsed.success) return { error: "Choose a valid court time and customer account." };
+  if (!parsed.success) return { error: "Choose a valid booking time and customer account." };
   try {
     if (!(await getSession()).staff) return { error: "Staff access is required." };
     const quote = parsed.data;
     const db = await createClient();
-    const { data, error } = await db.rpc("pos_quote_member_walk_in", {
+    const args = {
       p_customer: quote.customerId, p_date: quote.bookingDate, p_start: quote.startHour,
-      p_duration: quote.duration, p_quantity: quote.equipmentQuantity,
-    });
-    if (error) return { error: error.code === "PGRST202" ? "Apply migration 045 to enable member walk-ins." : bookingError(error) };
+      p_quantity: quote.equipmentQuantity,
+    };
+    const { data, error } = quote.kind === "open_play"
+      ? await db.rpc("pos_quote_member_open_play_walk_in", { ...args, p_people: quote.people })
+      : await db.rpc("pos_quote_member_walk_in", { ...args, p_duration: quote.duration });
+    if (error) return { error: error.code === "PGRST202"
+      ? `Apply migration ${quote.kind === "open_play" ? "046" : "045"} to enable this member walk-in.` : bookingError(error) };
     const result = memberQuoteSchema.safeParse(data);
     return result.success ? { quote: result.data } : { error: "The member price couldn’t be checked. Try again." };
   } catch {
@@ -136,28 +143,32 @@ export async function quoteMemberWalkIn(input: unknown): Promise<{ quote: Member
   }
 }
 
-const memberWalkInSchema = bookingSchema.omit({ expected_total_cents: true }).and(financeBookingSchema).and(z.object({
+const memberWalkInPayment = financeBookingSchema.and(z.object({
   key: id, member_id: id, reference: z.string().trim().max(40), verified: z.literal(true),
   collectedCents: z.int().nonnegative().max(9_999_999_999), expected_total_cents: z.int().nonnegative().max(9_999_999_999),
 }));
 
-export async function bookMemberWalkIn(input: unknown): Promise<{ id?: string; error?: string }> {
-  const parsed = memberWalkInSchema.safeParse(input);
-  if (!parsed.success) return { error: "Check the customer, booking, and payment details." };
+export async function bookMemberWalkIn(input: unknown, openPlay: boolean): Promise<{ id?: string; error?: string }> {
+  const schedule = openPlay ? openPlaySchema.omit({ expected_total_cents: true }) : bookingSchema.omit({ expected_total_cents: true });
+  const parsed = schedule.and(memberWalkInPayment).safeParse(input);
+  if (!parsed.success || parsed.data.start_hour === undefined) return { error: "Check the customer, booking, and payment details." };
   try {
     if (!(await getSession()).staff) return { error: "Staff access is required." };
     const booking = parsed.data;
     const db = await createClient();
-    const { data, error } = await db.rpc("pos_book_member_walk_in", {
+    const args = {
       p_key: booking.key, p_customer: booking.member_id, p_date: booking.booking_date,
-      p_name: booking.customer_name, p_phone: booking.customer_phone, p_court: booking.court_id,
-      p_start: booking.start_hour, p_duration: booking.duration,
+      p_name: booking.customer_name, p_phone: booking.customer_phone, p_start: booking.start_hour,
       p_quantity: booking.equipment_quantity ?? Number(booking.equipment_rental), p_payment_option: booking.payment_option,
       p_method: booking.payment_method, p_reference: booking.reference, p_verified: booking.verified,
       p_collected_cents: booking.collectedCents, p_expected_total_cents: booking.expected_total_cents,
       p_notes: booking.finance_notes,
-    });
-    if (error) return { error: error.code === "PGRST202" ? "Apply migration 045 to enable member walk-ins." : bookingError(error) };
+    };
+    const { data, error } = "participant_count" in booking
+      ? await db.rpc("pos_book_member_open_play_walk_in", { ...args, p_people: booking.participant_count })
+      : await db.rpc("pos_book_member_walk_in", { ...args, p_court: booking.court_id, p_duration: booking.duration });
+    if (error) return { error: error.code === "PGRST202"
+      ? `Apply migration ${openPlay ? "046" : "045"} to enable this member walk-in.` : bookingError(error) };
     const saved = id.safeParse(data);
     if (!saved.success) return { error: "Couldn’t confirm the walk-in. Check Reservations before starting another booking." };
     for (const path of ["/staff", "/admin", "/book", "/admin/finance", "/my-bookings/all"])

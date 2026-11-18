@@ -62,7 +62,7 @@ export function CreateBookingModal({
 
   const blocked = type === "block";
   const openPlay = type === "open_play";
-  const memberId = type === "court" ? member?.id : undefined;
+  const memberId = blocked ? undefined : member?.id;
   const requiresPaymentConfirmation = !manager || Boolean(memberId);
   const lastStep = blocked ? 1 : 2;
   const stepTitle = ["Choose court time", blocked ? "Block details" : "Customer details", "Record payment"][step];
@@ -126,9 +126,13 @@ export function CreateBookingModal({
         if (selectedHour !== undefined) setStartHour(selectedHour);
         setSessionStart(session?.start);
       }
-      if (step === 1 && memberId && selectedHour !== undefined) {
+      const quoteStart = openPlay ? session?.start : selectedHour;
+      if (step === 1 && memberId && quoteStart !== undefined) {
         startTransition(async () => {
-          const result = await quoteMemberWalkIn({ customerId: memberId, bookingDate, startHour: selectedHour, duration, equipmentQuantity });
+          const result = await quoteMemberWalkIn({
+            customerId: memberId, bookingDate, startHour: quoteStart, equipmentQuantity,
+            ...(openPlay ? { kind: "open_play", people: playerCount } : { kind: "court", duration }),
+          });
           if ("error" in result) {
             setError(result.error);
             return;
@@ -174,7 +178,7 @@ export function CreateBookingModal({
             walkInRequest.current = { payload, key: crypto.randomUUID() };
           }
           const request = { ...payment, key: walkInRequest.current.key };
-          const result = memberId ? await bookMemberWalkIn(request) : await bookWalkIn(request, openPlay);
+          const result = memberId ? await bookMemberWalkIn(request, openPlay) : await bookWalkIn(request, openPlay);
           if (result.error) {
             setError(result.error);
             if (memberId) setVerified(false);
@@ -300,11 +304,11 @@ export function CreateBookingModal({
               </>
             ) : (
               <>
-                {type === "court" && <WalkInCustomerLookup customer={member} onChange={(customer) => {
+                <WalkInCustomerLookup customer={member} onChange={(customer) => {
                   setMember(customer);
                   setMemberQuote(null);
                   if (customer?.full_name && customer.full_name.length >= 2) setCustomerName(customer.full_name);
-                }} />}
+                }} />
                 <label className="field">
                   <span>Customer name</span>
                   <input required minLength={2} maxLength={100} value={customerName}
@@ -374,7 +378,7 @@ export function CreateBookingModal({
                   <dl className="court-time-totals">
                     {memberId && memberQuote && memberQuote.discountCents > 0 && <>
                       <div><dt>Regular total</dt><dd>{money(memberQuote.regularCents / 100)}</dd></div>
-                      <div><dt>Membership discount</dt><dd>−{money(memberQuote.discountCents / 100)}</dd></div>
+                      <div><dt>{openPlay ? "Membership discount · 1 pass" : "Membership discount"}</dt><dd>−{money(memberQuote.discountCents / 100)}</dd></div>
                     </>}
                     <div><dt>Booking total</dt><dd>{money(total)}</dd></div>
                     <div><dt>Amount to collect</dt><dd><strong>{money(collected)}</strong></dd></div>

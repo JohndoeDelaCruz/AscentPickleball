@@ -1824,6 +1824,76 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
         join public.pos_sales s on s.booking_id=b.id join public.pos_payments p on p.sale_id=s.id where b.id=$1`, [guestBooking])).rows,
       [{ membership_discount_amount: "0.00", method: "gcash", amount_cents: 10000 }]);
     });
+
+    await t.test("configurable open-play discounts apply to one pass online or at the counter", async () => {
+      const before = await readCurrentData();
+      await db.exec(await readFile("supabase/migrations/202611180046_open_play_membership_discounts.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), before);
+
+      const date = dayKey(new Date(Date.now() + 28 * 86400000));
+      const updated = blocks.map((block) => block.id === "open-afternoon" ? { ...block, rate: 100 } : block);
+      await db.query("update public.venue_settings set schedule_config=jsonb_set(schedule_config,'{weekly}',$1::jsonb)", [JSON.stringify(updated)]);
+      const manager = (await db.query<{ id: string }>("select id from auth.users where email='membership-manager@example.test'")).rows[0].id;
+      const six = (await db.query<{ id: string }>("select id from auth.users where email='daytime-rate@test.example'")).rows[0].id;
+      const annual = randomUUID(), guest = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'open-play-annual@example.test'),($2,'open-play-guest@example.test')", [annual, guest]);
+      const { revision } = (await db.query<{ revision: number }>("select revision from public.membership_settings where id")).rows[0];
+      assert.deepEqual(await call(annual, "request_customer_membership", ["start", JSON.stringify({ plan: "annual", revision })]), { success: true });
+      const application = (await db.query<{ id: string }>("select id from public.membership_applications where user_id=$1", [annual])).rows[0].id;
+      assert.deepEqual(await call(annual, "request_customer_membership", ["submit", JSON.stringify({ id: application, reference: "MEMBER-OPEN-PLAY-2026" })]), { success: true });
+      await call(manager, "review_membership_payment", [application, true, ""]);
+
+      const edit = (actor: string, enabled: boolean, amount: number, floor: number, version: number) =>
+        call<number>(actor, "save_membership_open_play_discount", ["annual", enabled, amount, floor, version]);
+      const onlineQuote = (actor: string, start = 12) =>
+        call<number>(actor, "get_open_play_member_discount", [date, start]);
+      const walkInQuote = (actor: string, customer: string, start = 12) =>
+        call(actor, "pos_quote_member_open_play_walk_in", [customer, date, start, 3, 1]);
+      await assert.rejects(() => edit(cashier, true, 3500, 6000, 0), /Manager or owner access/);
+      await assert.rejects(() => walkInQuote(guest, annual), /Authorized staff/);
+      await assert.rejects(() => as("", () => db.query("select public.get_open_play_member_discount($1,12)", [date]), "anon"), /permission denied/);
+      assert.equal(await onlineQuote(annual, 8), 0);
+      assert.equal(await onlineQuote(annual), 3000);
+      assert.equal(await onlineQuote(six), 3000);
+      assert.equal(await onlineQuote(guest), 0);
+      assert.deepEqual(await walkInQuote(cashier, six), { regularCents: 33000, discountCents: 3000, totalCents: 30000 });
+
+      assert.equal(await edit(manager, true, 3550, 6000, 0), 1);
+      await assert.rejects(() => edit(owner, false, 3550, 6000, 0), /Someone updated this discount/);
+      assert.equal(await onlineQuote(annual), 3550);
+      assert.equal(await onlineQuote(six), 3000);
+      assert.equal(await onlineQuote(annual, 8), 0);
+
+      const reserve = (actor: string, expectedTotal: number) =>
+        call<{ id?: string; error?: string }>(actor, "request_customer_booking_v2", ["reserve_open_play", JSON.stringify({
+          booking_date: date, start_hour: 12, participant_count: 3,
+          customer_name: "Open-play member", customer_phone: "09171234567", equipment_quantity: 1,
+          payment_option: "reservation_fee", expected_total_cents: expectedTotal,
+        })]);
+      assert.match((await reserve(annual, 30000)).error ?? "", /booking price changed/);
+      const reserved = await reserve(annual, 29450);
+      assert.ok(reserved.id, reserved.error);
+      assert.deepEqual((await db.query(`select participant_count,membership_discount_amount,total_amount,initial_payment_amount,equipment_amount
+        from public.bookings where id=$1`, [reserved.id])).rows,
+      [{ participant_count: 3, membership_discount_amount: "35.50", total_amount: "294.50", initial_payment_amount: "147.25", equipment_amount: "30.00" }]);
+      assert.equal(await onlineQuote(annual), 0);
+      assert.deepEqual(await walkInQuote(cashier, annual), { regularCents: 33000, discountCents: 0, totalCents: 33000 });
+
+      const key = randomUUID();
+      const counter = () => call<string>(cashier, "pos_book_member_open_play_walk_in", [key, six, date, "Member and guests",
+        "09171234567", 12, 3, 1, "full", "gcash", "MEMBER-OPEN-PLAY-WALK-IN", true, 30000, 30000, ""]);
+      const walkIn = await counter();
+      assert.equal(await counter(), walkIn);
+      assert.equal(await onlineQuote(six), 0);
+      assert.deepEqual((await as(six, () => db.query(`select booking_type,account_linked_walk_in,participant_count,paid_amount
+        from public.bookings where id=$1`, [walkIn]))).rows,
+      [{ booking_type: "open_play", account_linked_walk_in: true, participant_count: 3, paid_amount: "300.00" }]);
+      assert.deepEqual((await db.query(`select p.amount_cents,p.method from public.pos_payments p
+        join public.pos_sales s on s.id=p.sale_id where s.booking_id=$1`, [walkIn])).rows,
+      [{ amount_cents: 30000, method: "gcash" }]);
+      assert.equal(await edit(owner, false, 3550, 6000, 1), 2);
+      assert.equal(await onlineQuote(annual), 0);
+    });
   } finally {
     await db.close();
   }

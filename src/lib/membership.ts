@@ -39,11 +39,16 @@ const membershipCourtDiscountSchema = z.object({
 export const membershipCourtDiscountStateSchema = membershipCourtDiscountSchema.extend({
   revision: z.number().int().min(0).max(2147483647),
 });
+export const membershipOpenPlayDiscountSchema = membershipCourtDiscountStateSchema.omit({ minHours: true }).extend({
+  floorCents: z.number().int().min(1).max(maxMembershipPrice * 100),
+});
 
 export type MembershipDetails = z.infer<typeof membershipDetailsSchema>;
 export type MembershipCourtDiscount = z.infer<typeof membershipCourtDiscountStateSchema>;
+export type MembershipOpenPlayDiscount = z.infer<typeof membershipOpenPlayDiscountSchema>;
 export type MembershipPlan = { id: MembershipPlanId; details: MembershipDetails; revision: number | null;
   courtDiscount: MembershipCourtDiscount | null;
+  openPlayDiscount?: MembershipOpenPlayDiscount;
   legacyCourtRates?: { daytime: number | null; evening: number | null };
 };
 
@@ -134,6 +139,10 @@ export function isBuiltInCourtDiscountBenefit(plan: MembershipPlan, benefit: Mem
   return Boolean(plan.courtDiscount || plan.legacyCourtRates) && benefit.title === legacy.title && benefit.description === legacy.description;
 }
 
+export function isBuiltInOpenPlayDiscountBenefit(plan: MembershipPlan, benefit: MembershipBenefit) {
+  return Boolean(plan.openPlayDiscount) && ["Discounted open play", "₱70 member open play"].includes(benefit.title);
+}
+
 function membershipCourtDiscountBenefits(plan: MembershipPlan): MembershipBenefit[] {
   const discount = plan.courtDiscount;
   const icon = plan.details.benefits.find((benefit) => isBuiltInCourtDiscountBenefit(plan, benefit))?.icon ?? "wallet";
@@ -153,10 +162,19 @@ function membershipCourtDiscountBenefits(plan: MembershipPlan): MembershipBenefi
 }
 
 export function publishedMembershipDetails(plan: MembershipPlan): MembershipDetails {
-  const { details, courtDiscount, legacyCourtRates } = plan;
-  if (!courtDiscount && !legacyCourtRates) return details;
-  const discounts = membershipCourtDiscountBenefits(plan);
-  const benefits = [...discounts, ...details.benefits.filter((item) => !isBuiltInCourtDiscountBenefit(plan, item))];
+  const { details, courtDiscount, legacyCourtRates, openPlayDiscount } = plan;
+  if (!courtDiscount && !legacyCourtRates && !openPlayDiscount) return details;
+  const discounts = courtDiscount || legacyCourtRates ? membershipCourtDiscountBenefits(plan) : [];
+  if (openPlayDiscount?.enabled) {
+    const amount = money(openPlayDiscount.amountCents / 100);
+    const floor = money(openPlayDiscount.floorCents / 100);
+    discounts.push({
+      icon: "users", title: `Up to ${amount} off open play`,
+      description: `Save up to ${amount} on your pass for each open-play session. The discount brings the price down to no less than ${floor}. Lower-priced sessions keep their regular price.`,
+    });
+  }
+  const benefits = [...discounts, ...details.benefits.filter((item) =>
+    !isBuiltInCourtDiscountBenefit(plan, item) && !isBuiltInOpenPlayDiscountBenefit(plan, item))];
   if (plan.id === "annual") return { ...details, benefits };
 
   const daytime = legacyCourtRates?.daytime != null;

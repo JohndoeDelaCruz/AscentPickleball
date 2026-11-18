@@ -271,6 +271,7 @@ export const openPlaySchema = bookingSchema
     equipment_rental: true,
     equipment_quantity: true,
     payment_option: true,
+    expected_total_cents: true,
   })
   .extend({
     participant_count: z.coerce.number().int().min(1).max(20),

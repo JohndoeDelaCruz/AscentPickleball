@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/data";
-import { membershipCourtDiscountStateSchema, membershipDetailsSchema, type MembershipCourtDiscount, type MembershipPlanId } from "@/lib/membership";
+import { membershipCourtDiscountStateSchema, membershipOpenPlayDiscountSchema, membershipDetailsSchema, type MembershipCourtDiscount, type MembershipOpenPlayDiscount, type MembershipPlanId } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 
 export async function saveMembershipDetails(plan: MembershipPlanId, input: unknown, revision: number) {
@@ -65,6 +65,34 @@ export async function saveMembershipCourtDiscount(plan: MembershipPlanId, input:
     revalidatePath("/membership");
     revalidatePath("/");
     revalidatePath("/book");
+    return { discount: { ...parsed.data, revision: data } };
+  } catch {
+    return { error: failed };
+  }
+}
+
+export async function saveMembershipOpenPlayDiscount(plan: MembershipPlanId, input: unknown): Promise<
+  { discount: MembershipOpenPlayDiscount } | { error: string }
+> {
+  if (plan !== "annual" && plan !== "six-month") return { error: "Choose a membership plan." };
+  const parsed = membershipOpenPlayDiscountSchema.safeParse(input);
+  if (!parsed.success) return { error: "Enter valid open-play discount settings." };
+
+  const failed = "The open-play discount couldn’t be saved. Please try again.";
+  try {
+    const { role, verificationUnavailable } = await getSession();
+    if (verificationUnavailable) return { error: "Sign-in verification is temporarily unavailable. Please try again." };
+    if (role !== "owner" && role !== "manager") return { error: "Manager or owner access is required." };
+
+    const { enabled, amountCents, floorCents, revision } = parsed.data;
+    const db = await createClient();
+    const { data, error } = await db.rpc("save_membership_open_play_discount", {
+      p_plan: plan, p_enabled: enabled, p_amount_cents: amountCents, p_floor_cents: floorCents, p_expected_revision: revision,
+    });
+    if (error?.code === "PGRST202") return { error: "Apply migration 046 before saving open-play discounts." };
+    if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
+    if (error || typeof data !== "number") return { error: failed };
+    for (const path of ["/admin/settings", "/membership", "/", "/book"]) revalidatePath(path);
     return { discount: { ...parsed.data, revision: data } };
   } catch {
     return { error: failed };

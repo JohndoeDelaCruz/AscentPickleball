@@ -3,7 +3,7 @@ import { createClient } from "./supabase/server";
 import { defaultVenue, type VenueResult } from "./types";
 import { defaultCourts, type Court } from "./courts";
 import { readSessionAccess } from "./session-access";
-import { defaultMembership, defaultSixMonthMembership, membershipCourtDiscountStateSchema, membershipDetailsSchema, membershipPlanIds, type MembershipPlan } from "./membership";
+import { defaultMembership, defaultSixMonthMembership, membershipCourtDiscountStateSchema, membershipOpenPlayDiscountSchema, membershipDetailsSchema, membershipPlanIds, type MembershipPlan } from "./membership";
 import type { MembershipApplication } from "./membership-applications";
 
 export const getCourtInventory = cache(async () => {
@@ -45,8 +45,13 @@ export const getMembershipPlans = cache(async (): Promise<MembershipPlan[]> => {
       const discount = membershipCourtDiscountStateSchema.safeParse({ enabled: row.court_discount_enabled,
         amountCents: row.court_booking_discount_cents ?? row.court_discount_cents,
         minHours: row.court_discount_min_hours, revision: row.court_discount_revision });
+      const openPlay = membershipOpenPlayDiscountSchema.safeParse({
+        enabled: row.open_play_discount_enabled, amountCents: row.open_play_discount_cents,
+        floorCents: row.open_play_member_floor_cents, revision: row.open_play_discount_revision,
+      });
       return { ...plan, ...(parsed.success && { details: parsed.data, revision: row.revision }),
         courtDiscount: perBooking && discount.success ? discount.data : null,
+        ...(openPlay.success && { openPlayDiscount: openPlay.data }),
         ...(!perBooking && discount.success && { legacyCourtRates: {
           daytime: row.court_daytime_cap_cents ?? null,
           evening: discount.data.enabled ? discount.data.amountCents : null,
