@@ -1745,6 +1745,85 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.ok((await as(buyer, () => db.query("select * from public.list_my_counter_orders()"))).rows.length === 3);
       await assert.rejects(() => as("", () => db.query("select * from private.counter_orders"), "anon"), /permission denied/);
     });
+
+    await t.test("member walk-ins use the online plan price and record the counter payment once", async () => {
+      const before = await readCurrentData();
+      await db.exec(await readFile("supabase/migrations/202611180045_walk_in_membership_discounts.sql", "utf8"));
+      assert.deepEqual(await readCurrentData(), {
+        ...before,
+        bookings: before.bookings.map((row) => ({ ...(row as object), account_linked_walk_in: false })),
+      });
+
+      const userId = async (email: string) => (await db.query<{ id: string }>("select id from auth.users where email=$1", [email])).rows[0].id;
+      const annual = await userId("annual@test.example");
+      const six = await userId("daytime-rate@test.example");
+      const manager = await userId("membership-manager@example.test");
+      const offDuty = await userId("membership-relief@test.example");
+      const guest = randomUUID();
+      await db.query("insert into auth.users(id,email) values($1,'member-walk-in-guest@example.test')", [guest]);
+      const date = dayKey(new Date(Date.now() + 28 * 86400000));
+      const quote = (actor: string, customer: string, start: number, duration: number, quantity = 0) =>
+        call<{ regularCents: number; discountCents: number; totalCents: number }>(actor, "pos_quote_member_walk_in",
+          [customer, date, start, duration, quantity]);
+      await assert.rejects(() => quote(player, annual, 6, 2), /Authorized staff/);
+      await assert.rejects(() => quote(offDuty, annual, 6, 2), /Authorized staff/);
+      assert.deepEqual(await quote(cashier, annual, 6, 2, 2), { regularCents: 26000, discountCents: 4550, totalCents: 21450 });
+      assert.deepEqual(await quote(manager, guest, 6, 2), { regularCents: 20000, discountCents: 0, totalCents: 20000 });
+      assert.equal((await quote(manager, six, 16, 2)).discountCents, 0);
+      const savedRevision = await call<number>(manager, "save_membership_booking_discount", ["six-month", true, 2250, 2, 6]);
+      assert.equal(savedRevision, 7);
+      assert.equal((await quote(manager, six, 16, 1)).discountCents, 0);
+      assert.deepEqual(await quote(manager, six, 16, 2), { regularCents: 40000, discountCents: 2250, totalCents: 37750 });
+
+      const key = randomUUID();
+      const request = [key, annual, date, "Annual member at counter", "09171234567", 1, 6, 2, 2,
+        "reservation_fee", "cash", "", true, 10725, 21450, ""];
+      const book = (actor: string, args: unknown[]) => call<string>(actor, "pos_book_member_walk_in", args);
+      await assert.rejects(() => book(player, request), /Authorized staff/);
+      await assert.rejects(() => book(offDuty, request), /Authorized staff/);
+      // A register or stale quote failure rolls back the slot along with the payment.
+      await assert.rejects(() => book(cashier, request), /Open your cashier shift/);
+      const shift = await call<string>(cashier, "pos_open_shift", [0]);
+      const stale = [...request];
+      stale[14] = 26000;
+      await assert.rejects(() => book(cashier, stale), /price or membership changed/);
+      stale[14] = 21450;
+      stale[13] = 100;
+      await assert.rejects(() => book(cashier, stale), /amount to collect changed/);
+      const id = await book(cashier, request);
+      assert.equal(await book(cashier, request), id);
+      const changedCustomer = [...request];
+      changedCustomer[1] = six;
+      await assert.rejects(() => book(cashier, changedCustomer), /different booking/);
+
+      const details = await as(annual, () => db.query(`select user_id, account_linked_walk_in, status,
+        membership_discount_amount, equipment_amount, total_amount, initial_payment_amount, paid_amount
+        from public.bookings where id=$1`, [id]));
+      assert.deepEqual(details.rows, [{ user_id: annual, account_linked_walk_in: true, status: "confirmed",
+        membership_discount_amount: "45.50", equipment_amount: "60.00", total_amount: "214.50",
+        initial_payment_amount: "107.25", paid_amount: "107.25" }]);
+      assert.deepEqual((await as(player, () => db.query("select id from public.bookings where id=$1", [id]))).rows, []);
+      assert.deepEqual((await db.query(`select p.method,p.amount_cents,p.shift_id from public.pos_payments p
+        join public.pos_sales s on s.id=p.sale_id where s.booking_id=$1`, [id])).rows,
+      [{ method: "cash", amount_cents: 10725, shift_id: shift }]);
+      await call(manager, "staff_save_booking_finance", [id, "cash", "Discount verified"]);
+      await call(cashier, "pos_close_shift", [shift, 10725]);
+
+      const managerRequest = [randomUUID(), six, date, "Six-month member at counter", "09171234567", 2, 16, 2, 0,
+        "full", "bank_transfer", "", true, 37750, 37750, "Verified transfer"];
+      await assert.rejects(() => book(cashier, managerRequest), /confirm the received payment/);
+      const managerBooking = await book(manager, managerRequest);
+      assert.deepEqual((await db.query(`select f.payment_method,f.notes,p.amount_cents from public.booking_finance f
+        join public.pos_sales s on s.booking_id=f.booking_id join public.pos_payments p on p.sale_id=s.id
+        where f.booking_id=$1`, [managerBooking])).rows,
+      [{ payment_method: "bank_transfer", notes: "Verified transfer", amount_cents: 37750 }]);
+
+      const guestBooking = await book(manager, [randomUUID(), guest, date, "Guest account at counter", "09171234567", 2, 6, 1, 0,
+        "full", "gcash", "WALKIN-MEMBER-TEST-2026", true, 10000, 10000, ""]);
+      assert.deepEqual((await db.query(`select b.membership_discount_amount,p.method,p.amount_cents from public.bookings b
+        join public.pos_sales s on s.booking_id=b.id join public.pos_payments p on p.sale_id=s.id where b.id=$1`, [guestBooking])).rows,
+      [{ membership_discount_amount: "0.00", method: "gcash", amount_cents: 10000 }]);
+    });
   } finally {
     await db.close();
   }

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { reserveOpenPlay, staffCreateBooking } from "@/app/actions";
-import { bookWalkIn } from "@/app/(workspace)/staff/actions";
+import { bookMemberWalkIn, bookWalkIn, quoteMemberWalkIn, type MemberWalkInQuote } from "@/app/(workspace)/staff/actions";
+import type { MembershipCustomer } from "@/app/(workspace)/staff/memberships/actions";
 import {
   addDays, bookingSchema, calculateCourtTotal, calculateReservationTotal, formatDate,
   formatHour, isPastSlot, localDate, money, privateEquipmentLimit,
@@ -15,6 +16,7 @@ import { resolveSchedule, scheduleHours } from "@/lib/schedule";
 import type { PaymentOption, VenueSettings } from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
 import { Modal } from "./modal";
+import { WalkInCustomerLookup } from "./walk-in-customer-lookup";
 
 type ReservationType = "court" | "open_play" | "block";
 type StepPosition = { step: number; direction: "forward" | "backward" | null };
@@ -43,6 +45,8 @@ export function CreateBookingModal({
   const [people, setPeople] = useState("1");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [member, setMember] = useState<MembershipCustomer | null>(null);
+  const [memberQuote, setMemberQuote] = useState<MemberWalkInQuote | null>(null);
   const [blockReason, setBlockReason] = useState("");
   const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("full");
@@ -58,6 +62,8 @@ export function CreateBookingModal({
 
   const blocked = type === "block";
   const openPlay = type === "open_play";
+  const memberId = type === "court" ? member?.id : undefined;
+  const requiresPaymentConfirmation = !manager || Boolean(memberId);
   const lastStep = blocked ? 1 : 2;
   const stepTitle = ["Choose court time", blocked ? "Block details" : "Customer details", "Record payment"][step];
   const blocks = resolveSchedule(venue, bookingDate).blocks;
@@ -81,7 +87,9 @@ export function CreateBookingModal({
     ? validPlayerCount ? playerCount : 0
     : privateEquipmentLimit(venue, bookingDate, selectedHour, duration);
   const equipmentQuantity = blocked ? 0 : Math.min(requestedEquipmentQuantity, equipmentLimit);
-  const total = base === null ? null : calculateReservationTotal(base, venue.equipment_rental_price, equipmentQuantity);
+  const total = base === null ? null : memberId && step === 2
+    ? (memberQuote ? memberQuote.totalCents / 100 : null)
+    : calculateReservationTotal(base, venue.equipment_rental_price, equipmentQuantity);
   const collected = total === null ? null : initialPaymentAmount(total, paymentOption);
 
   useEffect(() => {
@@ -118,10 +126,22 @@ export function CreateBookingModal({
         if (selectedHour !== undefined) setStartHour(selectedHour);
         setSessionStart(session?.start);
       }
+      if (step === 1 && memberId && selectedHour !== undefined) {
+        startTransition(async () => {
+          const result = await quoteMemberWalkIn({ customerId: memberId, bookingDate, startHour: selectedHour, duration, equipmentQuantity });
+          if ("error" in result) {
+            setError(result.error);
+            return;
+          }
+          setMemberQuote(result.quote);
+          goToStep(2);
+        });
+        return;
+      }
       goToStep(step + 1);
       return;
     }
-    if (!manager && !verified) return;
+    if (requiresPaymentConfirmation && !verified) return;
 
     const input = {
       booking_date: bookingDate,
@@ -139,9 +159,11 @@ export function CreateBookingModal({
     };
     startTransition(async () => {
       try {
-        if (!manager) {
+        if (!manager || memberId) {
           const payment = {
             ...input,
+            member_id: memberId,
+            expected_total_cents: memberId ? memberQuote?.totalCents : undefined,
             method,
             reference: method === "gcash" ? reference.trim() : "",
             verified,
@@ -151,9 +173,11 @@ export function CreateBookingModal({
           if (walkInRequest.current?.payload !== payload) {
             walkInRequest.current = { payload, key: crypto.randomUUID() };
           }
-          const result = await bookWalkIn({ ...payment, key: walkInRequest.current.key }, openPlay);
+          const request = { ...payment, key: walkInRequest.current.key };
+          const result = memberId ? await bookMemberWalkIn(request) : await bookWalkIn(request, openPlay);
           if (result.error) {
             setError(result.error);
+            if (memberId) setVerified(false);
             return;
           }
         } else {
@@ -164,9 +188,9 @@ export function CreateBookingModal({
           }
         }
         onClose();
-        if (!manager && bookingDate !== date) router.push(`/admin?date=${bookingDate}`);
+        if ((!manager || memberId) && bookingDate !== date) router.push(`/admin?date=${bookingDate}`);
         else {
-          if (!manager) onWalkInSaved();
+          if (!manager || memberId) onWalkInSaved();
           router.refresh();
         }
       } catch {
@@ -199,6 +223,8 @@ export function CreateBookingModal({
                   <select value={type} onChange={(event) => {
                     const value = event.target.value;
                     setType(value === "open_play" || (value === "block" && manager) ? value : "court");
+                    setMember(null);
+                    setMemberQuote(null);
                     setError("");
                   }}>
                     <option value="court">Private court booking</option>
@@ -274,6 +300,11 @@ export function CreateBookingModal({
               </>
             ) : (
               <>
+                {type === "court" && <WalkInCustomerLookup customer={member} onChange={(customer) => {
+                  setMember(customer);
+                  setMemberQuote(null);
+                  if (customer?.full_name && customer.full_name.length >= 2) setCustomerName(customer.full_name);
+                }} />}
                 <label className="field">
                   <span>Customer name</span>
                   <input required minLength={2} maxLength={100} value={customerName}
@@ -291,6 +322,7 @@ export function CreateBookingModal({
             {step === 2 && (
               <>
                 <p className="court-time-summary">{formatDate(bookingDate)} · {when}</p>
+                {memberId && member && <p className="small-print">Linked account · {member.full_name || member.email}</p>}
                 <div className="field-grid">
                   <label className="field">
                     <span>Payment collected</span>
@@ -309,18 +341,19 @@ export function CreateBookingModal({
                       setVerified(false);
                     }}>
                       {Object.entries(paymentMethods)
-                        .filter(([key]) => manager ? key !== "unspecified" && key !== "gcash" : key === "cash" || key === "gcash")
+                        .filter(([key]) => manager ? key !== "unspecified" && (key !== "gcash" || memberId) : key === "cash" || key === "gcash")
                         .map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
                   </label>
                 </div>
                 {method === "cash" && <p className="small-print">Cash payments require an open register shift.</p>}
-                {manager ? (
+                {manager && (
                   <label className="field">
                     <span>Staff notes (optional)</span>
                     <textarea rows={2} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} />
                   </label>
-                ) : (
+                )}
+                {requiresPaymentConfirmation && (
                   <>
                     {method === "gcash" && (
                       <label className="field">
@@ -333,17 +366,22 @@ export function CreateBookingModal({
                     )}
                     <label className="toggle-field">
                       <input type="checkbox" required checked={verified} onChange={(event) => setVerified(event.target.checked)} />
-                      <span>{method === "gcash" ? "I verified the payment in GCash." : "I received the cash payment."}</span>
+                      <span>{method === "gcash" ? "I verified the payment in GCash." : method === "cash" ? "I received the cash payment." : "I received the payment."}</span>
                     </label>
                   </>
                 )}
                 {total !== null && collected !== null && (
                   <dl className="court-time-totals">
+                    {memberId && memberQuote && memberQuote.discountCents > 0 && <>
+                      <div><dt>Regular total</dt><dd>{money(memberQuote.regularCents / 100)}</dd></div>
+                      <div><dt>Membership discount</dt><dd>−{money(memberQuote.discountCents / 100)}</dd></div>
+                    </>}
                     <div><dt>Booking total</dt><dd>{money(total)}</dd></div>
                     <div><dt>Amount to collect</dt><dd><strong>{money(collected)}</strong></dd></div>
                     {collected < total && <div><dt>Balance due before play</dt><dd>{money(total - collected)}</dd></div>}
                   </dl>
                 )}
+                {memberId && memberQuote?.discountCents === 0 && <p className="small-print">No membership discount applies to this booking.</p>}
               </>
             )}
           </fieldset>
@@ -356,8 +394,8 @@ export function CreateBookingModal({
               {step === 0 ? "Cancel" : "Back"}
             </button>
             <button type="submit" className="button button-dark"
-              disabled={pending || closing || (step === 0 && base === null) || (step === lastStep && !manager && !verified)}>
-              {pending ? "Saving…" : step < lastStep ? "Next" : blocked ? "Block court time" : "Confirm booking"}
+              disabled={pending || closing || (step === 0 && base === null) || (step === lastStep && requiresPaymentConfirmation && !verified)}>
+              {pending ? (step === 1 && memberId ? "Checking price…" : "Saving…") : step < lastStep ? "Next" : blocked ? "Block court time" : "Confirm booking"}
             </button>
           </div>
         </div>
