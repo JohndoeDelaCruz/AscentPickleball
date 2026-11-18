@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { getSession } from "@/lib/data";
-import { membershipCourtDiscountStateSchema, membershipOpenPlayDiscountSchema, membershipDetailsSchema, type MembershipCourtDiscount, type MembershipOpenPlayDiscount, type MembershipPlanId } from "@/lib/membership";
+import { membershipCourtDiscountStateSchema, membershipOpenPlayDiscountSchema, membershipDetailsSchema, type MembershipPlanId } from "@/lib/membership";
 import { createClient } from "@/lib/supabase/server";
 
 export async function saveMembershipDetails(plan: MembershipPlanId, input: unknown, revision: number) {
@@ -37,64 +38,66 @@ export async function saveMembershipDetails(plan: MembershipPlanId, input: unkno
   }
 }
 
-export async function saveMembershipCourtDiscount(plan: MembershipPlanId, input: unknown): Promise<
-  { discount: MembershipCourtDiscount } | { error: string }
-> {
-  if (plan !== "annual" && plan !== "six-month") return { error: "Choose a membership plan." };
-  const parsed = membershipCourtDiscountStateSchema.safeParse(input);
-  if (!parsed.success) {
-    return { error: "Enter valid court discount settings for this plan." };
-  }
+const discountsSchema = z.object({
+  court: membershipCourtDiscountStateSchema.nullable(),
+  openPlay: membershipOpenPlayDiscountSchema.nullable(),
+}).refine(({ court, openPlay }) => Boolean(court || openPlay));
+const revisionSchema = z.int().min(0).max(2147483647);
+const revisionsSchema = z.object({ courtRevision: revisionSchema, openPlayRevision: revisionSchema });
+const discountSaveFailed = "Booking discounts couldn’t be saved. Please try again.";
 
-  const failed = "The court discount couldn’t be saved. Please try again.";
-  try {
-    const { role, verificationUnavailable } = await getSession();
-    if (verificationUnavailable) return { error: "Sign-in verification is temporarily unavailable. Please try again." };
-    if (role !== "owner" && role !== "manager") return { error: "Manager or owner access is required." };
-
-    const { enabled, amountCents, minHours, revision } = parsed.data;
-    const db = await createClient();
-    const rpc = plan === "annual" ? "save_membership_court_discount" : "save_membership_booking_discount";
-    const { data, error } = await db.rpc(rpc, { p_plan: plan, p_enabled: enabled,
-      p_amount_cents: amountCents, p_min_hours: minHours, p_expected_revision: revision });
-    if (error?.code === "PGRST202") return { error: `Apply migration ${plan === "annual" ? "039" : "041"} before saving court discounts.` };
-    if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
-    if (error || typeof data !== "number") return { error: failed };
-
-    revalidatePath("/admin/settings");
-    revalidatePath("/membership");
-    revalidatePath("/");
-    revalidatePath("/book");
-    return { discount: { ...parsed.data, revision: data } };
-  } catch {
-    return { error: failed };
-  }
+function discountSaveError(error: { code: string; message: string } | null, migration: string) {
+  if (error?.code === "PGRST202") return { error: `Apply migration ${migration} to save these booking discounts.` };
+  if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
+  return { error: discountSaveFailed };
 }
 
-export async function saveMembershipOpenPlayDiscount(plan: MembershipPlanId, input: unknown): Promise<
-  { discount: MembershipOpenPlayDiscount } | { error: string }
+export async function saveMembershipDiscounts(plan: MembershipPlanId, input: unknown): Promise<
+  { discounts: z.infer<typeof discountsSchema> } | { error: string }
 > {
   if (plan !== "annual" && plan !== "six-month") return { error: "Choose a membership plan." };
-  const parsed = membershipOpenPlayDiscountSchema.safeParse(input);
-  if (!parsed.success) return { error: "Enter valid open-play discount settings." };
+  const parsed = discountsSchema.safeParse(input);
+  if (!parsed.success) return { error: "Enter valid booking discount settings." };
 
-  const failed = "The open-play discount couldn’t be saved. Please try again.";
   try {
     const { role, verificationUnavailable } = await getSession();
     if (verificationUnavailable) return { error: "Sign-in verification is temporarily unavailable. Please try again." };
     if (role !== "owner" && role !== "manager") return { error: "Manager or owner access is required." };
 
-    const { enabled, amountCents, floorCents, revision } = parsed.data;
+    const { court, openPlay } = parsed.data;
+    const discounts = { court, openPlay };
     const db = await createClient();
-    const { data, error } = await db.rpc("save_membership_open_play_discount", {
-      p_plan: plan, p_enabled: enabled, p_amount_cents: amountCents, p_floor_cents: floorCents, p_expected_revision: revision,
-    });
-    if (error?.code === "PGRST202") return { error: "Apply migration 046 before saving open-play discounts." };
-    if (error?.message.startsWith("Membership: ")) return { error: error.message.slice("Membership: ".length) };
-    if (error || typeof data !== "number") return { error: failed };
+    if (court && openPlay) {
+      const { data, error } = await db.rpc("save_membership_discounts", {
+        p_plan: plan,
+        p_court_enabled: court.enabled, p_court_amount_cents: court.amountCents,
+        p_court_min_hours: court.minHours, p_court_revision: court.revision,
+        p_open_play_enabled: openPlay.enabled, p_open_play_amount_cents: openPlay.amountCents,
+        p_open_play_floor_cents: openPlay.floorCents, p_open_play_revision: openPlay.revision,
+      });
+      const revisions = revisionsSchema.safeParse(data);
+      if (error || !revisions.success) return discountSaveError(error, "048");
+      discounts.court = { ...court, revision: revisions.data.courtRevision };
+      discounts.openPlay = { ...openPlay, revision: revisions.data.openPlayRevision };
+    } else if (court) {
+      const rpc = plan === "annual" ? "save_membership_court_discount" : "save_membership_booking_discount";
+      const { data, error } = await db.rpc(rpc, { p_plan: plan, p_enabled: court.enabled,
+        p_amount_cents: court.amountCents, p_min_hours: court.minHours, p_expected_revision: court.revision });
+      const revision = revisionSchema.safeParse(data);
+      if (error || !revision.success) return discountSaveError(error, plan === "annual" ? "039" : "041");
+      discounts.court = { ...court, revision: revision.data };
+    } else if (openPlay) {
+      const { data, error } = await db.rpc("save_membership_open_play_discount", {
+        p_plan: plan, p_enabled: openPlay.enabled, p_amount_cents: openPlay.amountCents,
+        p_floor_cents: openPlay.floorCents, p_expected_revision: openPlay.revision,
+      });
+      const revision = revisionSchema.safeParse(data);
+      if (error || !revision.success) return discountSaveError(error, "046");
+      discounts.openPlay = { ...openPlay, revision: revision.data };
+    }
     for (const path of ["/admin/settings", "/membership", "/", "/book"]) revalidatePath(path);
-    return { discount: { ...parsed.data, revision: data } };
+    return { discounts };
   } catch {
-    return { error: failed };
+    return { error: discountSaveFailed };
   }
 }

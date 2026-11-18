@@ -8,7 +8,6 @@ import { parseSettingNumber } from "@/lib/settings-input";
 import { membershipTerms } from "@/lib/membership-applications";
 import { benefitIcons } from "./membership-benefit-icons";
 import { MembershipDiscountEditor } from "./membership-discount-editor";
-import { MembershipOpenPlayDiscountEditor } from "./membership-open-play-discount-editor";
 import styles from "./membership-editor.module.css";
 
 const pageTextFields = [
@@ -75,7 +74,6 @@ export function MembershipEditor({ initial }: { initial: MembershipPlan }) {
     isBuiltInCourtDiscountBenefit(initial, benefit) || isBuiltInOpenPlayDiscountBenefit(initial, benefit);
   return <>
   <MembershipDiscountEditor plan={initial} />
-  <MembershipOpenPlayDiscountEditor plan={initial} />
   <form className="venue-settings-form" onSubmit={submit}>
     <section className="console-panel settings-card" aria-labelledby={planHeadingId}>
       <header className="settings-card-heading">

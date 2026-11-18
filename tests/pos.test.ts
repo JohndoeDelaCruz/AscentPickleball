@@ -1941,6 +1941,38 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       await assert.rejects(() => call(cashier, "pos_book_walk_in", [randomUUID(), "court", date, "Walk-in Guest", null,
         2, 6, 1, 1, 0, "full", "gcash", "GUEST-WALK-IN-REFERENCE", true, 10000]), /valid Philippine mobile/);
     });
+
+    await t.test("a shared membership discount save rolls back both rules on validation or revision conflicts", async () => {
+      const read = async () => (await db.query<{
+        court_booking_discount_cents: number; court_discount_revision: number;
+        open_play_discount_cents: number; open_play_discount_revision: number; open_play_member_floor_cents: number;
+      }>(`select court_booking_discount_cents,court_discount_revision,open_play_discount_cents,
+        open_play_discount_revision,open_play_member_floor_cents from public.membership_settings where id`)).rows[0];
+      const before = await read();
+      await db.exec(await readFile("supabase/migrations/202611190048_save_membership_discounts_together.sql", "utf8"));
+      assert.deepEqual(await read(), before);
+
+      const args = ["annual", true, 5000, 2, before.court_discount_revision, true, 4000, 7500, before.open_play_discount_revision];
+      const save = (actor: string, input = args) =>
+        call<{ courtRevision: number; openPlayRevision: number }>(actor, "save_membership_discounts", input);
+      await assert.rejects(() => save(cashier), /Manager or owner access/);
+      await assert.rejects(() => as("", () => db.query(
+        "select public.save_membership_discounts('annual',true,5000,2,0,true,4000,7500,0)"), "anon"), /permission denied/);
+      await assert.rejects(() => save(owner, [...args.slice(0, 7), 0, args[8]]), /valid open-play discount/);
+      assert.deepEqual(await read(), before);
+
+      await call(owner, "save_membership_open_play_discount", ["annual", true, 3100, 7000, before.open_play_discount_revision]);
+      const changed = await read();
+      await assert.rejects(() => save(owner), /Someone updated this discount/);
+      assert.deepEqual(await read(), changed);
+
+      const fresh = [...args.slice(0, -1), changed.open_play_discount_revision];
+      const revisions = { courtRevision: changed.court_discount_revision + 1, openPlayRevision: changed.open_play_discount_revision + 1 };
+      assert.deepEqual(await save(owner, fresh), revisions);
+      assert.deepEqual(await save(owner, fresh), revisions);
+      assert.deepEqual(await read(), { court_booking_discount_cents: 5000, court_discount_revision: revisions.courtRevision,
+        open_play_discount_cents: 4000, open_play_discount_revision: revisions.openPlayRevision, open_play_member_floor_cents: 7500 });
+    });
   } finally {
     await db.close();
   }
