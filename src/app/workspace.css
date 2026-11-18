@@ -981,12 +981,11 @@
 .club-app .management-collapse-toggle:hover,
 .club-app .management-close-toggle:hover { color: #fff; background: #ffffff12; }
 .club-app .management-sidebar-scroll { scrollbar-color: #4c6e5e transparent; padding-top: 0; }
-.club-app .management-nav-group + .management-nav-group { margin-top: 16px; }
-.club-app .management-settings-group { border-top: 1px solid #ffffff18; padding-top: 12px; }
+.club-app .management-nav-group + .management-nav-group { margin-top: 14px; }
 .club-app .management-nav-heading {
   display: block;
   padding: 0 13px;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   color: #a1b9ac;
   font-size: 12px;
   font-weight: 500;
@@ -1192,7 +1191,7 @@
 .club-app .field :is(input, select, textarea) { border-color: #dce4dd; border-radius: 7px; background: #fff; color: #233c31; }
 .club-app .field :is(input, select, textarea):focus { border-color: #77a086; box-shadow: 0 0 0 3px #e7f0e8; }
 @media (min-width: 651px) {
-  .club-app .management-sidebar.is-collapsed .management-nav-group + .management-nav-group { border-top: 1px solid #ffffff18; margin-top: 15px; padding-top: 15px; }
+  .club-app .management-sidebar.is-collapsed .management-nav-group + .management-nav-group { border-top: 1px solid #ffffff18; margin-top: 10px; padding-top: 10px; }
   .club-app .management-sidebar.is-collapsed nav :is(a, button) { padding-inline: 0; }
 }
 @media (max-width: 1100px) {
