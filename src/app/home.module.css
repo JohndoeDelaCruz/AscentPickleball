@@ -1,6 +1,7 @@
 .hero {
   --hero-header-shade: linear-gradient(180deg, #11251bc4,
     #11251b73 var(--header-height), transparent calc(var(--header-height) + 52px));
+  --hero-bottom-fade: linear-gradient(to top, var(--cream), transparent clamp(54px, 12vw, 144px));
   position: relative;
   isolation: isolate;
   background: var(--ink);
@@ -14,6 +15,18 @@
   overflow: hidden;
 }
 
+.heroPhoto {
+  position: absolute;
+  inset: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .heroPhoto {
+    /* Keep the photo covering the hero as it moves down during scrolling. */
+    top: calc(-1 * clamp(40px, 8vw, 96px));
+  }
+}
+
 .heroImage {
   object-fit: cover;
   object-position: center 46%;
@@ -24,6 +37,7 @@
   position: absolute;
   inset: 0;
   background:
+    var(--hero-bottom-fade),
     var(--hero-header-shade),
     linear-gradient(90deg, #11251bea 0%, #11251baa 34%, #11251b12 77%),
     linear-gradient(0deg, #12292084, transparent 54%);
@@ -237,6 +251,7 @@
 @media (max-width: 650px) {
   .heroVisual::after {
     background:
+      var(--hero-bottom-fade),
       var(--hero-header-shade),
       linear-gradient(90deg, #11251bdf, #11251b50),
       linear-gradient(0deg, #11251bad, transparent 66%);

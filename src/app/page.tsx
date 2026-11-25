@@ -60,10 +60,12 @@ export default async function Home() {
     <LandingMotion>
       <section className={styles.hero} aria-labelledby="home-title" data-landing-hero>
         <div className={styles.heroVisual}>
-          <Image src="/ascent-courts-panorama.jpg"
-            alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
-            unoptimized fill sizes="100vw" loading="eager" fetchPriority="high"
-            className={styles.heroImage} data-hero-image />
+          <div className={styles.heroPhoto} data-hero-photo>
+            <Image src="/ascent-courts-panorama.jpg"
+              alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
+              unoptimized fill sizes="100vw" loading="eager" fetchPriority="high"
+              className={styles.heroImage} data-hero-image />
+          </div>
         </div>
         <div className={`container ${styles.heroInner}`}>
           <div className={styles.heroCopy}>

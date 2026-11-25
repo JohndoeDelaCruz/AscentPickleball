@@ -28,6 +28,21 @@ export function LandingMotion({ children }: { children: ReactNode }) {
           const mobile = context.conditions?.mobile;
           const animations = new Map<HTMLElement, gsap.core.Tween>();
           const hero = root.querySelector<HTMLElement>("[data-landing-hero]");
+          const heroPhoto = hero?.querySelector<HTMLElement>("[data-hero-photo]");
+
+          if (hero && heroPhoto) {
+            gsap.fromTo(heroPhoto, { y: 0 }, {
+              y: () => -parseFloat(getComputedStyle(heroPhoto).top),
+              ease: "none",
+              scrollTrigger: {
+                trigger: hero,
+                start: "top top",
+                end: "bottom top",
+                scrub: true,
+                invalidateOnRefresh: true,
+              },
+            });
+          }
 
           if (hero && hero.getBoundingClientRect().bottom > 0) {
             const elements = root.querySelectorAll<HTMLElement>("[data-hero]");
