@@ -1,4 +1,6 @@
 .hero {
+  --hero-header-shade: linear-gradient(180deg, #11251bc4,
+    #11251b73 var(--header-height), transparent calc(var(--header-height) + 52px));
   position: relative;
   isolation: isolate;
   background: var(--ink);
@@ -22,6 +24,7 @@
   position: absolute;
   inset: 0;
   background:
+    var(--hero-header-shade),
     linear-gradient(90deg, #11251bea 0%, #11251baa 34%, #11251b12 77%),
     linear-gradient(0deg, #12292084, transparent 54%);
 }
@@ -29,8 +32,8 @@
 .heroInner {
   display: grid;
   align-content: center;
-  min-height: clamp(472px, 40vw, 616px);
-  padding-block: 64px 78px;
+  min-height: calc(clamp(472px, 40vw, 616px) + var(--header-height));
+  padding-block: calc(64px + var(--header-height)) 78px;
 }
 
 .heroCopy h1 {
@@ -233,7 +236,10 @@
 
 @media (max-width: 650px) {
   .heroVisual::after {
-    background: linear-gradient(90deg, #11251bdf, #11251b50), linear-gradient(0deg, #11251bad, transparent 66%);
+    background:
+      var(--hero-header-shade),
+      linear-gradient(90deg, #11251bdf, #11251b50),
+      linear-gradient(0deg, #11251bad, transparent 66%);
   }
 
   .heroImage {
@@ -241,8 +247,8 @@
   }
 
   .heroInner {
-    min-height: clamp(365px, 101vw, 460px);
-    padding-block: 48px 55px;
+    min-height: calc(clamp(365px, 101vw, 460px) + var(--header-height));
+    padding-block: calc(48px + var(--header-height)) 55px;
   }
 
   .heroCopy h1 {

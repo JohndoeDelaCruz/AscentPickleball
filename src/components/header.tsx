@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ArrowUpRight, Menu, X, LogOut, UserRound } from "lucide-react";
@@ -16,11 +16,27 @@ export function Header({
   staff: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const mobileNavId = useId();
   const menuButton = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const isHome = pathname === "/";
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  useEffect(() => {
+    if (!isHome) return;
+
+    const updateScroll = () => setScrolled(window.scrollY > 0);
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
+    window.addEventListener("pageshow", updateScroll);
+    return () => {
+      window.removeEventListener("scroll", updateScroll);
+      window.removeEventListener("pageshow", updateScroll);
+    };
+  }, [isHome]);
+
   if (pathname === "/login" || (staff && isWorkspacePath(pathname))) return null;
   async function signOut() {
     await createClient().auth.signOut();
@@ -35,7 +51,8 @@ export function Header({
   ];
   return (
     <header
-      className={`site-header${isAdmin ? " site-header--admin" : ""}`}
+      className={`site-header${isHome ? " site-header--home" : ""}${isAdmin ? " site-header--admin" : ""}`}
+      data-scrolled={isHome ? scrolled : undefined}
       onKeyDown={(event) => {
         if (!open || event.key !== "Escape") return;
         event.preventDefault();
