@@ -1,13 +1,6 @@
 .hero {
   --hero-header-shade: linear-gradient(180deg, #11251bc4,
     #11251b73 var(--header-height), transparent calc(var(--header-height) + 52px));
-  --hero-bottom-fade: linear-gradient(
-    to bottom,
-    transparent,
-    color-mix(in srgb, var(--cream) 10%, transparent) 20%,
-    color-mix(in srgb, var(--cream) 90%, transparent) 80%,
-    var(--cream)
-  ) bottom / 100% clamp(44px, 6vw, 92px) no-repeat;
   position: relative;
   isolation: isolate;
   background: var(--ink);
@@ -43,7 +36,6 @@
   position: absolute;
   inset: 0;
   background:
-    var(--hero-bottom-fade),
     var(--hero-header-shade),
     linear-gradient(90deg, #11251bea 0%, #11251baa 34%, #11251b12 77%),
     linear-gradient(0deg, #12292084, transparent 54%);
@@ -257,7 +249,6 @@
 @media (max-width: 650px) {
   .heroVisual::after {
     background:
-      var(--hero-bottom-fade),
       var(--hero-header-shade),
       linear-gradient(90deg, #11251bdf, #11251b50),
       linear-gradient(0deg, #11251bad, transparent 66%);
