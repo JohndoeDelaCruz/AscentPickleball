@@ -31,12 +31,14 @@ import { DateSlider } from "@/components/date-slider";
 import { OpenPlayBooking } from "@/components/open-play-booking";
 import { EquipmentRental } from "@/components/equipment-rental";
 import { PaymentOptions } from "@/components/payment-options";
+import { BookingPolicy, MobileBookingBar, MobileReviewHeading } from "./booking-checkout";
 import {
   resolveSchedule,
   scheduleHours,
   type DaySchedule,
 } from "@/lib/schedule";
 import { TablePagination, useTablePage } from "./table-pagination";
+import styles from "./booking-calendar.module.css";
 
 export function BookingCalendar({
   venue: initialVenue,
@@ -47,6 +49,11 @@ export function BookingCalendar({
   openPlayReady,
   initialOpenPlay = false,
   initialSession,
+  initialCourt,
+  initialHour,
+  initialDuration,
+  initialPlayers,
+  initialReview = false,
 }: {
   venue: VenueSettings;
   ready: boolean;
@@ -56,6 +63,11 @@ export function BookingCalendar({
   openPlayReady: boolean;
   initialOpenPlay?: boolean;
   initialSession?: number;
+  initialCourt?: number;
+  initialHour?: number;
+  initialDuration?: number;
+  initialPlayers?: number;
+  initialReview?: boolean;
 }) {
   const courts = activeCourts(initialVenue.courts);
   const [mode, setMode] = useState<"court" | "open_play">(
@@ -90,13 +102,21 @@ export function BookingCalendar({
   const openSessions = daySchedule.blocks.filter((b) => b.kind === "open_play");
   const selectedOpenSession =
     openSessions.find((b) => b.start === selectedSession) ?? openSessions[0];
-  const [duration, setDuration] = useState(1);
+  const [duration, setDuration] = useState(initialDuration && [1, 2, 3, 4].includes(initialDuration) ? initialDuration : 1);
   const [selection, setSelection] = useState<{
     court: number;
     hour: number;
-  } | null>(null);
-  const [slots, setSlots] = useState<Availability[]>([]);
-  const [loading, setLoading] = useState(ready);
+  } | null>(() =>
+    !initialOpenPlay && initialDate === validInitial && initialCourt !== undefined && courts.some(({ id }) => id === initialCourt) &&
+    initialHour !== undefined && initialHour >= 0 && initialHour < 24 &&
+    calculateCourtTotal(initialVenue, initialHour, duration, validInitial) !== null &&
+    !courtScheduleLabel(initialVenue, validInitial, initialHour, duration) && !isPastSlot(validInitial, initialHour)
+      ? { court: initialCourt, hour: initialHour }
+      : null,
+  );
+  const [reviewing, setReviewing] = useState(initialReview);
+  const [availability, setAvailability] = useState<{ date: string; slots: Availability[] } | null>(null);
+  const [refreshing, setRefreshing] = useState(ready);
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [name, setName] = useState(userName);
@@ -119,6 +139,9 @@ export function BookingCalendar({
   const [now, setNow] = useState(() => new Date());
   const [pending, startTransition] = useTransition();
   const summaryRef = useRef<HTMLElement>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const focusStep = useRef(initialReview);
+  const modeButtonRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const open = ready && openPlayReady && canBook(venue);
   const selectedHour = selection?.hour;
@@ -139,6 +162,43 @@ export function BookingCalendar({
         (_, i) => i + (venue.opening_hour ?? 6),
       );
   const courtHours = useTablePage(hours.length, date);
+  const slots = availability?.date === date ? availability.slots : [];
+  const loading = ready && (refreshing || (availability?.date !== date && !loadError));
+  const reviewActive = reviewing && (mode === "open_play" || selection !== null);
+  const bookingDateLabel = formatDate(date, { weekday: "long", month: "long", day: "numeric" });
+  const hasFutureCourtHours = daySchedule.blocks.some((block) => block.kind === "court" && !isPastSlot(date, block.end - 1, now));
+  const slotRows = hours.map((hour) => ({
+    hour,
+    session: openSessions.find((s) => hour >= s.start && hour < s.end),
+    past: isPastSlot(date, hour, now),
+    total: calculateCourtTotal(venue, hour, duration, date),
+    scheduleLabel: courtScheduleLabel(venue, date, hour, duration),
+  }));
+  const privateStarts = slotRows.flatMap(({ hour, past, total, scheduleLabel }) =>
+    !past && total !== null && !scheduleLabel ? [{ hour, total }] : [],
+  );
+  const mobileSlots = courts.map((court) => ({
+    ...court,
+    times: privateStarts.filter(({ hour }) => isSlotAvailable(slots, court.id, hour, duration)),
+  })).filter(({ times }) => times.length > 0);
+  const noPrivateTimes = !loading && !loadError && mobileSlots.length === 0;
+
+  useEffect(() => {
+    if (mode === "court" && reviewing && !selection) {
+      focusStep.current = true;
+      setReviewing(false);
+    }
+  }, [mode, reviewing, selection]);
+
+  useEffect(() => {
+    if (!focusStep.current) return;
+    focusStep.current = false;
+    if (!window.matchMedia("(max-width: 650px)").matches) return;
+    const marker = reviewActive ? "[data-booking-review-heading]" : "[data-booking-availability-heading]";
+    const target = layoutRef.current?.querySelector<HTMLElement>(marker);
+    target?.focus({ preventScroll: true });
+    (reviewActive ? target?.parentElement : layoutRef.current)?.scrollIntoView({ block: "start" });
+  }, [reviewActive, mode]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30000);
@@ -176,7 +236,7 @@ export function BookingCalendar({
     let active = true;
     const client = createClient();
     async function refresh() {
-      setLoading(true);
+      setRefreshing(true);
       const [{ data, error: requestError }, scheduleResult] = await Promise.all(
         [
           client.rpc("get_availability", { p_date: date }),
@@ -186,7 +246,7 @@ export function BookingCalendar({
         ],
       );
       if (!active) return;
-      setLoading(false);
+      setRefreshing(false);
       if (requestError || scheduleResult.error) {
         setLoadError(
           "We couldn’t load live availability. Please try again before reserving.",
@@ -194,7 +254,7 @@ export function BookingCalendar({
         return;
       }
       setLoadError("");
-      setSlots(data || []);
+      setAvailability({ date, slots: data || [] });
       if (scheduleResult.data)
         setLiveSchedule({ date, schedule: scheduleResult.data as DaySchedule });
       const checkedVenue = scheduleResult.data
@@ -208,7 +268,9 @@ export function BookingCalendar({
         : initialVenue;
       setSelection((selected) =>
         selected &&
+        !isPastSlot(date, selected.hour) &&
         isSlotAvailable(data || [], selected.court, selected.hour, duration) &&
+        !courtScheduleLabel(checkedVenue, date, selected.hour, duration) &&
         calculateCourtTotal(checkedVenue, selected.hour, duration, date) !==
           null
           ? selected
@@ -237,20 +299,41 @@ export function BookingCalendar({
     setDate(value);
     setSelection(null);
     setSelectedSession(null);
+    setReviewing(false);
+    setLoadError("");
     setError("");
   }
   function selectSlot(court: number, hour: number) {
     setSelection({ court, hour });
+    setAccepted(false);
     setError("");
-    if (window.innerWidth < 850)
+    if (window.innerWidth > 650 && window.innerWidth < 850)
       summaryRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "start",
       });
   }
+  function changeStep(review: boolean) {
+    focusStep.current = true;
+    setReviewing(review);
+  }
+  function changeMode(next: typeof mode) {
+    if (mode === next) return;
+    setMode(next);
+    setReviewing(false);
+    setSelection(null);
+    setAccepted(false);
+    setError("");
+  }
+  function viewOpenPlay(start?: number) {
+    if (start !== undefined) setSelectedSession(start);
+    changeMode("open_play");
+    modeButtonRef.current?.focus({ preventScroll: true });
+  }
   function reserve(event: React.FormEvent) {
     event.preventDefault();
-    if (!selection || !accepted || !open || quoteLoading || quote?.failed || bookingTotal === null) return;
+    if (!selection || !accepted || !open || loading || loadError || isPastSlot(date, selection.hour) ||
+      quoteLoading || quote?.failed || bookingTotal === null) return;
     setError("");
     startTransition(async () => {
       const result = await reserveCourt({
@@ -273,8 +356,10 @@ export function BookingCalendar({
   }
 
   return (
-    <div className="booking-layout">
-      <div className="booking-main">
+    <div className={`booking-layout ${styles.layout}`} ref={layoutRef}
+      data-booking-review={reviewActive ? mode : undefined}>
+      <div className={`booking-main ${styles.main}`}>
+        <div className={styles.picker}>
         {!open && (
           <div className="notice">
             <Info size={17} />
@@ -295,38 +380,35 @@ export function BookingCalendar({
             aria-label="Reservation type"
           >
             <button
+              type="button"
               className={mode === "court" ? "active" : ""}
               aria-pressed={mode === "court"}
-              onClick={() => {
-                setMode("court");
-                setSelection(null);
-              }}
+              onClick={() => changeMode("court")}
             >
               Book a court
             </button>
             <button
+              type="button"
+              ref={modeButtonRef}
               className={mode === "open_play" ? "active" : ""}
               aria-pressed={mode === "open_play"}
-              onClick={() => {
-                setMode("open_play");
-                setSelection(null);
-              }}
+              onClick={() => changeMode("open_play")}
             >
               Open play
             </button>
           </div>
         )}
-        <div className="calendar-toolbar">
+        <div className={`calendar-toolbar ${styles.dateToolbar}`}>
           <div>
             <h2>{formatDate(date, { month: "long", year: "numeric" })}</h2>
-            <p>
+            <p className={styles.desktopOnly}>
               {preview
                 ? "Example hours · not the final schedule"
                 : "Choose a date and an available time"}
             </p>
           </div>
-          <label className="field">
-            <span>Jump to date</span>
+          <label className={`field ${styles.calendarPicker}`}>
+            <span><CalendarDays size={16} aria-hidden="true" /> Jump to date</span>
             <input
               aria-label="Booking date"
               type="date"
@@ -339,14 +421,16 @@ export function BookingCalendar({
         </div>
         <DateSlider today={today} date={date} onChange={changeDate} />
         {daySchedule.override && (
-          <div className="notice schedule-period-notice">
+          <div className={`notice schedule-period-notice ${styles.scheduleNotice}`}>
             <span>
-              <strong>{daySchedule.override.name}</strong> · Temporary schedule
-              through {formatDate(daySchedule.override.end_date)}. Regular hours
-              resume {formatDate(addDays(daySchedule.override.end_date, 1))}.
+              <strong>{daySchedule.override.name}</strong>
+              <span className={styles.desktopOnly}> · Temporary schedule through {formatDate(daySchedule.override.end_date)}. Regular hours
+                resume {formatDate(addDays(daySchedule.override.end_date, 1))}.</span>
+              <span className={styles.mobileOnly}> · Regular hours resume {formatDate(addDays(daySchedule.override.end_date, 1), { month: "short", day: "numeric" })}.</span>
             </span>
           </div>
         )}
+        </div>
         {mode === "open_play" ? (
           <OpenPlayBooking
             venue={venue}
@@ -356,10 +440,13 @@ export function BookingCalendar({
             userName={userName}
             selectedStart={selectedSession}
             onSessionChange={setSelectedSession}
+            initialPlayers={initialPlayers}
+            reviewing={reviewActive}
+            onReviewChange={changeStep}
           />
         ) : (
           <>
-            <div className="notice booking-court-rules">
+            <div className={`notice booking-court-rules ${styles.desktopOnly}`}>
               <Info size={17} aria-hidden="true" />
               <span>
                 Private bookings allow up to{" "}
@@ -389,7 +476,7 @@ export function BookingCalendar({
               </span>
             </div>
             {openSessions.length > 0 && (
-              <div className="notice weekend-schedule-note">
+              <div className={`notice weekend-schedule-note ${styles.desktopOnly}`}>
                 <Info size={17} />
                 <span>
                   {openSessions
@@ -402,21 +489,28 @@ export function BookingCalendar({
                   <button
                     type="button"
                     className="text-link"
-                    onClick={() => setMode("open_play")}
+                    onClick={() => viewOpenPlay()}
                   >
                     Get open-play passes <ArrowRight size={12} />
                   </button>
                 </span>
               </div>
             )}
-            <div className="calendar-toolbar">
-              <label className="field" style={{ width: 175 }}>
-                <span>How long are we playing?</span>
+            <div className={`${styles.mobileOnly} ${styles.sectionHeading} ${styles.privateHeading}`}>
+              <h2 id="mobile-court-availability" data-booking-availability-heading tabIndex={-1}>Availability</h2>
+              <span>Philippine time</span>
+            </div>
+            <div className={`calendar-toolbar ${styles.durationToolbar}${!hasFutureCourtHours && !loadError ? ` ${styles.desktopOnly}` : ""}`}>
+              <label className={`field${hasFutureCourtHours ? "" : ` ${styles.desktopOnly}`}`} style={{ width: 175 }}>
+                <span className={styles.desktopOnly}>How long are we playing?</span>
+                <span className={styles.mobileOnly}>Duration</span>
                 <select
                   value={duration}
                   onChange={(e) => {
                     setDuration(Number(e.target.value));
                     setSelection(null);
+                    setReviewing(false);
+                    setAccepted(false);
                   }}
                 >
                   {[1, 2, 3, 4].map((v) => (
@@ -427,6 +521,7 @@ export function BookingCalendar({
                 </select>
               </label>
               <button
+                type="button"
                 className="icon-button"
                 title="Refresh availability"
                 aria-label="Refresh availability"
@@ -441,6 +536,50 @@ export function BookingCalendar({
                 {loadError}
               </div>
             )}
+            <section className={`${styles.mobileOnly} ${styles.availability}`} aria-labelledby="mobile-court-availability">
+              {loading && <p className={styles.availabilityStatus} role="status">Checking availability…</p>}
+              {!courts.length && <p className={styles.availabilityStatus}>No active courts are available. Please contact the venue.</p>}
+              {courts.length > 0 && !loadError && (!loading || availability?.date === date) && (
+                mobileSlots.length > 0 ? mobileSlots.map(({ id, name, times }) => (
+                  <div className={styles.sessionCard} key={id} role="group" aria-label={`${name} available times for ${bookingDateLabel}`}>
+                    <h3>{name}</h3>
+                    <div className={styles.timeChoices}>
+                      {times.map(({ hour, total }) => (
+                        <button key={hour} type="button" className="slot-button" disabled={loading}
+                          aria-pressed={selection?.court === id && selection.hour === hour}
+                          onClick={() => selectSlot(id, hour)}>
+                          <strong>{formatHour(hour)}</strong>
+                          <small>{money(total)}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )) : openSessions.length === 0 && <div className={styles.sessionCard}>
+                  <h3>No private court times</h3>
+                  <p>Choose another date{hasFutureCourtHours ? " or try a shorter duration" : ""}.</p>
+                </div>
+              )}
+              {openSessions.length > 0 && (
+                <div className={`${styles.sessionCard} ${styles.openAlternative}`}>
+                  <h3>{noPrivateTimes ? "No private court times" : "Open play"}</h3>
+                  {openSessions.map((session) => {
+                    const ended = isPastSlot(date, session.end, now);
+                    return <div key={session.id} className={styles.sessionAlternativeRow}>
+                      <div>
+                        {noPrivateTimes && <p>Open play</p>}
+                        <strong>{formatHour(session.start)}–{formatHour(session.end)}</strong>
+                        <p>{money(session.rate)} / person{ended ? " · Ended" : ""}</p>
+                      </div>
+                      {!ended && <button type="button" className="button button-dark"
+                        onClick={() => viewOpenPlay(session.start)}>
+                        View open play <ArrowRight size={15} aria-hidden="true" />
+                      </button>}
+                    </div>;
+                  })}
+                </div>
+              )}
+            </section>
+            <div className={styles.desktopOnly}>
             <div className="calendar-legend">
               <span>
                 <i className="legend-dot" />
@@ -476,15 +615,11 @@ export function BookingCalendar({
                   </div>
                 ))}
               </div>
-              {hours.slice(courtHours.start, courtHours.end).map((hour) => (
+              {slotRows.slice(courtHours.start, courtHours.end).map(({ hour, session, past, total, scheduleLabel }) => (
                 <div className="availability-row" key={hour}>
                   <div className="time-label">{formatHour(hour)}</div>
-                  {openSessions.some((s) => hour >= s.start && hour < s.end)
-                    ? (() => {
-                        const session = openSessions.find(
-                          (s) => hour >= s.start && hour < s.end,
-                        )!;
-                        return (
+                  {session
+                    ? (
                           <div className="slot-cell open-play-grid-cell">
                             <button
                               type="button"
@@ -495,10 +630,7 @@ export function BookingCalendar({
                                 isPastSlot(date, session.end, now)
                               }
                               aria-label={`Join open play, ${formatHour(session.start)} to ${formatHour(session.end)}`}
-                              onClick={() => {
-                                setSelectedSession(session.start);
-                                setMode("open_play");
-                              }}
+                              onClick={() => viewOpenPlay(session.start)}
                             >
                               Open play · Join session{" "}
                               {(hour === session.start || hour === hours[courtHours.start]) && (
@@ -510,41 +642,31 @@ export function BookingCalendar({
                               )}
                             </button>
                           </div>
-                        );
-                      })()
+                      )
                     : courts.map(({ id: court, name }) => {
-                        const past = isPastSlot(date, hour, now);
-                        const fits =
-                          calculateCourtTotal(venue, hour, duration, date) !==
-                          null;
+                        const fits = total !== null;
                         const available =
                           fits && isSlotAvailable(slots, court, hour, duration);
                         const selected =
                           selection?.court === court && selection.hour === hour;
-                        const sessionLabel = courtScheduleLabel(
-                          venue,
-                          date,
-                          hour,
-                          duration,
-                        );
                         const disabled =
                           !available ||
                           past ||
                           loading ||
                           Boolean(loadError) ||
-                          Boolean(sessionLabel);
+                          Boolean(scheduleLabel);
                         return (
                           <div className="slot-cell" key={court}>
                             <button
                               type="button"
                               className={`slot-button ${selected ? "active" : ""}`}
                               disabled={disabled}
-                              aria-label={`${name}, ${formatHour(hour)}, ${sessionLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
+                              aria-label={`${name}, ${formatHour(hour)}, ${scheduleLabel || (past ? "past" : !fits ? "outside hours" : !available ? "unavailable" : "available")}`}
                               aria-pressed={selected}
                               onClick={() => selectSlot(court, hour)}
                             >
-                              {sessionLabel ? (
-                                sessionLabel
+                              {scheduleLabel ? (
+                                scheduleLabel
                               ) : selected ? (
                                 <>
                                   <Check size={12} />
@@ -577,17 +699,27 @@ export function BookingCalendar({
             {courts.length > 0 && (
               <TablePagination {...courtHours} label="Court availability time slot pages" anchorId="booking-court-slots" />
             )}
+            </div>
+            {selection && !reviewActive && (
+              <MobileBookingBar
+                total={quoteLoading ? "Checking price…" : quote?.failed ? "Price unavailable" : bookingTotal === null ? "Price pending" : money(bookingTotal)}
+                selection={`${courtName(venue.courts, selection.court)} · ${formatHour(selection.hour)}–${formatHour(selection.hour + duration)}`}
+                disabled={loading || Boolean(loadError) || isPastSlot(date, selection.hour, now)}
+                onContinue={() => changeStep(true)}
+              />
+            )}
           </>
         )}
       </div>
       <aside
-        className="panel booking-sidebar"
+        className={`panel booking-sidebar ${styles.summary}`}
         ref={summaryRef}
         style={{ scrollMarginTop: 110 }}
       >
-        <span className="eyebrow">YOUR NEXT GAME</span>
-        <h3 style={{ marginTop: 12 }}>Booking summary</h3>
-        <p>Good times start with a plan.</p>
+        {mode === "court" && <MobileReviewHeading onBack={() => changeStep(false)} disabled={pending} />}
+        <span className={`eyebrow ${styles.desktopOnly}`}>YOUR NEXT GAME</span>
+        <h3 className={styles.desktopOnly} style={{ marginTop: 12 }}>Booking summary</h3>
+        <p className={styles.desktopOnly}>Good times start with a plan.</p>
         {mode === "open_play" ? (
           <div className="open-play-sidebar">
             <CalendarDays size={38} />
@@ -665,6 +797,9 @@ export function BookingCalendar({
                 ),
               )}
             </dl>
+            <p className={`small-print ${styles.mobileOnly}`}>
+              Up to {equipmentLimit} players per court.
+            </p>
             <EquipmentRental
               price={venue.equipment_rental_price}
               ballCount={venue.equipment_ball_count}
@@ -713,7 +848,7 @@ export function BookingCalendar({
               <>
                 <Link
                   className="button button-dark"
-                  href={`/login?next=${encodeURIComponent(`/book?court=${selection.court}&date=${date}`)}`}
+                  href={`/login?next=${encodeURIComponent(`/book?court=${selection.court}&date=${date}&start=${selection.hour}&duration=${duration}&review=1`)}`}
                 >
                   Sign in to reserve <ArrowRight size={16} />
                 </Link>
@@ -787,7 +922,8 @@ export function BookingCalendar({
                 <button
                   className="button button-dark"
                   disabled={
-                    pending || loading || Boolean(loadError) || !accepted || quoteLoading || Boolean(quote?.failed) || bookingTotal === null
+                    pending || loading || Boolean(loadError) || !accepted || isPastSlot(date, selection.hour, now) ||
+                    quoteLoading || Boolean(quote?.failed) || bookingTotal === null
                   }
                 >
                   {pending ? "Reserving…" : "Reserve & view GCash QR"}
@@ -802,25 +938,7 @@ export function BookingCalendar({
             )}
           </>
         )}
-        <details style={{ marginTop: 23 }} id="booking-policy">
-          <summary style={{ fontSize: 14, color: "var(--muted)" }}>
-            Booking & cancellation policy
-          </summary>
-          <p className="small-print">{venue.cancellation_policy}</p>
-          <Link
-            href="/court-rules"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-link policy-link"
-          >
-            Read the full court rules
-          </Link>
-          <p className="small-print">
-            Unpaid holds expire after {venue.hold_minutes} minutes. Submitted
-            payments stay pending for staff verification. Contact the venue if
-            you paid after your hold expired.
-          </p>
-        </details>
+        <BookingPolicy venue={venue} id="booking-policy" />
       </aside>
     </div>
   );

@@ -23,6 +23,8 @@ import type {
 } from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
 import { PaymentOptions } from "./payment-options";
+import { BookingPolicy, MobileBookingBar, MobileReviewHeading } from "./booking-checkout";
+import styles from "./booking-calendar.module.css";
 import { resolveSchedule } from "@/lib/schedule";
 import { activeCourts } from "@/lib/courts";
 
@@ -34,6 +36,9 @@ export function OpenPlayBooking({
   userName,
   selectedStart,
   onSessionChange,
+  initialPlayers,
+  reviewing,
+  onReviewChange,
 }: {
   venue: VenueSettings;
   date: string;
@@ -42,8 +47,14 @@ export function OpenPlayBooking({
   userName: string;
   selectedStart: number | null;
   onSessionChange: (start: number) => void;
+  initialPlayers?: number;
+  reviewing: boolean;
+  onReviewChange: (review: boolean) => void;
 }) {
-  const [people, setPeople] = useState(1);
+  const [people, setPeople] = useState(initialPlayers && initialPlayers >= 1 && initialPlayers <= 20 ? initialPlayers : 1);
+  const [selectedForReview, setSelectedForReview] = useState<string | null>(
+    reviewing && selectedStart !== null ? `${date}:${selectedStart}` : null,
+  );
   const [name, setName] = useState(userName);
   const [phone, setPhone] = useState("");
   const [requestedEquipmentQuantity, setEquipmentQuantity] = useState(0);
@@ -162,6 +173,7 @@ export function OpenPlayBooking({
   const remaining = activeSession.remaining;
   const tooMany =
     remaining !== null && remaining !== undefined && people > remaining;
+  const validPeople = Number.isInteger(people) && people >= 1 && people <= 20;
   const start = activeSession.start_hour;
   const price = activeSession.price;
   const quoteKey = signedIn && canReserve ? `${date}:${start}:${price}:${revision}` : null;
@@ -170,6 +182,10 @@ export function OpenPlayBooking({
   const discountCents = people >= 1 && memberQuote?.key === quoteKey ? memberQuote.discountCents ?? 0 : 0;
   const regularTotal = calculateReservationTotal((people || 0) * price, venue.equipment_rental_price, equipmentQuantity);
   const totalCents = Math.round(regularTotal * 100) - discountCents;
+  const time = `${formatHour(start)}–${formatHour(activeSession.end_hour)}`;
+  const passSelection = `${date}:${start}`;
+  const reservationReady = canReserve && validPeople && !tooMany && !loading && !loadError;
+  const displayedTotal = checkingPrice ? "Checking price…" : quoteFailed ? "Price unavailable" : money(totalCents / 100);
 
   useEffect(() => {
     if (!quoteKey) return;
@@ -189,7 +205,8 @@ export function OpenPlayBooking({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!canReserve || !accepted || tooMany || checkingPrice || quoteFailed) return;
+    if ((!reviewing && window.matchMedia("(max-width: 650px)").matches) ||
+      !signedIn || !reservationReady || !accepted || checkingPrice || quoteFailed) return;
     setError("");
     startTransition(async () => {
       const result = await reserveOpenPlay({
@@ -209,9 +226,24 @@ export function OpenPlayBooking({
       } else if (result.id) router.push(`/booking/${result.id}`);
     });
   }
+  const playersField = (
+    <label className={`field ${styles.playersField}`}>
+      <span>Number of players</span>
+      <input type="number" min="1" max="20" value={people}
+        onChange={(e) => setPeople(Number(e.target.value))}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !reviewing && window.matchMedia("(max-width: 650px)").matches) event.preventDefault();
+        }}
+        required
+      />
+      <small className={styles.desktopOnly}>Up to 20 players per reservation. Each player needs a pass.</small>
+    </label>
+  );
   return (
-    <section className="panel open-play-panel" aria-label="Open play">
-      <div className="open-play-heading">
+    <section className={`panel open-play-panel ${styles.openPlayPanel}`} aria-label="Open play"
+      data-open-review={reviewing || undefined}>
+      {reviewing && <MobileReviewHeading onBack={() => onReviewChange(false)} disabled={pending} />}
+      <div className={`open-play-heading ${styles.desktopOnly}`}>
         <span className="open-play-icon">
           <Users size={24} />
         </span>
@@ -226,9 +258,13 @@ export function OpenPlayBooking({
           </strong>
         )}
       </div>
+      <div className={`${styles.mobileOnly} ${styles.openBrowse} ${styles.sectionHeading}`}>
+        <h2 data-booking-availability-heading tabIndex={-1}>Open-play sessions</h2>
+        <span>Philippine time</span>
+      </div>
       {sessions.length > 0 && (
         <div
-          className="open-play-session-picker"
+          className={`open-play-session-picker ${styles.openBrowse}`}
           role="group"
           aria-label="Open-play session"
         >
@@ -245,9 +281,12 @@ export function OpenPlayBooking({
               <strong>
                 {formatHour(s.start_hour)}–{formatHour(s.end_hour)}
               </strong>
-              <span>{money(s.price)} / person / session</span>
+              <span>{money(s.price)} / person<span className={styles.desktopOnly}> / session</span></span>
               <small>
-                {s.capacity === null
+                {isPastSlot(date, s.end_hour, now) ? "Session ended"
+                  : s.conflict ? "Courts unavailable"
+                  : loading && loadedDate !== date ? "Checking availability…"
+                  : s.capacity === null
                   ? "No player limit"
                   : `${s.remaining ?? s.capacity} places remaining`}
               </small>
@@ -257,16 +296,16 @@ export function OpenPlayBooking({
       )}
       {scheduled && (
         <>
-          <p>
+          <p className={styles.desktopOnly}>
             Come for a few rallies or stay for the session. Your pass covers{" "}
             {formatHour(activeSession.start_hour)}–
             {formatHour(activeSession.end_hour)}.
           </p>
-          <p>
+          <p className={styles.desktopOnly}>
             <strong>{openPlayCapacityLabel(activeSession.capacity, activeCourts(venue.courts).length)}.</strong>{" "}
             Players share the active courts and rotate between games.
           </p>
-          <div className="open-play-meta">
+          <div className={`open-play-meta ${styles.desktopOnly}`}>
             <span>
               {formatDate(date, {
                 weekday: "long",
@@ -280,10 +319,24 @@ export function OpenPlayBooking({
                 : `${remaining ?? activeSession.capacity} places remaining`}
             </span>
           </div>
+          {reviewing && <dl className={`summary-rows ${styles.mobileOnly} ${styles.openRecap}`}>
+            <div><dt>Session</dt><dd>{time}</dd></div>
+            <div><dt>Date</dt><dd>{formatDate(date, { weekday: "short", month: "short", day: "numeric" })}</dd></div>
+            <div><dt>Players</dt><dd>{people}</dd></div>
+            <div><dt>Booking total</dt><dd><strong>{displayedTotal}</strong></dd></div>
+          </dl>}
         </>
       )}
+      {loadError && (
+        <div className="error-message" role="alert">
+          {loadError}
+          <button type="button" className="text-link" onClick={() => setRevision((v) => v + 1)}>
+            <RefreshCw size={12} /> Refresh availability
+          </button>
+        </div>
+      )}
       {!scheduled ? (
-        <div className="notice">
+        !loadError && <div className="notice">
           {loading
             ? "Checking sessions…"
             : "No open-play sessions are scheduled for this date. Choose another date or book a private court."}
@@ -291,18 +344,18 @@ export function OpenPlayBooking({
       ) : (
         <>
           {activeSession.conflict && (
-            <div className="notice notice-warning">
+            <div className={`notice notice-warning ${styles.openCheckout}`}>
               Open play is unavailable on this date because a court is reserved
               or blocked. Choose another session.
             </div>
           )}
           {ended && (
-            <div className="notice">
+            <div className={`notice ${styles.openCheckout}`}>
               This open-play session has ended. Choose another session or date.
             </div>
           )}
           {(!ready || !venue.booking_enabled) && (
-            <div className="notice">
+            <div className={`notice ${styles.openCheckout}`}>
               Online open-play reservations are opening soon. You can preview
               the session details here.
             </div>
@@ -312,18 +365,6 @@ export function OpenPlayBooking({
               {error}
             </div>
           )}
-          {loadError && (
-            <div className="error-message" role="alert">
-              {loadError}
-              <button
-                type="button"
-                className="text-link"
-                onClick={() => setRevision((v) => v + 1)}
-              >
-                <RefreshCw size={12} /> Refresh availability
-              </button>
-            </div>
-          )}
           {quoteFailed && <div className="error-message" role="alert">
             We couldn’t check the member price.
             <button type="button" className="text-link" onClick={() => setRevision((v) => v + 1)}>
@@ -331,30 +372,20 @@ export function OpenPlayBooking({
             </button>
           </div>}
           {!signedIn ? (
-            <Link
-              className="button button-dark"
-              href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}&session=${activeSession.start_hour}`)}`}
-            >
-              Sign in for open play <ArrowRight size={16} />
-            </Link>
+            <>
+              <div className={styles.mobileOnly}>{playersField}</div>
+              <Link
+                className={`button button-dark ${styles.openCheckout}`}
+                href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}&session=${start}&players=${people}&review=1`)}`}
+              >
+                Sign in for open play <ArrowRight size={16} />
+              </Link>
+            </>
           ) : (
             <form className="form-stack" onSubmit={submit}>
               <div className="field-grid">
-                <label className="field">
-                  <span>Number of players</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={people}
-                    onChange={(e) => setPeople(Number(e.target.value))}
-                    required
-                  />
-                  <small>
-                    Up to 20 players per reservation. Each player needs a pass.
-                  </small>
-                </label>
-                <label className="field">
+                {playersField}
+                <label className={`field ${styles.openCheckout}`}>
                   <span>Full name</span>
                   <input
                     value={name}
@@ -366,6 +397,7 @@ export function OpenPlayBooking({
                   />
                 </label>
               </div>
+              <div className={`form-stack ${styles.openCheckout}`}>
               <label className="field">
                 <span>Mobile number</span>
                 <input
@@ -444,14 +476,11 @@ export function OpenPlayBooking({
               <button
                 className="button button-dark"
                 disabled={
-                  !canReserve ||
-                  tooMany ||
-                  loading ||
+                  !reservationReady ||
                   checkingPrice ||
                   quoteFailed ||
                   pending ||
-                  !accepted ||
-                  Boolean(loadError)
+                  !accepted
                 }
               >
                 {pending
@@ -461,9 +490,29 @@ export function OpenPlayBooking({
                     : checkingPrice ? "Checking price…" : "Reserve passes & view GCash QR"}
                 <ArrowRight size={16} />
               </button>
+              </div>
             </form>
           )}
-          <p className="small-print">
+          {tooMany && <p className={`${styles.mobileOnly} ${styles.openBrowse} ${styles.availabilityStatus}`} role="status">
+            Choose fewer players or another session.
+          </p>}
+          {!reviewing && selectedForReview !== passSelection && (
+            <button type="button" className={`button button-outline ${styles.mobileOnly} ${styles.chooseSession}`}
+              disabled={!reservationReady} onClick={() => setSelectedForReview(passSelection)}>
+              Select session
+            </button>
+          )}
+          {!reviewing && selectedForReview === passSelection && (
+            <MobileBookingBar total={displayedTotal}
+              selection={`Open play · ${people} ${people === 1 ? "player" : "players"} · ${time}`}
+              disabled={!reservationReady || checkingPrice || quoteFailed}
+              onContinue={() => onReviewChange(true)}
+            />
+          )}
+          {reviewing && <div className={styles.mobileOnly}>
+            <BookingPolicy venue={venue} id="open-play-policy" />
+          </div>}
+          <p className={`small-print ${styles.desktopOnly}`}>
             Pay through the venue’s GCash QR and submit your reference. Staff
             confirms after checking payment. Selected equipment rental is
             included in your total. {venue.cancellation_policy}
