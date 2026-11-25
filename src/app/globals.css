@@ -12,7 +12,7 @@
   --lime: #d9ec98;
   --line: #dde2d5;
   --white: #fff;
-  --header-height: 113px;
+  --header-height: 80px;
 }
 * {
   box-sizing: border-box;
@@ -215,7 +215,7 @@ img {
   backdrop-filter: blur(18px);
 }
 .nav-shell {
-  min-height: 112px;
+  min-height: calc(var(--header-height) - 1px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -226,6 +226,9 @@ img {
   align-items: center;
   width: 96px;
   flex-shrink: 0;
+}
+.site-header .brand {
+  width: 68px;
 }
 .brand-image {
   display: block;
@@ -2870,9 +2873,6 @@ img {
   }
 }
 @media (max-width: 650px) {
-  :root {
-    --header-height: 89px;
-  }
   .weekend-home-callout {
     flex-direction: column;
     align-items: flex-start;
@@ -2900,9 +2900,6 @@ img {
   .container {
     width: calc(100% - 40px);
   }
-  .nav-shell {
-    min-height: 88px;
-  }
   .brand {
     width: 72px;
   }
@@ -2920,11 +2917,7 @@ img {
     gap: 8px;
   }
   .mobile-menu {
-    display: inline-flex;
-    width: 34px;
-    height: 34px;
     border: 0;
-    margin-left: -12px;
   }
   .marquee-band {
     padding-block: 12px;
@@ -3696,6 +3689,9 @@ img {
   .mobile-menu {
     display: inline-flex;
     flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
   }
   .mobile-nav {
     display: grid;
@@ -3742,7 +3738,7 @@ img {
 }
 @media (max-width: 850px) {
   :root {
-    --header-height: 89px;
+    --header-height: 72px;
   }
   .nav-account,
   .nav-book-button,
@@ -3757,21 +3753,14 @@ img {
     font-size: 14px;
   }
   .site-header .brand {
-    width: 72px;
+    width: 58px;
   }
   .nav-shell {
-    min-height: 88px;
     gap: 12px;
   }
   .nav-actions {
     margin-left: auto;
     gap: 0;
-  }
-  .mobile-menu {
-    width: 40px;
-    height: 44px;
-    margin-left: 0;
-    padding: 0;
   }
   .calendar-toolbar .field input,
   .admin-toolbar .field input {
@@ -3795,9 +3784,6 @@ img {
   .nav-actions .nav-mobile-primary {
     padding-inline: 10px;
   }
-  .mobile-menu {
-    width: 32px;
-  }
   .vertical-word {
     font-size: 10px;
   }
@@ -3807,7 +3793,6 @@ img {
 }
 .site-header--admin .nav-shell {
   width: 100%;
-  min-height: 63px;
   padding-inline: 24px;
   gap: 12px;
 }

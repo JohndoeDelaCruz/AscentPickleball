@@ -19,7 +19,7 @@ export function Brand({
         width={144}
         height={144}
         alt="Ascent Pickleball Courts"
-        sizes={light ? "144px" : compact ? "48px" : "(max-width: 850px) 72px, 96px"}
+        sizes={light ? "144px" : compact ? "48px" : "(max-width: 850px) 58px, 68px"}
         loading={light ? "lazy" : "eager"}
         className="brand-image"
       />
