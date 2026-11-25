@@ -22,7 +22,7 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
     setIndex((currentIndex + step + products.length) % products.length);
   }
 
-  return <section className={styles.card} aria-label="Products at the counter" data-hero="">
+  return <div className={styles.card} role="group" aria-label="Products at the counter">
     <div className={styles.media}>
       <div className={styles.photo}>
         {photo && photo !== failedPhoto ? (
@@ -37,7 +37,7 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
     <div className={styles.product}>
       <div className={styles.details}>
         <p>{product.category}</p>
-        <div className={styles.nameAndPrice}><h2>{product.name}</h2><span className={styles.price}>{price}</span></div>
+        <div className={styles.nameAndPrice}><h3>{product.name}</h3><span className={styles.price}>{price}</span></div>
       </div>
       {product.id && <Link href={pickupOrderPath(product.id)} className={styles.link} prefetch={false} aria-label={`Order ${product.name} for pickup`}>
         Order <ArrowUpRight size={15} aria-hidden="true" />
@@ -46,5 +46,5 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
         {product.name}, {price}. Product {currentIndex + 1} of {products.length}.
       </span>}
     </div>
-  </section>;
+  </div>;
 }

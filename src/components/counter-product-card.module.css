@@ -1,26 +1,28 @@
 .card {
-  position: absolute;
-  z-index: 2;
-  right: var(--hero-product-inset);
-  bottom: var(--hero-product-inset);
-  width: var(--hero-product-width);
-  padding: 8px;
+  display: grid;
+  grid-template-columns: clamp(64px, 15vw, 112px) minmax(0, 1fr);
+  grid-template-areas: "photo product";
+  align-items: center;
+  gap: 6px 13px;
+  min-width: 0;
+  padding: 9px 11px 9px 9px;
   border: 1px solid #4a6253;
-  border-radius: 19px;
+  border-radius: 12px;
   background: radial-gradient(ellipse at top right, #294936, #13271e 72%);
   color: var(--cream);
   box-shadow: 0 8px 24px rgb(14 35 24 / 28%);
 }
 
 .media {
-  position: relative;
+  display: contents;
 }
 
 .photo {
   position: relative;
+  grid-area: photo;
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
   overflow: hidden;
   border-radius: 12px;
   background: #eef2e8;
@@ -33,24 +35,22 @@
 }
 
 .controls {
-  position: absolute;
-  inset: auto 6px 6px;
+  grid-column: 1 / -1;
   display: flex;
-  justify-content: space-between;
-  pointer-events: none;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
 .controls button {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid rgb(255 255 255 / 40%);
   border-radius: 50%;
   background: rgb(16 25 19 / 86%);
   color: var(--white);
-  pointer-events: auto;
 }
 
 .controls button:hover {
@@ -58,11 +58,11 @@
 }
 
 .product {
+  grid-area: product;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 9px;
-  padding: 11px 3px 3px;
   overflow-wrap: anywhere;
 }
 
@@ -87,7 +87,7 @@
   text-transform: uppercase;
 }
 
-.product h2 {
+.product h3 {
   margin: 0;
   font-family: inherit;
   font-size: 15px;
@@ -123,47 +123,4 @@
 
 .link:hover {
   background: #e6f5b7;
-}
-
-@media (max-width: 780px) {
-  .card {
-    position: relative;
-    inset: auto;
-    display: grid;
-    grid-template-columns: clamp(58px, 16.5vw, 84px) minmax(0, 1fr);
-    grid-template-areas: "photo product";
-    align-items: center;
-    gap: 6px 11px;
-    width: auto;
-    margin-top: 12px;
-    padding: 8px 10px 8px 8px;
-    box-shadow: 0 5px 15px rgb(14 35 24 / 16%);
-  }
-
-  .media {
-    display: contents;
-  }
-
-  .photo {
-    grid-area: photo;
-    aspect-ratio: 1;
-  }
-
-  .product {
-    grid-area: product;
-    padding: 0;
-  }
-
-  .controls {
-    grid-column: 1 / -1;
-    position: static;
-    justify-content: flex-end;
-    gap: 4px;
-    pointer-events: auto;
-  }
-
-  .controls button {
-    width: 44px;
-    height: 44px;
-  }
 }

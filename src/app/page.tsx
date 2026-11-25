@@ -1,13 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  Clock3,
   MapPin,
-  QrCode,
-  CalendarDays,
 } from "lucide-react";
 import { getMembershipPlans, getVenue } from "@/lib/data";
 import { getCounterProducts } from "@/lib/counter-products";
@@ -17,19 +13,27 @@ import { Starburst } from "@/components/starburst";
 import { CounterProductCard } from "@/components/counter-product-card";
 import { LandingMotion } from "@/components/landing-motion";
 import { ScheduleOverview } from "@/components/schedule-overview";
+import { HomePlaySelector } from "@/components/home-play-selector";
 import {
   canBook,
   formatHour,
   money,
   getRatePeriods,
-  openPlayCapacityLabel,
+  localDate,
   equipmentPackageLabel,
 } from "@/lib/booking";
+import styles from "./home.module.css";
 
 export default async function Home() {
-  const [{ venue }, membershipPlans, products] = await Promise.all([getVenue(), getMembershipPlans(), getCounterProducts()]);
+  const [{ venue, ready }, membershipPlans, products] = await Promise.all([getVenue(), getMembershipPlans(), getCounterProducts()]);
   const courts = activeCourts(venue.courts);
-  const open = canBook(venue);
+  const open = ready && canBook(venue);
+  const today = localDate();
+  const showOpenPlay = venue.schedule_config
+    ? venue.schedule_config.weekly.some((block) => block.kind === "open_play") ||
+      venue.schedule_config.overrides.some((period) =>
+        period.end_date >= today && period.blocks.some((block) => block.kind === "open_play"))
+    : venue.open_play_enabled;
   const ratePeriods = getRatePeriods(venue);
   const faqs = [
     [
@@ -54,53 +58,35 @@ export default async function Home() {
   ];
   return (
     <LandingMotion>
-      <div className={`container hero-layout${products.length ? " hero-layout--with-products" : ""}`}>
-        <section className="hero" aria-label="Ascent Pickleball courts">
-          <div className="hero-copy">
-            <h1 data-hero="">
-              PLAY HIGHER.
-              <br />
-              <span className="hero-ascent">
-                PLAY <span className="text-outline">ASCENT.</span>
-                <svg viewBox="0 0 410 20" aria-hidden="true">
-                  <path
-                    d="M3 13Q190-3 405 9M35 19Q220 4 380 13"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </span>
+      <section className={styles.hero} aria-labelledby="home-title" data-landing-hero>
+        <div className={styles.heroVisual}>
+          <Image src="/ascent-courts-panorama.jpg"
+            alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
+            unoptimized fill sizes="100vw" loading="eager" fetchPriority="high"
+            className={styles.heroImage} data-hero-image />
+        </div>
+        <div className={`container ${styles.heroInner}`}>
+          <div className={styles.heroCopy}>
+            <h1 id="home-title" data-hero="">
+              <span>Play higher.</span>{" "}
+              <span>Play <em>Ascent.</em></span>
             </h1>
-            <p className="hero-description" data-hero="">
-              A place to play, a reason to connect. Get your crew together and
-              make your next game an Ascent game.
-            </p>
-            <div className="hero-buttons" data-hero="">
-              <Link href="/book" className="button button-dark">
-                Find your court <ArrowUpRight size={19} />
+            {venue.city && <p data-hero="">{venue.city}</p>}
+            <div className={styles.heroActions} data-hero="">
+              <Link href="/book" className="button button-lime">
+                {open ? "Book a court" : "Explore the calendar"} <ArrowUpRight size={19} aria-hidden="true" />
               </Link>
-              <a href="#courts" className="text-link">
-                Meet Ascent <ArrowDown size={16} />
-              </a>
+              {showOpenPlay && (
+                <Link href="/book?play=open" className={`button ${styles.secondaryAction}`}>
+                  {open ? "Join open play" : "Explore open play"} <ArrowUpRight size={19} aria-hidden="true" />
+                </Link>
+              )}
             </div>
           </div>
-          <div className="hero-visual">
-            <Image
-              src="/ascent-courts-panorama.jpg"
-              alt="Ascent Pickleball’s two gray and red courts surrounded by trees"
-              unoptimized
-              fill
-              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), 1280px"
-              loading="eager"
-              fetchPriority="high"
-              className="hero-art"
-            />
-            <div className="vertical-word">LET’S PLAY.</div>
-          </div>
-        </section>
-        <CounterProductCard products={products} />
+        </div>
+      </section>
+      <div className={`container ${styles.scheduleWrap}`}>
+        <ScheduleOverview venue={venue} ready={ready} date={today} courtCount={courts.length} />
       </div>
       <div
         className="marquee-band"
@@ -122,15 +108,11 @@ export default async function Home() {
           ))}
         </div>
       </div>
-      <section className="container section courts-section" id="courts">
+      <HomePlaySelector showOpenPlay={showOpenPlay} />
+      <section className={`container ${styles.courts}`} id="courts">
         <div className="section-heading" data-reveal="">
           <div>
-            <span className="eyebrow">YOUR SPACE TO PLAY</span>
-            <h2>
-              {courts.length === 2 ? "TWO COURTS." : "THE COURTS."}
-              <br />
-              MAKE THEM YOURS.
-            </h2>
+            <h2>The courts.</h2>
           </div>
         </div>
         <div className="court-cards">
@@ -146,7 +128,6 @@ export default async function Home() {
                 src={courtPhoto(court)}
                 alt=""
                 fill
-                loading="eager"
                 sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1280px) 50vw, 627px"
               />
               <div className="court-card-copy">
@@ -186,34 +167,7 @@ export default async function Home() {
             </Link>
           ))}
         </div>
-        {venue.schedule_config && (
-          <ScheduleOverview config={venue.schedule_config} courtCount={courts.length} />
-        )}
-        {!venue.schedule_config && venue.open_play_enabled && (
-          <div className="weekend-home-callout" data-reveal="">
-            <div>
-              <span className="eyebrow">SATURDAY & SUNDAY</span>
-              <h3>More rallies. One open-play pass.</h3>
-              <p>
-                {formatHour(venue.open_play_start_hour)}–
-                {formatHour(venue.open_play_end_hour)} ·{" "}
-                {money(venue.open_play_price)} per person ·{" "}
-                {openPlayCapacityLabel(venue.open_play_capacity, courts.length)}. Players
-                rotate throughout the session.
-              </p>
-              <p className="small-print">
-                Weekend private court bookings:{" "}
-                {formatHour(venue.opening_hour ?? 6)}–
-                {formatHour(venue.weekend_court_end_hour)} and{" "}
-                {formatHour(venue.open_play_end_hour)}–
-                {formatHour(venue.closing_hour ?? 22)}.
-              </p>
-            </div>
-            <Link className="button button-dark" href="/book?play=open">
-              Join weekend open play <ArrowUpRight size={16} />
-            </Link>
-          </div>
-        )}
+        {!courts.length && <p>No active courts are listed.</p>}
       </section>
       <section
         className="container membership-home"
@@ -236,58 +190,12 @@ export default async function Home() {
           View membership benefits <ArrowUpRight size={18} />
         </Link>
       </section>
-      <section className="booking-callout">
-        <div className="container callout-inner">
-          <div data-reveal="">
-            <span className="eyebrow">LESS PLANNING. MORE PLAYING.</span>
-            <h2>
-              YOUR COURT TIME
-              <br />
-              IS CALLING.
-            </h2>
-            <Link href="/book" className="button button-lime">
-              {open ? "Book your next game" : "Explore the calendar"}
-              <ArrowUpRight size={18} />
-            </Link>
-          </div>
-          <div className="callout-details" data-reveal="">
-            <div>
-              <CalendarDays />
-              <span>
-                THE COURTS<strong>{courts.length === 2 ? "Two courts. Your choice." : "Find your court."}</strong>
-              </span>
-            </div>
-            <div>
-              <Clock3 />
-              <span>
-                COURT HOURS
-                <strong>
-                  {venue.schedule_config
-                    ? "See our play schedule by date"
-                    : ratePeriods.length
-                      ? ratePeriods.map((period) => (
-                          <span className="court-hours-line" key={period.start}>
-                            {formatHour(period.start)} –{" "}
-                            {formatHour(period.end)}
-                          </span>
-                        ))
-                      : "Coming soon"}
-                </strong>
-              </span>
-            </div>
-            <div>
-              <QrCode />
-              <span>
-                KEEP IT SIMPLE<strong>GCash. Checked by our team.</strong>
-              </span>
-            </div>
-            <div className="callout-status">
-              <span className="live-dot" />
-              {open ? "Reservations are open" : "Reservations opening soon"}
-            </div>
-          </div>
-        </div>
-      </section>
+      {products.length > 0 && (
+        <section className={`container ${styles.counter}`} aria-labelledby="counter-heading" data-reveal="">
+          <h2 id="counter-heading">At the counter.</h2>
+          <CounterProductCard products={products} />
+        </section>
+      )}
       <section className="visit-section" id="visit">
         <div className="container visit-grid">
           <div data-reveal="">

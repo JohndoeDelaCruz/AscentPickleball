@@ -27,7 +27,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
 
           const mobile = context.conditions?.mobile;
           const animations = new Map<HTMLElement, gsap.core.Tween>();
-          const hero = root.querySelector<HTMLElement>(".hero");
+          const hero = root.querySelector<HTMLElement>("[data-landing-hero]");
 
           if (hero && hero.getBoundingClientRect().bottom > 0) {
             const elements = root.querySelectorAll<HTMLElement>("[data-hero]");
@@ -41,7 +41,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
             });
             elements.forEach((element) => animations.set(element, entrance));
 
-            gsap.from(root.querySelector(".hero-art"), {
+            gsap.from(root.querySelector("[data-hero-image]"), {
               scale: 1.035,
               duration: 1.2,
               ease: "power2.out",
