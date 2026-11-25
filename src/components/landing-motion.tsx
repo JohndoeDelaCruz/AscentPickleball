@@ -38,7 +38,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
                 trigger: hero,
                 start: "top top",
                 end: "bottom 20%",
-                scrub: true,
+                scrub: 1.3,
                 invalidateOnRefresh: true,
               },
             });
