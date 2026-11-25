@@ -27,6 +27,7 @@ import styles from "./home.module.css";
 export default async function Home() {
   const [{ venue, ready }, membershipPlans, products] = await Promise.all([getVenue(), getMembershipPlans(), getCounterProducts()]);
   const courts = activeCourts(venue.courts);
+  const heroDescription = courts.length === 2 ? "Two outdoor pickleball courts" : "Outdoor pickleball";
   const open = ready && canBook(venue);
   const today = localDate();
   const showOpenPlay = venue.schedule_config
@@ -73,7 +74,9 @@ export default async function Home() {
               <span>Play higher.</span>{" "}
               <span>Play <em>Ascent.</em></span>
             </h1>
-            {venue.city && <p data-hero="">{venue.city}</p>}
+            <p data-hero="">
+              {heroDescription}{venue.city && ` in ${venue.city}`}.
+            </p>
             <div className={styles.heroActions} data-hero="">
               <Link href="/book" className="button button-lime">
                 {open ? "Book a court" : "Explore the calendar"} <ArrowUpRight size={19} aria-hidden="true" />

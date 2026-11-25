@@ -96,7 +96,13 @@
 .scheduleWrap {
   position: relative;
   z-index: 1;
-  margin-block: -34px clamp(28px, 5vw, 56px);
+  margin-block: -74px clamp(28px, 5vw, 56px);
+}
+
+@media (max-width: 650px), (max-height: 540px) and (orientation: landscape) {
+  .scheduleWrap {
+    margin-top: -18px;
+  }
 }
 
 .scheduleWrap .schedule {
@@ -270,10 +276,6 @@
   .heroActions :global(.button) {
     padding-inline: 11px;
     gap: 7px;
-  }
-
-  .scheduleWrap {
-    margin-top: -18px;
   }
 
   .scheduleHeading :global(.button) {
