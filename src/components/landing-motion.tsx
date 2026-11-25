@@ -33,11 +33,11 @@ export function LandingMotion({ children }: { children: ReactNode }) {
           if (hero && heroPhoto) {
             gsap.fromTo(heroPhoto, { y: 0 }, {
               y: () => -parseFloat(getComputedStyle(heroPhoto).top),
-              ease: "none",
+              ease: "power1.out",
               scrollTrigger: {
                 trigger: hero,
                 start: "top top",
-                end: "bottom top",
+                end: "bottom 20%",
                 scrub: true,
                 invalidateOnRefresh: true,
               },

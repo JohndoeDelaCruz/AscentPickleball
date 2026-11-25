@@ -1,7 +1,13 @@
 .hero {
   --hero-header-shade: linear-gradient(180deg, #11251bc4,
     #11251b73 var(--header-height), transparent calc(var(--header-height) + 52px));
-  --hero-bottom-fade: linear-gradient(to top, var(--cream), transparent clamp(54px, 12vw, 144px));
+  --hero-bottom-fade: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--cream) 10%, transparent) 20%,
+    color-mix(in srgb, var(--cream) 90%, transparent) 80%,
+    var(--cream)
+  ) bottom / 100% clamp(44px, 6vw, 92px) no-repeat;
   position: relative;
   isolation: isolate;
   background: var(--ink);
@@ -23,7 +29,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .heroPhoto {
     /* Keep the photo covering the hero as it moves down during scrolling. */
-    top: calc(-1 * clamp(40px, 8vw, 96px));
+    top: calc(-1 * clamp(64px, 10vw, 148px));
   }
 }
 
@@ -46,7 +52,7 @@
 .heroInner {
   display: grid;
   align-content: center;
-  min-height: calc(clamp(472px, 40vw, 616px) + var(--header-height));
+  min-height: clamp(600px, 100svh, 1028px);
   padding-block: calc(64px + var(--header-height)) 78px;
 }
 
@@ -262,7 +268,7 @@
   }
 
   .heroInner {
-    min-height: calc(clamp(365px, 101vw, 460px) + var(--header-height));
+    min-height: clamp(520px, 86svh, 692px);
     padding-block: calc(48px + var(--header-height)) 55px;
   }
 
@@ -311,5 +317,16 @@
   .playTabs button {
     padding-inline: 8px;
     font-size: 14px;
+  }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .heroInner {
+    min-height: 100svh;
+    padding-block: calc(var(--header-height) + 18px) 40px;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(38px, 13svh, 70px);
   }
 }
