@@ -3,13 +3,13 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { VenueSettings } from "@/lib/types";
 import styles from "./booking-calendar.module.css";
 
-export function MobileBookingBar({ total, selection, disabled, onContinue }: {
+export function BookingBar({ total, selection, disabled, onContinue }: {
   total: string;
   selection: string;
   disabled?: boolean;
   onContinue: () => void;
 }) {
-  return <div className={styles.mobileBar} data-booking-bar>
+  return <div className={styles.bookingBar} data-booking-bar>
     <div aria-live="polite">
       <strong>{total}</strong>
       <small>{selection}</small>
@@ -20,8 +20,8 @@ export function MobileBookingBar({ total, selection, disabled, onContinue }: {
   </div>;
 }
 
-export function MobileReviewHeading({ onBack, disabled }: { onBack: () => void; disabled?: boolean }) {
-  return <div className={styles.mobileOnly}>
+export function BookingReviewHeading({ onBack, disabled }: { onBack: () => void; disabled?: boolean }) {
+  return <div>
     <button type="button" className={styles.back} onClick={onBack} disabled={disabled}>
       <ArrowLeft size={16} aria-hidden="true" /> Back to availability
     </button>

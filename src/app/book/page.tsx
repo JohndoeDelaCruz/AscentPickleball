@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { getSession, getVenue } from "@/lib/data";
 import { BookingCalendar } from "@/components/booking-calendar";
 import styles from "@/components/booking-calendar.module.css";
@@ -29,19 +27,6 @@ export default async function BookPage({
   );
   return (
     <main id="main" className={`container ${styles.page}`}>
-      <div className={`page-heading ${styles.pageHeading}`}>
-        <div className={`breadcrumb ${styles.desktopOnly}`}>
-          <Link href="/">Home</Link>
-          <ChevronRight size={12} />
-          <span>Book a court</span>
-        </div>
-        <span className={`eyebrow ${styles.desktopOnly}`}>MAKE TIME FOR A GOOD GAME</span>
-        <h1>FIND YOUR COURT.</h1>
-        <p className={styles.desktopOnly}>
-          Your crew, your court, your kind of game. Pick a date and find your
-          time. All times are in Philippine Time.
-        </p>
-      </div>
       <BookingCalendar
         venue={venue}
         ready={ready}

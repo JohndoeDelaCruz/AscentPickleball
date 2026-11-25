@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Users, RefreshCw } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import { reserveOpenPlay } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -14,7 +14,6 @@ import {
   money,
   canBook,
   calculateReservationTotal,
-  openPlayCapacityLabel,
 } from "@/lib/booking";
 import type {
   OpenPlayAvailability,
@@ -23,10 +22,9 @@ import type {
 } from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
 import { PaymentOptions } from "./payment-options";
-import { BookingPolicy, MobileBookingBar, MobileReviewHeading } from "./booking-checkout";
+import { BookingBar, BookingPolicy, BookingReviewHeading } from "./booking-checkout";
 import styles from "./booking-calendar.module.css";
 import { resolveSchedule } from "@/lib/schedule";
-import { activeCourts } from "@/lib/courts";
 
 export function OpenPlayBooking({
   venue,
@@ -92,10 +90,8 @@ export function OpenPlayBooking({
     }));
   const sessions =
     loadedDate === date && availability ? availability : previewSessions;
-  const chosen =
-    sessions.find((s) => s.start_hour === selectedStart) ??
-    sessions.find((s) => !isPastSlot(date, s.end_hour, now)) ??
-    sessions[0];
+  const chosen = sessions.find((session) => session.start_hour === selectedStart) ??
+    (reviewing ? undefined : (sessions.find((session) => !isPastSlot(date, session.end_hour, now)) ?? sessions[0]));
   const activeSession = chosen ?? {
     enabled: false,
     start_hour: 0,
@@ -205,8 +201,7 @@ export function OpenPlayBooking({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if ((!reviewing && window.matchMedia("(max-width: 650px)").matches) ||
-      !signedIn || !reservationReady || !accepted || checkingPrice || quoteFailed) return;
+    if (!reviewing || !signedIn || !reservationReady || !accepted || checkingPrice || quoteFailed) return;
     setError("");
     startTransition(async () => {
       const result = await reserveOpenPlay({
@@ -226,299 +221,161 @@ export function OpenPlayBooking({
       } else if (result.id) router.push(`/booking/${result.id}`);
     });
   }
-  const playersField = (
-    <label className={`field ${styles.playersField}`}>
-      <span>Number of players</span>
-      <input type="number" min="1" max="20" value={people}
-        onChange={(e) => setPeople(Number(e.target.value))}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !reviewing && window.matchMedia("(max-width: 650px)").matches) event.preventDefault();
-        }}
-        required
-      />
-      <small className={styles.desktopOnly}>Up to 20 players per reservation. Each player needs a pass.</small>
-    </label>
+  const availabilityError = loadError && (
+    <div className="error-message" role="alert">
+      {loadError}{" "}
+      <button type="button" className="button button-small button-outline" onClick={() => setRevision((value) => value + 1)}>
+        Retry
+      </button>
+    </div>
   );
-  return (
-    <section className={`panel open-play-panel ${styles.openPlayPanel}`} aria-label="Open play"
-      data-open-review={reviewing || undefined}>
-      {reviewing && <MobileReviewHeading onBack={() => onReviewChange(false)} disabled={pending} />}
-      <div className={`open-play-heading ${styles.desktopOnly}`}>
-        <span className="open-play-icon">
-          <Users size={24} />
-        </span>
-        <div>
-          <span className="eyebrow">SHARE THE COURT</span>
-          <h2>Open play</h2>
+  const priceError = quoteFailed && (
+    <div className="error-message" role="alert">
+      We couldn’t check the member price.{" "}
+      <button type="button" className="button button-small button-outline" onClick={() => setRevision((value) => value + 1)}>
+        Check price again
+      </button>
+    </div>
+  );
+
+  if (!reviewing) {
+    return (
+      <section className={styles.availability} aria-labelledby="open-play-availability">
+        <div className={styles.sectionHeading}>
+          <h2 id="open-play-availability" data-booking-availability-heading tabIndex={-1}>Open-play sessions</h2>
+          <span>Philippine time</span>
         </div>
+        {availabilityError}
+        {priceError}
+        {sessions.length > 0 ? (
+          <div className={styles.openSessions} role="group" aria-label="Open-play session">
+            {sessions.map((session) => (
+              <button key={session.start_hour} type="button"
+                aria-pressed={activeSession.start_hour === session.start_hour}
+                onClick={() => onSessionChange(session.start_hour)}>
+                <strong>{formatHour(session.start_hour)}–{formatHour(session.end_hour)}</strong>
+                <span>{money(session.price)} / person</span>
+                <small>{isPastSlot(date, session.end_hour, now) ? "Session ended"
+                  : session.conflict ? "Courts unavailable"
+                  : loading && loadedDate !== date ? "Checking availability…"
+                  : session.capacity === null ? "No player limit"
+                  : `${session.remaining ?? session.capacity} places remaining`}</small>
+              </button>
+            ))}
+          </div>
+        ) : !loadError && (
+          <div className={styles.sessionCard}>
+            <p>{loading ? "Checking sessions…" : "No open-play sessions are scheduled for this date. Choose another date or book a private court."}</p>
+          </div>
+        )}
         {scheduled && (
-          <strong className="open-play-price">
-            {money(activeSession.price)}
-            <small>/ person</small>
-          </strong>
+          <>
+            <div className={styles.sessionControls}>
+              <label className={`field ${styles.playersField}`}>
+                <span>Number of players</span>
+                <input type="number" min="1" max="20" value={people}
+                  onChange={(event) => setPeople(Number(event.target.value))} required />
+              </label>
+              {selectedForReview !== passSelection && (
+                <button type="button" className="button button-outline" disabled={!reservationReady}
+                  onClick={() => setSelectedForReview(passSelection)}>
+                  Select session
+                </button>
+              )}
+            </div>
+            {tooMany && <p className={styles.availabilityStatus} role="status">Choose fewer players or another session.</p>}
+            {!validPeople && <p className={styles.availabilityStatus} role="status">Choose 1 to 20 players.</p>}
+            {selectedForReview === passSelection && (
+              <BookingBar total={displayedTotal}
+                selection={`Open play · ${people} ${people === 1 ? "player" : "players"} · ${time}`}
+                disabled={!reservationReady || checkingPrice || quoteFailed} onContinue={() => onReviewChange(true)} />
+            )}
+          </>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className={styles.review} aria-label="Open-play booking review">
+      <BookingReviewHeading onBack={() => onReviewChange(false)} disabled={pending} />
+      <div className={`panel ${styles.reviewPanel}`}>
+        {availabilityError}
+        {priceError}
+        {!scheduled ? (
+          !loadError && <p role="status">{loading ? "Checking sessions…" : "This session is no longer available. Go back to choose another session."}</p>
+        ) : (
+          <>
+            <dl className="summary-rows">
+              <div><dt>Session</dt><dd>{time}</dd></div>
+              <div><dt>Date</dt><dd>{formatDate(date, { weekday: "long", month: "short", day: "numeric" })}</dd></div>
+              <div><dt>Players</dt><dd>{people}</dd></div>
+              {!signedIn && <div><dt>Booking total</dt><dd><strong>{displayedTotal}</strong></dd></div>}
+            </dl>
+            <p className="small-print">Each pass covers one player for the session. Players share the courts and rotate between games.</p>
+            {activeSession.conflict && (
+              <div className="notice notice-warning" role="status">A court was reserved or blocked. Go back to choose another session.</div>
+            )}
+            {ended && <div className="notice" role="status">This open-play session has ended.</div>}
+            {tooMany && <div className="notice notice-warning" role="status">There are fewer places available now. Go back to change your group size.</div>}
+            {(!ready || !venue.booking_enabled) && <div className="notice">Online open-play reservations are opening soon.</div>}
+            {error && <div className="error-message" role="alert">{error}</div>}
+            {!signedIn ? (
+              <Link className="button button-dark"
+                href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}&session=${start}&players=${people}&review=1`)}`}>
+                Sign in for open play <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            ) : (
+              <form className="form-stack" onSubmit={submit}>
+                <div className="field-grid">
+                  <label className="field">
+                    <span>Full name</span>
+                    <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name"
+                      required minLength={2} maxLength={100} />
+                  </label>
+                  <label className="field">
+                    <span>Mobile number</span>
+                    <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)}
+                      autoComplete="tel" placeholder="09171234567" required />
+                  </label>
+                </div>
+                <EquipmentRental price={venue.equipment_rental_price} ballCount={venue.equipment_ball_count}
+                  quantity={equipmentQuantity} maxQuantity={equipmentLimit} onChange={setEquipmentQuantity} disabled={pending} />
+                <dl className="summary-rows equipment-cost-rows">
+                  <div>
+                    <dt>{people} {people === 1 ? "player" : "players"} × {money(price)}</dt>
+                    <dd>{money(people * price)}</dd>
+                  </div>
+                  {discountCents > 0 && (
+                    <div><dt>Membership discount · 1 pass</dt><dd>−{money(discountCents / 100)}</dd></div>
+                  )}
+                  <div><dt>Equipment rental</dt><dd>{money(equipmentQuantity * venue.equipment_rental_price)}</dd></div>
+                </dl>
+                <div className="summary-total"><span>Booking total</span><strong>{displayedTotal}</strong></div>
+                {!checkingPrice && !quoteFailed && (
+                  <PaymentOptions total={totalCents / 100} value={paymentOption} onChange={setPaymentOption} disabled={pending} />
+                )}
+                <label className="open-play-agreement">
+                  <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} required />
+                  <span>
+                    I agree to the <a href="#open-play-policy" className="policy-link">booking and cancellation policy</a> and{" "}
+                    <Link href="/court-rules" target="_blank" rel="noopener noreferrer" className="policy-link">court rules</Link>,
+                    and understand that players share the courts and rotate between games.
+                  </span>
+                </label>
+                <button className="button button-dark" disabled={
+                  !reservationReady || checkingPrice || quoteFailed || pending || !accepted
+                }>
+                  {pending ? "Reserving…" : loading ? "Checking availability…"
+                    : checkingPrice ? "Checking price…" : "Reserve passes & view GCash QR"}
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </form>
+            )}
+            <BookingPolicy venue={venue} id="open-play-policy" />
+          </>
         )}
       </div>
-      <div className={`${styles.mobileOnly} ${styles.openBrowse} ${styles.sectionHeading}`}>
-        <h2 data-booking-availability-heading tabIndex={-1}>Open-play sessions</h2>
-        <span>Philippine time</span>
-      </div>
-      {sessions.length > 0 && (
-        <div
-          className={`open-play-session-picker ${styles.openBrowse}`}
-          role="group"
-          aria-label="Open-play session"
-        >
-          {sessions.map((s) => (
-            <button
-              key={s.start_hour}
-              type="button"
-              aria-pressed={activeSession.start_hour === s.start_hour}
-              className={
-                activeSession.start_hour === s.start_hour ? "active" : ""
-              }
-              onClick={() => onSessionChange(s.start_hour)}
-            >
-              <strong>
-                {formatHour(s.start_hour)}–{formatHour(s.end_hour)}
-              </strong>
-              <span>{money(s.price)} / person<span className={styles.desktopOnly}> / session</span></span>
-              <small>
-                {isPastSlot(date, s.end_hour, now) ? "Session ended"
-                  : s.conflict ? "Courts unavailable"
-                  : loading && loadedDate !== date ? "Checking availability…"
-                  : s.capacity === null
-                  ? "No player limit"
-                  : `${s.remaining ?? s.capacity} places remaining`}
-              </small>
-            </button>
-          ))}
-        </div>
-      )}
-      {scheduled && (
-        <>
-          <p className={styles.desktopOnly}>
-            Come for a few rallies or stay for the session. Your pass covers{" "}
-            {formatHour(activeSession.start_hour)}–
-            {formatHour(activeSession.end_hour)}.
-          </p>
-          <p className={styles.desktopOnly}>
-            <strong>{openPlayCapacityLabel(activeSession.capacity, activeCourts(venue.courts).length)}.</strong>{" "}
-            Players share the active courts and rotate between games.
-          </p>
-          <div className={`open-play-meta ${styles.desktopOnly}`}>
-            <span>
-              {formatDate(date, {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
-            <span>
-              {activeSession.capacity === null
-                ? "No player limit"
-                : `${remaining ?? activeSession.capacity} places remaining`}
-            </span>
-          </div>
-          {reviewing && <dl className={`summary-rows ${styles.mobileOnly} ${styles.openRecap}`}>
-            <div><dt>Session</dt><dd>{time}</dd></div>
-            <div><dt>Date</dt><dd>{formatDate(date, { weekday: "short", month: "short", day: "numeric" })}</dd></div>
-            <div><dt>Players</dt><dd>{people}</dd></div>
-            <div><dt>Booking total</dt><dd><strong>{displayedTotal}</strong></dd></div>
-          </dl>}
-        </>
-      )}
-      {loadError && (
-        <div className="error-message" role="alert">
-          {loadError}
-          <button type="button" className="text-link" onClick={() => setRevision((v) => v + 1)}>
-            <RefreshCw size={12} /> Refresh availability
-          </button>
-        </div>
-      )}
-      {!scheduled ? (
-        !loadError && <div className="notice">
-          {loading
-            ? "Checking sessions…"
-            : "No open-play sessions are scheduled for this date. Choose another date or book a private court."}
-        </div>
-      ) : (
-        <>
-          {activeSession.conflict && (
-            <div className={`notice notice-warning ${styles.openCheckout}`}>
-              Open play is unavailable on this date because a court is reserved
-              or blocked. Choose another session.
-            </div>
-          )}
-          {ended && (
-            <div className={`notice ${styles.openCheckout}`}>
-              This open-play session has ended. Choose another session or date.
-            </div>
-          )}
-          {(!ready || !venue.booking_enabled) && (
-            <div className={`notice ${styles.openCheckout}`}>
-              Online open-play reservations are opening soon. You can preview
-              the session details here.
-            </div>
-          )}
-          {error && (
-            <div className="error-message" role="alert">
-              {error}
-            </div>
-          )}
-          {quoteFailed && <div className="error-message" role="alert">
-            We couldn’t check the member price.
-            <button type="button" className="text-link" onClick={() => setRevision((v) => v + 1)}>
-              <RefreshCw size={12} /> Check price again
-            </button>
-          </div>}
-          {!signedIn ? (
-            <>
-              <div className={styles.mobileOnly}>{playersField}</div>
-              <Link
-                className={`button button-dark ${styles.openCheckout}`}
-                href={`/login?next=${encodeURIComponent(`/book?play=open&date=${date}&session=${start}&players=${people}&review=1`)}`}
-              >
-                Sign in for open play <ArrowRight size={16} />
-              </Link>
-            </>
-          ) : (
-            <form className="form-stack" onSubmit={submit}>
-              <div className="field-grid">
-                {playersField}
-                <label className={`field ${styles.openCheckout}`}>
-                  <span>Full name</span>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="name"
-                    required
-                    minLength={2}
-                    maxLength={100}
-                  />
-                </label>
-              </div>
-              <div className={`form-stack ${styles.openCheckout}`}>
-              <label className="field">
-                <span>Mobile number</span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  placeholder="09171234567"
-                  required
-                />
-              </label>
-              <EquipmentRental
-                price={venue.equipment_rental_price}
-                ballCount={venue.equipment_ball_count}
-                quantity={equipmentQuantity}
-                maxQuantity={equipmentLimit}
-                onChange={setEquipmentQuantity}
-                disabled={pending}
-              />
-              <dl className="summary-rows equipment-cost-rows">
-                <div>
-                  <dt>
-                    {people || 0} {people === 1 ? "player" : "players"} ×{" "}
-                    {money(activeSession.price)}
-                  </dt>
-                  <dd>{money((people || 0) * activeSession.price)}</dd>
-                </div>
-                {discountCents > 0 && <div>
-                  <dt>Membership discount · 1 pass</dt>
-                  <dd>−{money(discountCents / 100)}</dd>
-                </div>}
-                <div>
-                  <dt>Equipment rental</dt>
-                  <dd>
-                    {money(equipmentQuantity * venue.equipment_rental_price)}
-                  </dd>
-                </div>
-              </dl>
-              <div className="summary-total">
-                <span>Booking total</span>
-                <strong>{checkingPrice ? "Checking price…" : quoteFailed ? "—" : money(totalCents / 100)}</strong>
-              </div>
-              {!checkingPrice && !quoteFailed && <PaymentOptions
-                total={totalCents / 100}
-                value={paymentOption}
-                onChange={setPaymentOption}
-                disabled={pending}
-              />}
-              {tooMany && (
-                <div className="notice notice-warning">
-                  There are not enough places for this group. Choose fewer
-                  players or another date.
-                </div>
-              )}
-              <label className="open-play-agreement">
-                <input
-                  type="checkbox"
-                  checked={accepted}
-                  onChange={(e) => setAccepted(e.target.checked)}
-                  required
-                />
-                <span>
-                  I agree to the booking policy and{" "}
-                  <Link
-                    href="/court-rules"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="policy-link"
-                  >
-                    court rules
-                  </Link>
-                  , and understand that open play uses shared courts with player
-                  rotation.
-                </span>
-              </label>
-              <button
-                className="button button-dark"
-                disabled={
-                  !reservationReady ||
-                  checkingPrice ||
-                  quoteFailed ||
-                  pending ||
-                  !accepted
-                }
-              >
-                {pending
-                  ? "Reserving…"
-                  : loading
-                    ? "Checking availability…"
-                    : checkingPrice ? "Checking price…" : "Reserve passes & view GCash QR"}
-                <ArrowRight size={16} />
-              </button>
-              </div>
-            </form>
-          )}
-          {tooMany && <p className={`${styles.mobileOnly} ${styles.openBrowse} ${styles.availabilityStatus}`} role="status">
-            Choose fewer players or another session.
-          </p>}
-          {!reviewing && selectedForReview !== passSelection && (
-            <button type="button" className={`button button-outline ${styles.mobileOnly} ${styles.chooseSession}`}
-              disabled={!reservationReady} onClick={() => setSelectedForReview(passSelection)}>
-              Select session
-            </button>
-          )}
-          {!reviewing && selectedForReview === passSelection && (
-            <MobileBookingBar total={displayedTotal}
-              selection={`Open play · ${people} ${people === 1 ? "player" : "players"} · ${time}`}
-              disabled={!reservationReady || checkingPrice || quoteFailed}
-              onContinue={() => onReviewChange(true)}
-            />
-          )}
-          {reviewing && <div className={styles.mobileOnly}>
-            <BookingPolicy venue={venue} id="open-play-policy" />
-          </div>}
-          <p className={`small-print ${styles.desktopOnly}`}>
-            Pay through the venue’s GCash QR and submit your reference. Staff
-            confirms after checking payment. Selected equipment rental is
-            included in your total. {venue.cancellation_policy}
-          </p>
-        </>
-      )}
     </section>
   );
 }
