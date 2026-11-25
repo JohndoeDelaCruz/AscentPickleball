@@ -1,22 +1,36 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { VenueSettings } from "@/lib/types";
 import styles from "./booking-calendar.module.css";
 
-export function BookingBar({ total, selection, disabled, onContinue }: {
+export type BookingBarDetails = {
   total: string;
   selection: string;
-  disabled?: boolean;
+  disabled: boolean;
+};
+
+export function BookingBar({ details, onContinue }: {
+  details: BookingBarDetails | null;
   onContinue: () => void;
 }) {
-  return <div className={styles.bookingBar} data-booking-bar>
-    <div aria-live="polite">
-      <strong>{total}</strong>
-      <small>{selection}</small>
+  const [lastDetails, setLastDetails] = useState(details);
+  if (details && details !== lastDetails) setLastDetails(details);
+  const display = details ?? lastDetails;
+
+  return <div className={styles.bookingBarDock}>
+    <div className={styles.bookingBar} data-booking-bar data-visible={Boolean(details)}
+      inert={!details} aria-hidden={!details}>
+      <div aria-live="polite">
+        <strong>{display?.total}</strong>
+        <small>{display?.selection}</small>
+      </div>
+      <button type="button" className="button button-dark" disabled={!details || details.disabled} onClick={onContinue}>
+        Continue <ArrowRight size={16} aria-hidden="true" />
+      </button>
     </div>
-    <button type="button" className="button button-dark" disabled={disabled} onClick={onContinue}>
-      Continue <ArrowRight size={16} aria-hidden="true" />
-    </button>
   </div>;
 }
 

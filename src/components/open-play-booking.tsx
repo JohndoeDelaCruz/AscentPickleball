@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, RefreshCw } from "lucide-react";
@@ -22,7 +22,7 @@ import type {
 } from "@/lib/types";
 import { EquipmentRental } from "./equipment-rental";
 import { PaymentOptions } from "./payment-options";
-import { BookingBar, BookingPolicy, BookingReviewHeading } from "./booking-checkout";
+import { BookingPolicy, BookingReviewHeading, type BookingBarDetails } from "./booking-checkout";
 import styles from "./booking-calendar.module.css";
 import { resolveSchedule } from "@/lib/schedule";
 
@@ -37,6 +37,7 @@ export function OpenPlayBooking({
   initialPlayers,
   reviewing,
   onReviewChange,
+  onBookingBarChange,
 }: {
   venue: VenueSettings;
   date: string;
@@ -48,6 +49,7 @@ export function OpenPlayBooking({
   initialPlayers?: number;
   reviewing: boolean;
   onReviewChange: (review: boolean) => void;
+  onBookingBarChange: (details: BookingBarDetails | null) => void;
 }) {
   const [people, setPeople] = useState(initialPlayers && initialPlayers >= 1 && initialPlayers <= 20 ? initialPlayers : 1);
   const [selectedForReview, setSelectedForReview] = useState<string | null>(
@@ -182,6 +184,15 @@ export function OpenPlayBooking({
   const passSelection = `${date}:${start}`;
   const reservationReady = canReserve && validPeople && !tooMany && !loading && !loadError;
   const displayedTotal = checkingPrice ? "Checking price…" : quoteFailed ? "Price unavailable" : money(totalCents / 100);
+  const sessionSelected = scheduled && selectedForReview === passSelection;
+  const selectionText = `Open play · ${people} ${people === 1 ? "player" : "players"} · ${time}`;
+  const continueDisabled = !reservationReady || checkingPrice || quoteFailed;
+
+  useLayoutEffect(() => {
+    onBookingBarChange(sessionSelected
+      ? { total: displayedTotal, selection: selectionText, disabled: continueDisabled }
+      : null);
+  }, [onBookingBarChange, sessionSelected, displayedTotal, selectionText, continueDisabled]);
 
   useEffect(() => {
     if (!quoteKey) return;
@@ -276,20 +287,14 @@ export function OpenPlayBooking({
                 <input type="number" min="1" max="20" value={people}
                   onChange={(event) => setPeople(Number(event.target.value))} required />
               </label>
-              {selectedForReview !== passSelection && (
-                <button type="button" className="button button-outline" disabled={!reservationReady}
-                  onClick={() => setSelectedForReview(passSelection)}>
-                  Select session
-                </button>
-              )}
+              <button type="button" className="button button-outline" aria-pressed={sessionSelected}
+                disabled={!sessionSelected && !reservationReady}
+                onClick={() => setSelectedForReview(sessionSelected ? null : passSelection)}>
+                {sessionSelected ? "Session selected" : "Select session"}
+              </button>
             </div>
             {tooMany && <p className={styles.availabilityStatus} role="status">Choose fewer players or another session.</p>}
             {!validPeople && <p className={styles.availabilityStatus} role="status">Choose 1 to 20 players.</p>}
-            {selectedForReview === passSelection && (
-              <BookingBar total={displayedTotal}
-                selection={`Open play · ${people} ${people === 1 ? "player" : "players"} · ${time}`}
-                disabled={!reservationReady || checkingPrice || quoteFailed} onContinue={() => onReviewChange(true)} />
-            )}
           </>
         )}
       </section>

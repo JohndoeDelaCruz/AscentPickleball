@@ -28,7 +28,7 @@ import { DateSlider } from "@/components/date-slider";
 import { OpenPlayBooking } from "@/components/open-play-booking";
 import { EquipmentRental } from "@/components/equipment-rental";
 import { PaymentOptions } from "@/components/payment-options";
-import { BookingBar, BookingPolicy, BookingReviewHeading } from "./booking-checkout";
+import { BookingBar, BookingPolicy, BookingReviewHeading, type BookingBarDetails } from "./booking-checkout";
 import {
   resolveSchedule,
   scheduleHours,
@@ -109,6 +109,7 @@ export function BookingCalendar({
       : null,
   );
   const [reviewing, setReviewing] = useState(initialReview);
+  const [openBookingBar, setOpenBookingBar] = useState<BookingBarDetails | null>(null);
   const [availability, setAvailability] = useState<{ date: string; slots: Availability[] } | null>(null);
   const [refreshing, setRefreshing] = useState(ready);
   const [loadError, setLoadError] = useState("");
@@ -161,6 +162,12 @@ export function BookingCalendar({
     times: privateStarts.filter(({ hour }) => isSlotAvailable(slots, court.id, hour, duration)),
   })).filter(({ times }) => times.length > 0);
   const noPrivateTimes = !loading && !loadError && availableCourts.length === 0;
+  const courtBookingBar = selection ? {
+    total: quoteLoading ? "Checking price…" : quote?.failed ? "Price unavailable" : bookingTotal === null ? "Price pending" : money(bookingTotal),
+    selection: `${courtName(venue.courts, selection.court)} · ${formatHour(selection.hour)}–${formatHour(selection.hour + duration)}`,
+    disabled: loading || Boolean(loadError) || isPastSlot(date, selection.hour, now),
+  } : null;
+  const bookingBar = reviewActive ? null : mode === "open_play" ? openBookingBar : courtBookingBar;
 
   useEffect(() => {
     if (mode === "court" && reviewing && !selection) {
@@ -277,6 +284,7 @@ export function BookingCalendar({
     setDate(value);
     setSelection(null);
     setSelectedSession(null);
+    setOpenBookingBar(null);
     setReviewing(false);
     setAccepted(false);
     setLoadError("");
@@ -296,6 +304,7 @@ export function BookingCalendar({
     setMode(next);
     setReviewing(false);
     setSelection(null);
+    setOpenBookingBar(null);
     setAccepted(false);
     setError("");
   }
@@ -372,7 +381,7 @@ export function BookingCalendar({
         <OpenPlayBooking venue={venue} date={date} ready={ready && openPlayReady}
           signedIn={signedIn} userName={userName} selectedStart={selectedSession}
           onSessionChange={setSelectedSession} initialPlayers={initialPlayers}
-          reviewing={reviewActive} onReviewChange={changeStep} />
+          reviewing={reviewActive} onReviewChange={changeStep} onBookingBarChange={setOpenBookingBar} />
       ) : reviewActive && selection ? (
         <section className={styles.review} aria-label="Private court booking review">
           <BookingReviewHeading onBack={() => changeStep(false)} disabled={pending} />
@@ -537,16 +546,9 @@ export function BookingCalendar({
               })}
             </div>
           )}
-          {selection && (
-            <BookingBar
-              total={quoteLoading ? "Checking price…" : quote?.failed ? "Price unavailable" : bookingTotal === null ? "Price pending" : money(bookingTotal)}
-              selection={`${courtName(venue.courts, selection.court)} · ${formatHour(selection.hour)}–${formatHour(selection.hour + duration)}`}
-              disabled={loading || Boolean(loadError) || isPastSlot(date, selection.hour, now)}
-              onContinue={() => changeStep(true)}
-            />
-          )}
         </section>
       )}
+      <BookingBar details={bookingBar} onContinue={() => changeStep(true)} />
     </div>
   );
 }
