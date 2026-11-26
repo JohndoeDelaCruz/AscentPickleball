@@ -2385,38 +2385,76 @@ img {
   line-height: 1.9;
 }
 .membership-home {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "heading action" "plans plans";
   align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-  padding: 34px;
+  gap: 20px;
+  padding: clamp(18px, 2.3vw, 34px);
   margin-bottom: 70px;
   border-radius: 12px;
   background: var(--green);
   color: var(--cream);
 }
 .membership-home h2 {
+  grid-area: heading;
   font-family: var(--font-body), Arial, sans-serif;
   font-size: clamp(24px, 3vw, 34px);
   line-height: 1.25;
-  margin: 0 0 12px;
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.membership-home p {
-  max-width: 650px;
-  margin-bottom: 0;
-  color: #e4ebd7;
-}
 .membership-home-plans {
+  grid-area: plans;
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 14px;
   list-style: none;
   margin: 0;
   padding: 0;
   overflow-wrap: anywhere;
 }
+.membership-home-plans > li {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: clamp(14px, 1.7vw, 24px);
+  border: 1px solid rgb(248 249 243 / 18%);
+  border-radius: 9px;
+  background: rgb(248 249 243 / 6%);
+}
+.membership-home-plans h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.membership-home-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin: 0;
+  color: #e4ebd7;
+  font-size: 14px;
+}
+.membership-home-price strong {
+  color: var(--lime);
+  font-size: clamp(34px, 4.5vw, 54px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+.membership-home-summary {
+  max-width: 60ch;
+  margin: 0;
+  color: #e4ebd7;
+  font-size: 14px;
+  line-height: 1.6;
+}
 .membership-home > .button {
-  flex-shrink: 0;
+  grid-area: action;
+  justify-self: end;
 }
 .rules-page {
   padding-bottom: 72px;
@@ -2608,21 +2646,21 @@ img {
 .booking-court-rules {
   margin-bottom: 22px;
 }
-@media (max-width: 1000px) {
-  .membership-home {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
 @media (max-width: 650px) {
   .membership-home {
-    padding: 26px 22px;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "heading" "plans" "action";
+    gap: 14px;
     margin-bottom: 48px;
+  }
+  .membership-home-plans {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
   .membership-home > .button {
     width: 100%;
-    gap: 16px;
+    gap: 10px;
+    padding-inline: 12px;
   }
   .rules-layout {
     grid-template-columns: minmax(0, 1fr);

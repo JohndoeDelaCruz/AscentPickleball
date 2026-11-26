@@ -195,20 +195,24 @@ export default async function Home() {
         aria-labelledby="membership-home-title"
         data-reveal=""
       >
-        <div>
-          <h2 id="membership-home-title">Membership plans</h2>
-          <ul className="membership-home-plans">
-            {membershipPlans.map((plan) => {
-              const details = publishedMembershipDetails(plan);
-              return <li key={plan.id}>
-                <strong>{details.plan_name} · {money(details.price_cents / 100)} / {details.price_period}</strong>
-                <p>{details.home_summary}</p>
-              </li>;
-            })}
-          </ul>
-        </div>
+        <h2 id="membership-home-title">Membership plans</h2>
+        <ul className="membership-home-plans" role="list">
+          {membershipPlans.map((plan) => {
+            const details = publishedMembershipDetails(plan);
+            return (
+              <li key={plan.id}>
+                <h3>{details.plan_name}</h3>
+                <p className="membership-home-price">
+                  <strong>{money(details.price_cents / 100)}</strong>{" "}
+                  <span>/ {details.price_period}</span>
+                </p>
+                <p className="membership-home-summary">{details.home_summary}</p>
+              </li>
+            );
+          })}
+        </ul>
         <Link href="/membership" className="button button-lime">
-          View membership benefits <ArrowUpRight size={18} />
+          View membership benefits <ArrowUpRight size={18} aria-hidden="true" />
         </Link>
       </section>
       {products.length > 0 && (
