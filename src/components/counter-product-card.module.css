@@ -1,20 +1,13 @@
 .card {
   display: grid;
-  grid-template-columns: clamp(64px, 15vw, 112px) minmax(0, 1fr);
-  grid-template-areas: "photo product";
+  grid-template-columns: clamp(82px, 11vw, 156px) minmax(0, 1fr) auto;
+  grid-template-areas: "photo details purchase";
   align-items: center;
-  gap: 6px 13px;
-  min-width: 0;
-  padding: 9px 11px 9px 9px;
-  border: 1px solid #4a6253;
+  gap: 14px clamp(14px, 2vw, 28px);
+  padding: clamp(12px, 1.5vw, 22px);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: radial-gradient(ellipse at top right, #294936, #13271e 72%);
-  color: var(--cream);
-  box-shadow: 0 8px 24px rgb(14 35 24 / 28%);
-}
-
-.media {
-  display: contents;
+  background: #fffefa;
 }
 
 .photo {
@@ -24,21 +17,72 @@
   place-items: center;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 12px;
-  background: #eef2e8;
-  color: #43624f;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--muted);
 }
 
 .photo img {
-  padding: 4px;
+  padding: 5px;
   object-fit: contain;
+}
+
+.details {
+  grid-area: details;
+  overflow-wrap: anywhere;
+}
+
+.details p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.details h3 {
+  margin: 0;
+  font-size: clamp(18px, 2vw, 27px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.25;
+}
+
+.purchase {
+  grid-area: purchase;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px clamp(12px, 2vw, 28px);
+}
+
+.price {
+  font-size: clamp(26px, 3vw, 40px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.035em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.link {
+  min-height: 44px;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.link svg {
+  flex: none;
 }
 
 .controls {
   grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
-  gap: 5px;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .controls button {
@@ -47,80 +91,23 @@
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid rgb(255 255 255 / 40%);
-  border-radius: 50%;
-  background: rgb(16 25 19 / 86%);
-  color: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--cream);
 }
 
 .controls button:hover {
-  background: var(--green);
+  border-color: var(--green);
 }
 
-.product {
-  grid-area: product;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px;
-  overflow-wrap: anywhere;
-}
+@media (max-width: 650px) {
+  .card {
+    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-areas: "photo details" "purchase purchase";
+  }
 
-.details {
-  min-width: 0;
-}
-
-.nameAndPrice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 7px;
-}
-
-.product p {
-  margin: 0 0 5px;
-  color: #c6d5c6;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  line-height: 1.35;
-  text-transform: uppercase;
-}
-
-.product h3 {
-  margin: 0;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.35;
-}
-
-.price {
-  color: var(--lime);
-  font-size: 20px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.link {
-  flex: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding-inline: 10px;
-  border-radius: 999px;
-  background: var(--lime);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.link:hover {
-  background: #e6f5b7;
+  .purchase {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
 }

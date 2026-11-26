@@ -23,28 +23,32 @@ export function CounterProductCard({ products }: { products: CounterProduct[] })
   }
 
   return <div className={styles.card} role="group" aria-label="Products at the counter">
-    <div className={styles.media}>
-      <div className={styles.photo}>
-        {photo && photo !== failedPhoto ? (
-          <Image key={photo} src={`/product-photo/${photo}.jpg`} alt="" fill unoptimized onError={() => setFailedPhoto(photo)} />
-        ) : <ShoppingBag size={34} aria-hidden="true" />}
-      </div>
-      {products.length > 1 && <div className={styles.controls}>
-        <button type="button" onClick={() => move(-1)} aria-label="Previous product"><ChevronLeft size={19} aria-hidden="true" /></button>
-        <button type="button" onClick={() => move(1)} aria-label="Next product"><ChevronRight size={19} aria-hidden="true" /></button>
-      </div>}
+    <div className={styles.photo}>
+      {photo && photo !== failedPhoto ? (
+        <Image key={photo} src={`/product-photo/${photo}.jpg`} alt="" fill unoptimized onError={() => setFailedPhoto(photo)} />
+      ) : <ShoppingBag size={34} aria-hidden="true" />}
     </div>
-    <div className={styles.product}>
-      <div className={styles.details}>
-        <p>{product.category}</p>
-        <div className={styles.nameAndPrice}><h3>{product.name}</h3><span className={styles.price}>{price}</span></div>
-      </div>
-      {product.id && <Link href={pickupOrderPath(product.id)} className={styles.link} prefetch={false} aria-label={`Order ${product.name} for pickup`}>
-        Order <ArrowUpRight size={15} aria-hidden="true" />
+    <div className={styles.details}>
+      <p>{product.category}</p>
+      <h3>{product.name}</h3>
+    </div>
+    <div className={styles.purchase}>
+      <span className={styles.price}>{price}</span>
+      {product.id && <Link
+        href={pickupOrderPath(product.id)}
+        className={`button button-dark ${styles.link}`}
+        prefetch={false}
+        aria-label={`Order for pickup: ${product.name}`}
+      >
+        Order for pickup <ArrowUpRight size={17} aria-hidden="true" />
       </Link>}
-      {products.length > 1 && <span className="sr-only" role="status">
-        {product.name}, {price}. Product {currentIndex + 1} of {products.length}.
-      </span>}
     </div>
+    {products.length > 1 && <div className={styles.controls}>
+      <button type="button" onClick={() => move(-1)} aria-label="Previous product"><ChevronLeft size={19} aria-hidden="true" /></button>
+      <button type="button" onClick={() => move(1)} aria-label="Next product"><ChevronRight size={19} aria-hidden="true" /></button>
+      <span className="sr-only" role="status">
+        {product.name}, {price}. Product {currentIndex + 1} of {products.length}.
+      </span>
+    </div>}
   </div>;
 }

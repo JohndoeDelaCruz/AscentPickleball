@@ -225,86 +225,145 @@
   font-size: 12px;
 }
 
-.play,
-.counter {
-  display: grid;
-  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
-  align-items: center;
-  gap: clamp(18px, 5vw, 76px);
+.courts {
+  padding-block: clamp(36px, 5vw, 72px) clamp(38px, 6vw, 78px);
 }
 
-.play {
-  padding-block: clamp(40px, 7vw, 96px);
-}
-
-.play h2,
 .courts h2,
 .counter h2 {
   margin: 0;
   text-transform: uppercase;
 }
 
-.playTabs {
+.courtsHeading {
+  margin-bottom: clamp(18px, 2.2vw, 28px);
+}
+
+.courtsHeading p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.courtCards {
   display: grid;
-  gap: 8px;
-  margin-top: 19px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 27px);
 }
 
-.playTabs button {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  min-width: 0;
-  min-height: 48px;
-  padding: 10px 13px;
+.courtCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: #fffefa;
-  text-align: left;
-  font-size: 15px;
-  font-weight: 600;
 }
 
-.playTabs svg {
+.courtPhoto {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  min-height: 144px;
+  background: #e8eee0;
+}
+
+.courtPhoto img {
+  object-fit: cover;
+  object-position: 50% 43%;
+}
+
+.courtCardBody {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px clamp(12px, 2vw, 24px);
+}
+
+.courtCardBody h3 {
+  margin: 0;
+  font: 700 clamp(23px, 2vw, 30px)/1.1 var(--font-display), Impact, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.courtAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--cream);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.courtAction svg,
+.courtInfo svg {
   flex: none;
 }
 
-.playTabs button[aria-selected="true"] {
-  border-color: var(--green);
-  background: #e9efdf;
-}
-
-.playPanel {
-  min-width: 0;
-  padding: clamp(20px, 4vw, 54px);
-  border-radius: 12px;
-  background: var(--green);
+.courtCard:is(:hover, :focus-visible) .courtAction {
+  border-color: var(--ink);
+  background: var(--ink);
   color: var(--cream);
 }
 
-.playPanel h3 {
+.courtInfo {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #eef2e7;
+  font-size: 14px;
+}
+
+.courtInfo p {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   margin: 0;
-  font: 700 clamp(32px, 5vw, 56px)/.98 var(--font-display), Impact, sans-serif;
+  line-height: 1.45;
 }
 
-.playPanel p {
-  margin: 12px 0 17px;
-  color: #e4ebdc;
-  font-size: 15px;
+.courtInfo p svg {
+  margin-top: 2px;
 }
 
-.playPanel :global(.button) {
-  min-height: 44px;
-  gap: 10px;
-  padding: 9px 14px;
+.courtRates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin: 0 0 10px;
 }
 
-.courts {
-  padding-bottom: clamp(38px, 6vw, 78px);
+.courtRates > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.courtRates dd {
+  margin: 0;
 }
 
 .counter {
+  display: grid;
+  gap: clamp(18px, 2.2vw, 28px);
   padding-bottom: clamp(36px, 6vw, 72px);
+}
+
+@media (min-width: 1101px) {
+  .counter {
+    grid-template-columns: minmax(max-content, 1fr) minmax(0, 2fr);
+    align-items: center;
+  }
 }
 
 @media (max-width: 650px) {
@@ -352,19 +411,13 @@
     grid-area: 1 / 2 / 3 / 3;
   }
 
-  .play,
-  .counter {
+  .courtCards {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .playTabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 12px;
-  }
-
-  .playTabs button {
-    padding-inline: 8px;
-    font-size: 14px;
+  .courtPhoto {
+    aspect-ratio: 2.4 / 1;
+    min-height: 0;
   }
 }
 

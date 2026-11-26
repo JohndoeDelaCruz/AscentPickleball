@@ -364,100 +364,6 @@ img {
   max-width: 300px;
   margin-bottom: 5px;
 }
-.court-cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 27px;
-}
-.court-card {
-  display: flex;
-  align-items: end;
-  min-height: 260px;
-  position: relative;
-  overflow: hidden;
-  background: var(--ink);
-  color: var(--cream);
-  border-radius: 10px;
-}
-@media (min-width: 1400px) {
-  .court-card {
-    aspect-ratio: 12 / 5;
-  }
-}
-.court-card img {
-  object-fit: cover;
-  object-position: 50% 43%;
-  transition: transform 0.5s;
-}
-.court-card:hover img {
-  transform: scale(1.04);
-}
-.court-card-copy {
-  position: relative;
-  isolation: isolate;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 12px;
-  padding: 16px clamp(16px, 2vw, 24px);
-}
-.court-card-copy::before {
-  content: "";
-  position: absolute;
-  inset: -3rem 0 0;
-  z-index: -1;
-  background: linear-gradient(180deg, transparent, rgb(14 29 22 / 80%) 3rem, rgb(14 29 22 / 95%));
-}
-.court-card-copy > div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.court-card-copy h3 {
-  font-family: var(--font-display), Impact, sans-serif;
-  font-size: 30px;
-  line-height: 1.05;
-  margin: 0 0 2px;
-}
-.court-card-copy p,
-.court-rates {
-  font-size: 0.875rem;
-  line-height: 1.45;
-  margin: 0;
-}
-.court-rates {
-  display: grid;
-  gap: 4px;
-}
-.court-rates > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 2px 12px;
-  flex-wrap: wrap;
-}
-.court-rates dd {
-  margin: 0;
-  white-space: nowrap;
-}
-.court-rates dd strong {
-  font-weight: 600;
-}
-.circle-arrow {
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgb(248 249 243 / 65%);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-.court-card:is(:hover, :focus-visible) .circle-arrow {
-  background: var(--lime);
-  border-color: var(--lime);
-  color: var(--ink);
-}
 .visit-section {
   background: #ecefdf;
   padding-block: 65px;
@@ -2844,16 +2750,6 @@ img {
   }
   .section-heading > .text-link {
     margin-top: 22px;
-  }
-  .court-cards {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-  .court-card {
-    min-height: 240px;
-  }
-  .court-card-copy h3 {
-    font-size: 28px;
   }
   .visit-section {
     padding-block: 48px;

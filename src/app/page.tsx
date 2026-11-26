@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   MapPin,
+  Package,
 } from "lucide-react";
 import { getMembershipPlans, getVenue } from "@/lib/data";
 import { getCounterProducts } from "@/lib/counter-products";
@@ -13,7 +14,6 @@ import { Starburst } from "@/components/starburst";
 import { CounterProductCard } from "@/components/counter-product-card";
 import { LandingMotion } from "@/components/landing-motion";
 import { ScheduleOverview } from "@/components/schedule-overview";
-import { HomePlaySelector } from "@/components/home-play-selector";
 import {
   canBook,
   formatHour,
@@ -128,67 +128,63 @@ export default async function Home() {
           ))}
         </div>
       </div>
-      <HomePlaySelector showOpenPlay={showOpenPlay} />
-      <section className={`container ${styles.courts}`} id="courts">
-        <div className="section-heading" data-reveal="">
-          <div>
-            <h2>The courts.</h2>
-          </div>
+      <section className={`container ${styles.courts}`} id="courts" aria-labelledby="courts-heading">
+        <div className={styles.courtsHeading} data-reveal="">
+          <h2 id="courts-heading">The courts.</h2>
+          {courts.length > 0 && (
+            <p>{venue.schedule_config
+              ? "Choose a date to see court times, rates, and player limits."
+              : `Up to ${venue.private_court_capacity} players per private court.`}</p>
+          )}
         </div>
-        <div className="court-cards">
+        <div className={styles.courtCards}>
           {courts.map(({ id: court, name }, index) => (
             <Link
               href={`/book?court=${court}`}
-              className="court-card"
-              aria-labelledby={`court-${court}-title`}
+              className={styles.courtCard}
+              aria-labelledby={`court-${court}-action court-${court}-title`}
               data-reveal=""
               data-reveal-delay={Math.min(index, 3) * 0.09}
               key={court}
             >
-              <Image
-                src={courtPhoto(court)}
-                alt=""
-                fill
-                sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(50vw - 45px), (max-width: 1712px) calc(50vw - 69px), 787px"
-              />
-              <div className="court-card-copy">
-                <div>
-                  <h3 id={`court-${court}-title`}><span className="sr-only">Book </span>{name}</h3>
-                  {venue.schedule_config ? (
-                    <p>Private hours and rates vary by day. Choose a date to see availability.</p>
-                  ) : (
-                    <dl className="court-rates">
-                      {ratePeriods.map((period) => (
-                        <div key={period.start}>
-                          <dt>
-                            {formatHour(period.start)} –{" "}
-                            {formatHour(period.end)}
-                          </dt>
-                          <dd>
-                            <strong>{money(period.rate)}</strong> / hour
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                  <p>
-                    Optional rental: {money(venue.equipment_rental_price)} ·{" "}
-                    {equipmentPackageLabel(venue.equipment_ball_count)}
-                  </p>
-                  <p>
-                    {venue.schedule_config
-                      ? "Player limits are listed for each booking period."
-                      : `Up to ${venue.private_court_capacity} players per private court.`}
-                  </p>
-                </div>
-                <span className="circle-arrow" aria-hidden="true">
-                  <ArrowUpRight size={22} />
+              <div className={styles.courtPhoto}>
+                <Image
+                  src={courtPhoto(court)}
+                  alt=""
+                  fill
+                  sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(50vw - 45px), (max-width: 1712px) calc(50vw - 70px), 787px"
+                />
+              </div>
+              <div className={styles.courtCardBody}>
+                <h3 id={`court-${court}-title`}>{name}</h3>
+                <span className={styles.courtAction} id={`court-${court}-action`}>
+                  Check availability <ArrowUpRight size={17} aria-hidden="true" />
                 </span>
               </div>
             </Link>
           ))}
         </div>
-        {!courts.length && <p>No active courts are listed.</p>}
+        {courts.length > 0 ? (
+          <div className={styles.courtInfo} data-reveal="">
+            {!venue.schedule_config && (
+              <dl className={styles.courtRates}>
+                {ratePeriods.map((period) => (
+                  <div key={period.start}>
+                    <dt>{formatHour(period.start)}–{formatHour(period.end)}</dt>
+                    <dd><strong>{money(period.rate)}</strong> / hour</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p>
+              <Package size={17} aria-hidden="true" />
+              <span>
+                <strong>Optional equipment rental</strong> · {money(venue.equipment_rental_price)} per set
+                {" "}({equipmentPackageLabel(venue.equipment_ball_count)})
+              </span>
+            </p>
+          </div>
+        ) : <p>No active courts are listed.</p>}
       </section>
       <section
         className="container membership-home"
