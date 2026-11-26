@@ -134,7 +134,7 @@ export default async function Home() {
                 src={courtPhoto(court)}
                 alt=""
                 fill
-                sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1280px) 50vw, 627px"
+                sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(50vw - 45px), (max-width: 1712px) calc(50vw - 69px), 787px"
               />
               <div className="court-card-copy">
                 <div>
@@ -253,7 +253,7 @@ export default async function Home() {
               src="/pickleball-equipment.jpg"
               alt=""
               fill
-              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) 45vw, 560px"
+              sizes="(max-width: 650px) calc(100vw - 40px), (max-width: 1100px) calc(50vw - 54px), (max-width: 1712px) calc(50vw - 103px), 753px"
               className="visit-photo"
             />
             <span className="visit-word">

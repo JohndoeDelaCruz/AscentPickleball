@@ -115,6 +115,12 @@ img {
   width: min(1280px, calc(100% - 112px));
   margin-inline: auto;
 }
+@media (min-width: 1101px) {
+  body:has(> .site-header--home) .container {
+    width: min(1600px, calc(100% - 112px));
+    max-width: none;
+  }
+}
 .eyebrow {
   display: flex;
   align-items: center;
@@ -365,6 +371,11 @@ img {
   background: var(--ink);
   color: var(--cream);
   border-radius: 10px;
+}
+@media (min-width: 1400px) {
+  .court-card {
+    aspect-ratio: 12 / 5;
+  }
 }
 .court-card img {
   object-fit: cover;
