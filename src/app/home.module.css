@@ -48,6 +48,26 @@
   padding-block: calc(64px + var(--header-height)) 78px;
 }
 
+.heroBrandSlot {
+  display: none;
+}
+
+@media (min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference) {
+  .heroInner {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .65fr);
+    align-items: center;
+    column-gap: clamp(24px, 5vw, 72px);
+  }
+
+  .heroBrandSlot {
+    display: block;
+    justify-self: center;
+    width: clamp(220px, 20vw, 340px);
+    aspect-ratio: 1;
+    translate: 0 -36px;
+  }
+}
+
 .heroCopy h1 {
   margin: 0;
   font-size: clamp(60px, 8vw, 118px);

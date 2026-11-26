@@ -61,7 +61,11 @@ export function Header({
       }}
     >
       <div className="container nav-shell">
-        <Brand compact={isAdmin} />
+        {isHome ? (
+          <div className="home-brand-slot" data-home-brand-slot>
+            <Brand sizes="(min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference) 340px, (max-width: 850px) 58px, 68px" />
+          </div>
+        ) : <Brand compact={isAdmin} />}
         {!isAdmin && (
           <nav className="desktop-nav" aria-label="Main navigation">
             {links.map((link) => (

@@ -9,6 +9,71 @@ import "lenis/dist/lenis.css";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
+function animateHeroBrand(root: HTMLElement) {
+  const header = document.querySelector<HTMLElement>(".site-header--home");
+  const headerSlot = header?.querySelector<HTMLElement>("[data-home-brand-slot]");
+  const brand = headerSlot?.querySelector<HTMLAnchorElement>(".brand");
+  const hero = root.querySelector<HTMLElement>("[data-landing-hero]");
+  const heroSlot = hero?.querySelector<HTMLElement>("[data-hero-brand-slot]");
+  if (!header || !headerSlot || !brand || !hero || !heroSlot) return;
+
+  let previousScroll = Math.max(0, window.scrollY);
+  let destination = previousScroll === 0 ? 1 : 0;
+  const position = { progress: destination };
+  const originalTransform = brand.style.transform;
+
+  const render = (
+    end = heroSlot.getBoundingClientRect(),
+    headerBottom = header.getBoundingClientRect().bottom,
+  ) => {
+    const start = headerSlot.getBoundingClientRect();
+    const { progress } = position;
+    const x = (end.left - start.left) * progress;
+    const y = (Math.max(end.top, headerBottom + 12) - start.top) * progress;
+    const scale = gsap.utils.interpolate(1, end.width / start.width, progress);
+    brand.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  };
+
+  const move = gsap.quickTo(position, "progress", {
+    duration: 0.65,
+    ease: "power3.inOut",
+    onUpdate: render,
+  });
+
+  const update = () => {
+    const scroll = Math.max(0, window.scrollY);
+    const delta = scroll - previousScroll;
+    const hasDirection = Math.abs(delta) >= 6 || (scroll === 0 && delta < 0);
+    if (hasDirection) previousScroll = scroll;
+
+    const headerBottom = header.getBoundingClientRect().bottom;
+    const slot = heroSlot.getBoundingClientRect();
+    let next = destination;
+    if (slot.top < headerBottom + 12) next = 0;
+    else if (hasDirection) next = delta > 0 ? 1 : 0;
+
+    if (next !== destination) {
+      destination = next;
+      move(next);
+    }
+    // A jump to a section below the hero should leave the logo in the header.
+    if (hero.getBoundingClientRect().bottom <= headerBottom && position.progress > 0) {
+      move.tween.progress(1);
+    }
+    render(slot, headerBottom);
+  };
+
+  update();
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  return () => {
+    window.removeEventListener("scroll", update);
+    window.removeEventListener("resize", update);
+    move.tween.kill();
+    brand.style.transform = originalTransform;
+  };
+}
+
 export function LandingMotion({ children }: { children: ReactNode }) {
   const container = useRef<HTMLElement>(null);
 
@@ -18,6 +83,10 @@ export function LandingMotion({ children }: { children: ReactNode }) {
       if (!root) return;
 
       const media = gsap.matchMedia();
+      media.add(
+        "(min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference)",
+        () => animateHeroBrand(root),
+      );
       media.add(
         {
           mobile: "(max-width: 850px)",

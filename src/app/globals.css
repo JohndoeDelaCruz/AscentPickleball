@@ -249,6 +249,13 @@ img {
 .site-header--home .mobile-nav {
   color: var(--ink);
 }
+.home-brand-slot {
+  display: flex;
+  flex-shrink: 0;
+}
+.home-brand-slot .brand {
+  transform-origin: top left;
+}
 .nav-shell {
   min-height: calc(var(--header-height) - 1px);
   display: flex;

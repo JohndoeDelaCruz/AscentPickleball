@@ -88,6 +88,7 @@ export default async function Home() {
               )}
             </div>
           </div>
+          <div className={styles.heroBrandSlot} data-hero-brand-slot aria-hidden="true" />
         </div>
       </section>
       <div className={`container ${styles.scheduleWrap}`}>
