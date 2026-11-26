@@ -50,6 +50,10 @@
 
 .heroBrands {
   display: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr);
+  align-items: center;
+  gap: clamp(10px, 1.2vw, 20px);
+  justify-self: center;
 }
 
 .heroBrandSlot {
@@ -94,10 +98,6 @@
 
   .heroBrands {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr);
-    align-items: center;
-    gap: clamp(10px, 1.2vw, 20px);
-    justify-self: center;
     width: min(100%, 550px);
     translate: 0 -36px;
   }
@@ -365,6 +365,43 @@
   .playTabs button {
     padding-inline: 8px;
     font-size: 14px;
+  }
+}
+
+@media (max-width: 1100px) and (prefers-reduced-motion: no-preference) and ((min-height: 561px) or (orientation: portrait)) {
+  .heroInner {
+    grid-template-rows: auto 1fr;
+    align-content: stretch;
+    row-gap: clamp(14px, 4svh, 34px);
+    padding-block: calc(var(--header-height) + clamp(16px, 5svh, 42px))
+      clamp(26px, 7svh, 64px);
+  }
+
+  .heroBrands {
+    display: grid;
+    grid-row: 1;
+    width: min(100%, clamp(216px, 62vw, 264px));
+    gap: 12px;
+  }
+
+  .heroCopy {
+    align-self: center;
+  }
+
+  .heroBrandCross {
+    font-size: 24px;
+  }
+}
+
+@media (max-height: 560px) and (orientation: portrait) and (prefers-reduced-motion: no-preference) {
+  .heroInner {
+    min-height: min(520px, 100svh);
+    row-gap: 14px;
+    padding-top: calc(var(--header-height) + 16px);
+  }
+
+  .heroActions {
+    margin-top: 16px;
   }
 }
 

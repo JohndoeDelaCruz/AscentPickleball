@@ -98,7 +98,7 @@ export default async function Home() {
                   alt="ALPRO Pickleball"
                   width={585}
                   height={585}
-                  sizes="(min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference) 360px, 1px"
+                  sizes="(min-width: 1101px) 360px, 180px"
                 />
               </div>
             </div>

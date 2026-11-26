@@ -9,7 +9,7 @@ import "lenis/dist/lenis.css";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-function animateHeroBrand(root: HTMLElement) {
+function animateHeroBrand(root: HTMLElement, compact: boolean) {
   const header = document.querySelector<HTMLElement>(".site-header--home");
   const headerSlot = header?.querySelector<HTMLElement>("[data-home-brand-slot]");
   const brand = headerSlot?.querySelector<HTMLAnchorElement>(".brand");
@@ -18,6 +18,7 @@ function animateHeroBrand(root: HTMLElement) {
   const heroSlot = brands?.querySelector<HTMLElement>("[data-hero-brand-slot]");
   const partner = brands?.querySelector<HTMLElement>("[data-hero-partner]");
   if (!header || !headerSlot || !brand || !hero || !brands || !heroSlot || !partner) return;
+  const menu = compact ? header.querySelector<HTMLElement>(".mobile-nav") : null;
 
   let previousScroll = Math.max(0, window.scrollY);
   let destination = previousScroll === 0 ? 1 : 0;
@@ -45,7 +46,7 @@ function animateHeroBrand(root: HTMLElement) {
   };
 
   const move = gsap.quickTo(position, "progress", {
-    duration: 0.65,
+    duration: compact ? 0.46 : 0.65,
     ease: "power3.inOut",
     onUpdate: render,
   });
@@ -53,7 +54,7 @@ function animateHeroBrand(root: HTMLElement) {
     reveal: 1,
     paused: true,
     delay: 0.2,
-    duration: 0.9,
+    duration: compact ? 0.66 : 0.9,
     ease: "power2.inOut",
     onUpdate: render,
   });
@@ -62,13 +63,15 @@ function animateHeroBrand(root: HTMLElement) {
     const scroll = Math.max(0, window.scrollY);
     const atTop = scroll === 0;
     const delta = scroll - previousScroll;
-    const hasDirection = Math.abs(delta) >= 6;
+    const hasDirection = Math.abs(delta) >= (compact ? 12 : 6);
     if (hasDirection || atTop) previousScroll = scroll;
 
     const headerBottom = header.getBoundingClientRect().bottom;
     const slot = heroSlot.getBoundingClientRect();
+    const menuOpen = menu?.dataset.open === "true" && menu.getClientRects().length > 0;
     let next = destination;
-    if (atTop) next = 1;
+    if (menuOpen) next = 0;
+    else if (atTop) next = 1;
     else if (slot.top < headerBottom + 12) next = 0;
     else if (hasDirection) next = delta > 0 ? 1 : 0;
 
@@ -88,9 +91,12 @@ function animateHeroBrand(root: HTMLElement) {
   update();
   window.addEventListener("scroll", update, { passive: true });
   window.addEventListener("resize", update);
+  const menuObserver = menu ? new MutationObserver(update) : null;
+  if (menu && menuObserver) menuObserver.observe(menu, { attributeFilter: ["data-open"] });
   return () => {
     window.removeEventListener("scroll", update);
     window.removeEventListener("resize", update);
+    menuObserver?.disconnect();
     move.tween.kill();
     revealPartner.kill();
     brand.style.transform = originalTransform;
@@ -109,8 +115,13 @@ export function LandingMotion({ children }: { children: ReactNode }) {
 
       const media = gsap.matchMedia();
       media.add(
-        "(min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference)",
-        () => animateHeroBrand(root),
+        {
+          showBrands: "(prefers-reduced-motion: no-preference) and ((min-height: 561px) or (orientation: portrait))",
+          compact: "(max-width: 1100px)",
+        },
+        ({ conditions }) => {
+          if (conditions?.showBrands) return animateHeroBrand(root, Boolean(conditions.compact));
+        },
       );
       media.add(
         {
