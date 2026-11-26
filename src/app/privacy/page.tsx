@@ -38,8 +38,8 @@ export default async function Privacy() {
         </p>
         <h2>Your choices</h2>
         <p>
-          You can request access to, correction of, or deletion of your account
-          information by contacting Ascent staff. Some reservation or payment
+          You can delete your account in Account settings. Contact Ascent staff
+          to request access to or correction of your account information. Some reservation or payment
           records may need to be retained for operational or recordkeeping
           purposes.
         </p>

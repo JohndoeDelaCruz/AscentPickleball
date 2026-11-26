@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { setAccountRole } from "@/app/(workspace)/admin/access/actions";
-import { accountRoleLabels, accountRolesHref, type AccountRole, type ManagedAccount } from "@/lib/account-roles";
+import { deleteManagedAccount, setAccountRole } from "@/app/(workspace)/admin/access/actions";
+import { accountRoleLabels, accountRolesHref, canManageAccount, type AccountRole, type ManagedAccount } from "@/lib/account-roles";
+import { DeleteAccountDialog } from "./account-deletion";
 import { Modal } from "./modal";
 import { TablePagination } from "./table-pagination";
 import { useAnimatedModal } from "./use-animated-modal";
@@ -65,7 +66,7 @@ export function AccountRoles(props: AccountRolesProps) {
     <WorkspacePageHeading title="Access" />
     <section className="console-panel" aria-labelledby="account-roles">
       <div className={`panel-heading ${styles.toolbar}`}>
-        <h2 id="account-roles">Account roles</h2>
+        <h2 id="account-roles">Accounts</h2>
         <AccountSearch query={props.query} />
       </div>
       <AccountRoleResults key={accountRolesHref(props.query, props.page)} {...props} />
@@ -74,8 +75,9 @@ export function AccountRoles(props: AccountRolesProps) {
 }
 
 function AccountRoleResults({ rows, count, page, pageSize, query, owner, userId }: AccountRolesProps) {
-  const [account, setAccount, closing] = useAnimatedModal<ManagedAccount>();
+  const [dialog, setDialog, closing] = useAnimatedModal<{ account: ManagedAccount; action: "role" | "delete" }>();
   const [status, setStatus] = useState("");
+  const account = dialog?.account;
 
   return <>
     {status && <p className={`success-message ${styles.status}`} role="status">{status}</p>}
@@ -90,8 +92,9 @@ function AccountRoleResults({ rows, count, page, pageSize, query, owner, userId 
           <tbody>
             {rows.map((row) => {
               const ownAccount = row.id === userId;
-              const canEdit = !ownAccount && (owner || row.role === "player" || row.role === "cashier")
-                && (row.email_confirmed || row.role !== "player");
+              const canManage = canManageAccount(row, owner, userId);
+              const canEdit = canManage && (row.email_confirmed || row.role !== "player");
+              const label = row.full_name ? `${row.full_name} (${row.email})` : row.email;
               return <tr key={row.id}>
                 <td className={styles.email}>
                   <strong>{row.full_name || row.email}</strong>
@@ -100,23 +103,32 @@ function AccountRoleResults({ rows, count, page, pageSize, query, owner, userId 
                   {!row.email_confirmed && <small>Email confirmation pending</small>}
                 </td>
                 <td>{accountRoleLabels[row.role]}</td>
-                <td>{canEdit ? (
-                  <button className="button button-outline button-small" type="button"
-                    aria-label={`Edit role for ${row.full_name ? `${row.full_name} (${row.email})` : row.email}`}
-                    onClick={() => { setStatus(""); setAccount(row); }}>Edit role</button>
-                ) : <span className="small-print">
-                  {ownAccount ? "Your role" : (row.role === "owner" || row.role === "manager") ? "Owner only" : "Awaiting confirmation"}
-                </span>}</td>
+                <td>{canManage ? (
+                  <div className={styles.rowActions}>
+                    {canEdit && <button className="button button-outline button-small" type="button" aria-label={`Edit role for ${label}`}
+                      onClick={() => { setStatus(""); setDialog({ account: row, action: "role" }); }}>Edit role</button>}
+                    <button className={`button button-outline button-small ${styles.dangerButton}`} type="button"
+                      aria-label={`Delete account for ${label}`}
+                      onClick={() => { setStatus(""); setDialog({ account: row, action: "delete" }); }}>Delete</button>
+                  </div>
+                ) : <span className="small-print">{ownAccount ? "Your role" : "Owner only"}</span>}</td>
               </tr>;
             })}
           </tbody>
         </table>
       </div>
     ) : <p className="panel-empty-note">{query ? "No accounts match this search." : "No accounts found."}</p>}
-    {account && <RoleDialog key={account.id} account={account} owner={owner} closing={closing}
-      onClose={() => setAccount(null)} onSaved={(role) => {
+    {account && dialog?.action === "role" && <RoleDialog key={account.id} account={account} owner={owner} closing={closing}
+      onClose={() => setDialog(null)} onSaved={(role) => {
         setStatus(`${account.full_name || account.email} now has ${accountRoleLabels[role]} access.`);
-        setAccount(null);
+        setDialog(null);
+      }} />}
+    {account && dialog?.action === "delete" && <DeleteAccountDialog key={account.id} email={account.email} closing={closing}
+      onClose={() => setDialog(null)}
+      deleteAccount={(confirmation) => deleteManagedAccount({ id: account.id, current: account.role, confirmation })}
+      onDeleted={() => {
+        setStatus("Account deleted.");
+        setDialog(null);
       }} />}
   </>;
 }

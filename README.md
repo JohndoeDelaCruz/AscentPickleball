@@ -126,6 +126,8 @@ Apply `202611140027_overview_trends.sql` after 026 to enable the **Overview** me
 
 Apply `202611140028_account_names.sql` after 027 to show saved full names in **Access** and search by name or email. Accounts without a saved name use their email address.
 
+Apply `202611270049_account_deletion.sql` after 048 before deploying account deletion. Signed-in users can delete their own accounts in **Account settings**. Managers can delete Player and Front Desk Staff accounts from **Access**, and owners can also delete Manager and Owner accounts. Keep at least one owner if the venue has one, and close any open shift before deleting its operator. Bookings, membership records, and the payment ledger are retained. Outstanding pickup orders are cancelled and their stock is released.
+
 Apply `202611140029_cashier_display_names.sql` after 028 to show saved staff names in the assignment controls and Overview’s **On duty** card. The card follows the selected report date. Opening Overview without a report date follows the current Philippine date.
 
 Apply `202611150030_cashier_duty_access.sql` after 029. A staff assignment for the current Philippine date gives the assigned person exclusive access among Front Desk Staff accounts. Managers and owners retain access, and all front desk staff can access staff tools when the date is unassigned. Off-duty staff use **My bookings** and can record the closing count for their own open drawer during a handover.

@@ -1,6 +1,7 @@
 import type { WorkspaceRole } from "./session-access";
 
 export const accountRolesPath = "/admin/access";
+export const accountDeletionConfirmation = "DELETE";
 export const accountRoleLabels = {
   player: "Player",
   cashier: "Front Desk Staff",
@@ -16,6 +17,10 @@ export type ManagedAccount = {
   email_confirmed: boolean;
   role: AccountRole;
 };
+
+export function canManageAccount(account: ManagedAccount, owner: boolean, userId: string) {
+  return account.id !== userId && (owner || account.role === "player" || account.role === "cashier");
+}
 
 export function accountRolesHref(query: string, page = 1) {
   const params = new URLSearchParams();

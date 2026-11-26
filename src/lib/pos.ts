@@ -62,7 +62,7 @@ export type Shift = {
   opening_cents: number;
   expected_cents: number;
   counted_cents: number | null;
-  cashier_id: string;
+  cashier_id: string | null;
 };
 export type Movement = {
   id: string;

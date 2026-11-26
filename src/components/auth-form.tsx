@@ -15,10 +15,12 @@ export function AuthForm({
   next,
   recovery = false,
   initialError = "",
+  initialMessage = "",
 }: {
   next?: string;
   recovery?: boolean;
   initialError?: string;
+  initialMessage?: string;
 }) {
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">(
     recovery ? "reset" : "login",
@@ -29,7 +31,7 @@ export function AuthForm({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaRevision, setCaptchaRevision] = useState(0);
   const needsCaptcha = mode !== "reset";

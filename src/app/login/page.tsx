@@ -14,6 +14,7 @@ export default async function LoginPage({
     next?: string | string[];
     recovery?: string;
     error?: string;
+    deleted?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -44,6 +45,7 @@ export default async function LoginPage({
           <AuthForm
             next={typeof params.next === "string" ? params.next : undefined}
             recovery={recovery}
+            initialMessage={params.deleted === "1" && !recovery && !params.error ? "Your account has been deleted." : undefined}
             initialError={
               params.error === "access"
                 ? "You’re signed in, but we couldn’t load your account access. Please try again."

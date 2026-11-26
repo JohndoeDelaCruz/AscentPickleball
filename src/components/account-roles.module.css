@@ -28,3 +28,35 @@
 .status {
   margin: 12px 16px;
 }
+.rowActions {
+  display: flex;
+  gap: 6px;
+}
+.deletePanel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 12px;
+  justify-items: start;
+  margin-block-start: 16px;
+}
+.deletePanel > div > p {
+  margin: 0;
+}
+.dangerButton {
+  border-color: #e5c6c1;
+  background: #fff7f5;
+  color: #9c3434;
+  gap: 8px;
+}
+.dangerConfirm,
+.dangerButton:hover:not(:disabled) {
+  border-color: #9c3434;
+  background: #9c3434;
+  color: #fff;
+}
+@media (max-width: 520px) {
+  .rowActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

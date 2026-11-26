@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentMembership, getSession } from "@/lib/data";
 import { accountRoleLabels } from "@/lib/account-roles";
 import { ChangePasswordForm } from "@/components/change-password-form";
+import { DeleteOwnAccount } from "@/components/account-deletion";
 import { WorkspacePageHeading } from "@/components/workspace-page-heading";
 import { MembershipStatus } from "@/components/membership-status";
 
@@ -28,6 +29,7 @@ export default async function AccountPage() {
           <span className="status-pill status-ok workspace-account-role">{role ? accountRoleLabels[role] : "Staff"}</span>
         </aside>
         {application !== undefined && <MembershipStatus application={application} account />}
+        <DeleteOwnAccount email={user.email} />
       </div>
     </>
   );
@@ -42,6 +44,7 @@ export default async function AccountPage() {
       </div>
       {application !== undefined && <MembershipStatus application={application} account />}
       <ChangePasswordForm />
+      <DeleteOwnAccount email={user.email} />
     </main>
   );
 }

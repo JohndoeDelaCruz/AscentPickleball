@@ -1973,6 +1973,85 @@ test("full database: atomic checkout, ledger integrity, permissions, booking dep
       assert.deepEqual(await read(), { court_booking_discount_cents: 5000, court_discount_revision: revisions.courtRevision,
         open_play_discount_cents: 4000, open_play_discount_revision: revisions.openPlayRevision, open_play_member_floor_cents: 7500 });
     });
+
+    await t.test("deleting an account preserves venue records and enforces Access roles", async () => {
+      await db.exec(`create table auth.sessions(id uuid primary key, user_id uuid not null references auth.users on delete cascade);
+        create function auth.jwt() returns jsonb language sql stable as $$
+          select jsonb_build_object('session_id', nullif(current_setting('request.jwt.claim.session_id', true), ''));
+        $$;
+        alter table storage.objects add column owner uuid references auth.users, add column owner_id text;`);
+      await db.exec(await readFile("supabase/migrations/202611270049_account_deletion.sql", "utf8"));
+
+      const manager = randomUUID(), staff = randomUUID(), customer = randomUUID();
+      await db.query(`insert into auth.users(id,email) values
+        ($1,'delete-manager@example.test'),($2,'delete-cashier@example.test'),($3,'delete-customer@example.test')`,
+        [manager, staff, customer]);
+      await db.query("insert into public.staff_members(user_id,role) values ($1,'manager'),($2,'cashier')", [manager, staff]);
+      await db.query("insert into auth.sessions select id,id from auth.users where id in ($1,$2,$3,$4)", [owner, manager, staff, customer]);
+
+      const remove = async (actor: string, target = actor, role: string | null = null, confirmation = "DELETE", session = actor) => {
+        await db.query("select set_config('request.jwt.claim.session_id',$1,false)", [session]);
+        return call(actor, "delete_account", [target, confirmation, role]);
+      };
+
+      await assert.rejects(() => as("", () => db.query("select public.delete_account($1,'DELETE')", [customer]), "anon"), /permission denied/);
+      await assert.rejects(() => remove(customer, customer, null, "delete"), /Type DELETE/);
+      await assert.rejects(() => remove(customer, customer, null, "DELETE", randomUUID()), /Log in again/);
+      await assert.rejects(() => remove(customer, staff, "cashier"), /Manager or owner authorization/);
+      await assert.rejects(() => remove(staff, customer, "player"), /Manager or owner authorization/);
+      await assert.rejects(() => remove(manager, owner, "owner"), /Only an owner/);
+      await assert.rejects(() => remove(manager, customer, "cashier"), /role changed/);
+      await db.query("update public.staff_members set role = 'manager' where role = 'owner' and user_id <> $1", [owner]);
+      await assert.rejects(() => remove(owner), /last Owner account/);
+
+      const register = randomUUID(), shift = randomUUID(), expense = randomUUID(), asset = randomUUID();
+      await db.query("insert into public.pos_registers values ($1, 'Deletion test register')", [register]);
+      await db.query("insert into public.pos_shifts(id,register_id,cashier_id,opening_cents) values ($1,$2,$3,0)", [shift, register, staff]);
+      await assert.rejects(() => remove(manager, staff, "cashier"), /Close this account’s register shift/);
+      await db.query("update public.pos_shifts set closed_at = now(), counted_cents = 0 where id = $1", [shift]);
+      await db.query(`insert into public.pos_expenses(id,expense_date,category,description,amount_cents,payment_method,
+        actor_id,voided_by,voided_at,void_reason) values($1,current_date,'supplies','Test supplies',100,'card',$2,$2,now(),'Duplicate')`, [expense, staff]);
+      await db.query(`insert into storage.objects(id,bucket_id,name,owner,owner_id)
+        values($1,'venue-assets','deletion-fixture.png',$2::uuid,$2::uuid::text)`, [asset, staff]);
+
+      const booking = randomUUID(), membership = randomUUID(), product = randomUUID(), pickup = randomUUID();
+      await db.query(`insert into public.bookings(id,user_id,court_id,booking_date,start_hour,duration,total_amount,
+        status,customer_name,customer_phone,payment_reference,payment_option) values($1,$2,1,current_date-60,6,1,200,
+        'confirmed','Deletion test customer','09171234567','DELETE-TEST-BOOKING','full')`, [booking, customer]);
+      await db.query(`insert into public.membership_applications(id,user_id,plan_id,plan_name,price_cents,gcash_name,gcash_number,gcash_qr_url)
+        values($1,$2,'annual','Annual',50000,'Ascent','00000000000','')`, [membership, customer]);
+      await db.query(`insert into public.pos_products(id,name,sku,category,price_cents,stock)
+        values($1,'Deletion test product','DELETE-TEST','Equipment',100,2)`, [product]);
+      await db.query(`insert into private.counter_orders(id,customer_id,product_id,customer_name,product_name,quantity,price_cents,expires_at)
+        values($1,$2,$3,'Test buyer','Deletion test product',1,100,now()+interval '1 hour')`, [pickup, customer, product]);
+
+      const bookingPayment = async () => (await db.query<{ user_id: string | null }>(`select b.user_id,b.status,b.paid_amount,p.amount_cents from public.bookings b
+        join public.pos_sales s on s.booking_id=b.id join public.pos_payments p on p.sale_id=s.id where b.id=$1`, [booking])).rows;
+      const [paidBooking] = await bookingPayment();
+      assert.equal(paidBooking?.user_id, customer);
+      await remove(customer);
+      await assert.rejects(() => remove(customer), /Log in again/);
+      assert.deepEqual(await bookingPayment(), [{ ...paidBooking, user_id: null }]);
+      assert.deepEqual((await db.query("select user_id from public.membership_applications where id = $1", [membership])).rows, [{ user_id: null }]);
+      assert.deepEqual((await db.query("select customer_id,cancelled_at is not null as cancelled from private.counter_orders where id = $1", [pickup])).rows,
+        [{ customer_id: null, cancelled: true }]);
+      assert.deepEqual((await db.query("select private.counter_held_units($1) as held", [product])).rows, [{ held: 0 }]);
+      await assert.rejects(() => call(player, "cancel_counter_order", [pickup]), /Order not found/);
+
+      await remove(manager, staff, "cashier");
+      assert.equal(await call(staff, "is_club_staff"), false);
+      assert.deepEqual((await db.query("select cashier_id from public.pos_shifts where id = $1", [shift])).rows, [{ cashier_id: null }]);
+      assert.deepEqual((await db.query("select actor_id,voided_by,void_reason from public.pos_expenses where id = $1", [expense])).rows,
+        [{ actor_id: null, voided_by: null, void_reason: "Duplicate" }]);
+      assert.deepEqual((await db.query("select owner,owner_id from storage.objects where id = $1", [asset])).rows, [{ owner: null, owner_id: null }]);
+      assert.deepEqual((await db.query("select actor_id from public.pos_audit where action='access.account_deleted' and entity_id=$1", [staff])).rows,
+        [{ actor_id: manager }]);
+      await remove(owner, manager, "manager");
+      const accounts = await call<{ row_count: number }>(owner, "admin_list_accounts", ["delete-", 1]);
+      assert.equal(accounts.row_count, 0);
+      assert.equal((await db.query("select id from auth.users where id in ($1,$2,$3)", [customer, staff, manager])).rows.length, 0);
+      assert.equal((await db.query("select id from auth.sessions where user_id in ($1,$2,$3)", [customer, staff, manager])).rows.length, 0);
+    });
   } finally {
     await db.close();
   }
