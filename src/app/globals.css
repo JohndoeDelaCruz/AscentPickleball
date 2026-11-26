@@ -3448,6 +3448,11 @@ img {
   .sign-out {
     display: none;
   }
+  .nav-actions .overview-account {
+    display: inline-grid;
+    min-width: 44px;
+    min-height: 44px;
+  }
   .nav-actions .nav-mobile-primary {
     display: inline-flex;
     min-height: 44px;

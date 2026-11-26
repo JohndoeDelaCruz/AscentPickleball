@@ -50,7 +50,7 @@ export default async function AllBookings({
       <div className="page-heading">
         <Link href="/my-bookings" className="breadcrumb">
           <ArrowLeft size={13} aria-hidden="true" />
-          Current matches
+          My bookings
         </Link>
         <h1>All bookings</h1>
       </div>

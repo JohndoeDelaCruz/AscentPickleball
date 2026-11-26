@@ -23,6 +23,7 @@ export function Header({
   const pathname = usePathname();
   const isHome = pathname === "/";
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isCustomerOverview = signedIn && !staff && pathname === "/my-bookings";
 
   useEffect(() => {
     if (!isHome) return;
@@ -92,32 +93,30 @@ export function Header({
               >
                 {staff ? "Dashboard" : signedIn ? "My bookings" : "Log in"}
               </Link>
-              <Link
-                href="/book"
-                className="button button-dark button-small nav-book-button"
-              >
-                Book a court <ArrowUpRight size={16} />
-              </Link>
-              <Link
-                href={signedIn ? (staff ? "/staff" : "/book") : "/login"}
-                className="button button-dark button-small nav-mobile-primary"
-                onClick={() => setOpen(false)}
-              >
-                {signedIn
-                  ? staff
-                    ? "Dashboard"
-                    : "Book a court"
-                  : "Log in / Sign up"}
-                {signedIn && !staff && (
-                  <ArrowUpRight size={16} aria-hidden="true" />
-                )}
-              </Link>
+              {!isCustomerOverview && (
+                <>
+                  <Link
+                    href="/book"
+                    className="button button-dark button-small nav-book-button"
+                  >
+                    Book a court <ArrowUpRight size={16} />
+                  </Link>
+                  <Link
+                    href={signedIn ? (staff ? "/staff" : "/book") : "/login"}
+                    className="button button-dark button-small nav-mobile-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    {signedIn ? (staff ? "Dashboard" : "Book a court") : "Log in / Sign up"}
+                    {signedIn && !staff && <ArrowUpRight size={16} aria-hidden="true" />}
+                  </Link>
+                </>
+              )}
             </>
           )}
           {signedIn && (
             <Link
               href="/account"
-              className="icon-button account-settings"
+              className={`icon-button account-settings${isCustomerOverview ? " overview-account" : ""}`}
               aria-label="Account settings"
               title="Account settings"
             >

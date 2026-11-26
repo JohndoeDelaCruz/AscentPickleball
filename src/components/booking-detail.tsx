@@ -362,7 +362,7 @@ export function BookingDetail({
         </section>
       </div>
       {owner && awaitingPayment ? (
-        <aside className="panel qr-panel">
+        <aside id="gcash-payment" className="panel qr-panel">
           <span
             className="eyebrow"
             style={{ justifyContent: "center", marginBottom: 13 }}
