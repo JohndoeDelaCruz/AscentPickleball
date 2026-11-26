@@ -48,8 +48,41 @@
   padding-block: calc(64px + var(--header-height)) 78px;
 }
 
-.heroBrandSlot {
+.heroBrands {
   display: none;
+}
+
+.heroBrandSlot {
+  aspect-ratio: 1;
+}
+
+.heroPartner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(10px, 1.2vw, 20px);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.heroBrandCross {
+  color: var(--cream);
+  font-size: clamp(24px, 2.5vw, 38px);
+  line-height: 1;
+  text-shadow: 0 2px 8px #11251b85;
+}
+
+.heroPartnerImage {
+  overflow: hidden;
+}
+
+.heroPartnerImage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* The supplied mark has transparent padding around the wordmark. */
+  scale: 1.42;
+  filter: drop-shadow(0 2px 6px #11251b70);
 }
 
 @media (min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference) {
@@ -59,11 +92,13 @@
     column-gap: clamp(24px, 5vw, 72px);
   }
 
-  .heroBrandSlot {
-    display: block;
+  .heroBrands {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr);
+    align-items: center;
+    gap: clamp(10px, 1.2vw, 20px);
     justify-self: center;
-    width: clamp(220px, 20vw, 340px);
-    aspect-ratio: 1;
+    width: min(100%, 550px);
     translate: 0 -36px;
   }
 }

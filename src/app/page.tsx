@@ -88,7 +88,21 @@ export default async function Home() {
               )}
             </div>
           </div>
-          <div className={styles.heroBrandSlot} data-hero-brand-slot aria-hidden="true" />
+          <div className={styles.heroBrands} data-hero-brands>
+            <div className={styles.heroBrandSlot} data-hero-brand-slot aria-hidden="true" />
+            <div className={styles.heroPartner} data-hero-partner>
+              <span className={styles.heroBrandCross} aria-hidden="true">×</span>
+              <div className={styles.heroPartnerImage}>
+                <Image
+                  src="/alpro-pickleball-logo.png"
+                  alt="ALPRO Pickleball"
+                  width={585}
+                  height={585}
+                  sizes="(min-width: 1101px) and (min-height: 561px) and (prefers-reduced-motion: no-preference) 360px, 1px"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
       <div className={`container ${styles.scheduleWrap}`}>

@@ -14,12 +14,14 @@ function animateHeroBrand(root: HTMLElement) {
   const headerSlot = header?.querySelector<HTMLElement>("[data-home-brand-slot]");
   const brand = headerSlot?.querySelector<HTMLAnchorElement>(".brand");
   const hero = root.querySelector<HTMLElement>("[data-landing-hero]");
-  const heroSlot = hero?.querySelector<HTMLElement>("[data-hero-brand-slot]");
-  if (!header || !headerSlot || !brand || !hero || !heroSlot) return;
+  const brands = hero?.querySelector<HTMLElement>("[data-hero-brands]");
+  const heroSlot = brands?.querySelector<HTMLElement>("[data-hero-brand-slot]");
+  const partner = brands?.querySelector<HTMLElement>("[data-hero-partner]");
+  if (!header || !headerSlot || !brand || !hero || !brands || !heroSlot || !partner) return;
 
   let previousScroll = Math.max(0, window.scrollY);
   let destination = previousScroll === 0 ? 1 : 0;
-  const position = { progress: destination };
+  const position = { progress: destination, reveal: 0 };
   const originalTransform = brand.style.transform;
 
   const render = (
@@ -27,16 +29,32 @@ function animateHeroBrand(root: HTMLElement) {
     headerBottom = header.getBoundingClientRect().bottom,
   ) => {
     const start = headerSlot.getBoundingClientRect();
-    const { progress } = position;
-    const x = (end.left - start.left) * progress;
-    const y = (Math.max(end.top, headerBottom + 12) - start.top) * progress;
-    const scale = gsap.utils.interpolate(1, end.width / start.width, progress);
+    const { progress, reveal } = position;
+    const centeredSize = Math.min(340, end.width * 1.35);
+    const size = gsap.utils.interpolate(centeredSize, end.width, reveal);
+    const left = end.left + (brands.clientWidth - centeredSize) / 2 * (1 - reveal);
+    const top = end.top + (end.width - size) / 2;
+    const x = (left - start.left) * progress;
+    const y = (Math.max(top, headerBottom + 12) - start.top) * progress;
+    const scale = gsap.utils.interpolate(1, size / start.width, progress);
     brand.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+
+    const opacity = Math.max(0, (Math.min(progress, reveal) - 0.25) / 0.75);
+    partner.style.opacity = String(opacity);
+    partner.style.visibility = opacity > 0 ? "visible" : "hidden";
   };
 
   const move = gsap.quickTo(position, "progress", {
     duration: 0.65,
     ease: "power3.inOut",
+    onUpdate: render,
+  });
+  const revealPartner = gsap.to(position, {
+    reveal: 1,
+    paused: true,
+    delay: 0.2,
+    duration: 0.9,
+    ease: "power2.inOut",
     onUpdate: render,
   });
 
@@ -57,6 +75,7 @@ function animateHeroBrand(root: HTMLElement) {
     if (next !== destination) {
       destination = next;
       move(next);
+      if (next) revealPartner.play();
     }
     // A jump to a section below the hero should leave the logo in the header.
     if (hero.getBoundingClientRect().bottom <= headerBottom && position.progress > 0) {
@@ -65,6 +84,7 @@ function animateHeroBrand(root: HTMLElement) {
     render(slot, headerBottom);
   };
 
+  if (destination) revealPartner.play();
   update();
   window.addEventListener("scroll", update, { passive: true });
   window.addEventListener("resize", update);
@@ -72,7 +92,10 @@ function animateHeroBrand(root: HTMLElement) {
     window.removeEventListener("scroll", update);
     window.removeEventListener("resize", update);
     move.tween.kill();
+    revealPartner.kill();
     brand.style.transform = originalTransform;
+    partner.style.removeProperty("opacity");
+    partner.style.removeProperty("visibility");
   };
 }
 
