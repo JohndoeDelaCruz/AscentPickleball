@@ -32,8 +32,8 @@ export function HomePlaySelector({ showOpenPlay }: { showOpenPlay: boolean }) {
   const detail = choices[choice];
 
   return (
-    <section className={`container ${styles.play}`} id="play" aria-labelledby="ways-to-play-title" data-reveal="">
-      <div>
+    <section className={`container ${styles.play}`} id="play" aria-labelledby="ways-to-play-title">
+      <div data-reveal="left">
         <h2 id="ways-to-play-title">Ways to play.</h2>
         {showOpenPlay && (
           <div className={styles.playTabs} role="tablist" aria-label="Ways to play">
@@ -58,7 +58,7 @@ export function HomePlaySelector({ showOpenPlay }: { showOpenPlay: boolean }) {
         )}
       </div>
       <div id={`${id}-panel`} className={styles.playPanel} role={showOpenPlay ? "tabpanel" : undefined}
-        aria-labelledby={showOpenPlay ? `${id}-${choice}` : undefined}>
+        aria-labelledby={showOpenPlay ? `${id}-${choice}` : undefined} data-reveal="right" data-reveal-delay={0.1}>
         <h3>{detail.title}</h3>
         <p>{detail.description}</p>
         <Link href={detail.href} className="button button-lime">

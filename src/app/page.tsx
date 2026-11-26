@@ -121,12 +121,13 @@ export default async function Home() {
           </div>
         </div>
         <div className="court-cards">
-          {courts.map(({ id: court, name }) => (
+          {courts.map(({ id: court, name }, index) => (
             <Link
               href={`/book?court=${court}`}
               className="court-card"
               aria-labelledby={`court-${court}-title`}
               data-reveal=""
+              data-reveal-delay={Math.min(index, 3) * 0.09}
               key={court}
             >
               <Image
@@ -203,7 +204,7 @@ export default async function Home() {
       )}
       <section className="visit-section" id="visit">
         <div className="container visit-grid">
-          <div data-reveal="">
+          <div data-reveal="left">
             <span className="eyebrow">A NEW PLACE TO CONNECT</span>
             <h2>
               SEE YOU
@@ -247,7 +248,7 @@ export default async function Home() {
               </a>
             )}
           </div>
-          <div className="visit-art" aria-hidden="true" data-reveal="">
+          <div className="visit-art" aria-hidden="true" data-reveal="right" data-reveal-delay={0.1}>
             <Image
               src="/pickleball-equipment.jpg"
               alt=""

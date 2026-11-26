@@ -150,7 +150,7 @@ export function Header({
         inert={!open}
       >
         <div className="mobile-nav-clip">
-          <div className="mobile-nav-links">
+          <div className="mobile-nav-links" data-lenis-prevent="">
             {!isAdmin && (
               <>
                 {links.map((link) => (
