@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect, RedirectType } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { signupConfirmationDestination, signupConfirmationReturnPath } from "@/lib/auth-callback";
 import { createClient } from "@/lib/supabase/server";
+import { ConfirmEmailButton } from "./confirm-email-button";
 
 export const metadata: Metadata = {
   title: "Confirm your email",
@@ -39,9 +39,7 @@ export default async function ConfirmEmailPage({
       <form action={confirmEmail} className="panel">
         <input type="hidden" name="token_hash" value={params.token_hash} />
         <input type="hidden" name="next" value={signupConfirmationReturnPath(params.redirect_to)} />
-        <button className="button button-dark" type="submit">
-          Confirm and continue <ArrowRight size={18} aria-hidden="true" />
-        </button>
+        <ConfirmEmailButton />
       </form>
     </main>
   );

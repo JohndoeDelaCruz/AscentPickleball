@@ -2604,6 +2604,16 @@ img {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+.button > .spinner {
+  flex: none;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+.button:disabled:has(> .spinner) {
+  cursor: wait;
+  opacity: 1;
+  transform: none;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);
