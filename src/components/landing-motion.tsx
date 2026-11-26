@@ -42,14 +42,16 @@ function animateHeroBrand(root: HTMLElement) {
 
   const update = () => {
     const scroll = Math.max(0, window.scrollY);
+    const atTop = scroll === 0;
     const delta = scroll - previousScroll;
-    const hasDirection = Math.abs(delta) >= 6 || (scroll === 0 && delta < 0);
-    if (hasDirection) previousScroll = scroll;
+    const hasDirection = Math.abs(delta) >= 6;
+    if (hasDirection || atTop) previousScroll = scroll;
 
     const headerBottom = header.getBoundingClientRect().bottom;
     const slot = heroSlot.getBoundingClientRect();
     let next = destination;
-    if (slot.top < headerBottom + 12) next = 0;
+    if (atTop) next = 1;
+    else if (slot.top < headerBottom + 12) next = 0;
     else if (hasDirection) next = delta > 0 ? 1 : 0;
 
     if (next !== destination) {
