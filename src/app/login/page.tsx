@@ -47,9 +47,11 @@ export default async function LoginPage({
             initialError={
               params.error === "access"
                 ? "You’re signed in, but we couldn’t load your account access. Please try again."
-                : params.error
-                  ? "That sign-in link couldn’t restore your session. If you just confirmed your email, try logging in below with your email and password."
-                  : undefined
+                : params.error === "confirmation"
+                  ? "This email confirmation link couldn’t be verified. If you already confirmed your email, log in below."
+                  : params.error
+                    ? "That sign-in link couldn’t restore your session. If you just confirmed your email, try logging in below with your email and password."
+                    : undefined
             }
           />
           <footer className="auth-panel-footer">

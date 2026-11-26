@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   authCallbackDestination,
+  signupConfirmationDestination,
+  signupConfirmationReturnPath,
   type AuthCallbackClient,
 } from "../src/lib/auth-callback";
 import { authCallbackUrl, siteOrigin } from "../src/lib/site-url";
@@ -173,4 +175,53 @@ test("missing or expired confirmation codes and account lookup failures return u
     ),
     "/login?error=access",
   );
+});
+
+test("signup confirmation recovers the original local return path from the email", () => {
+  const next = "/book?court=2&date=2026-10-24#availability";
+  const emailUrl = new URL("https://ascent.example/auth/confirm");
+  emailUrl.searchParams.set("redirect_to", authCallbackUrl("https://ascent.example", next));
+  assert.equal(signupConfirmationReturnPath(emailUrl.searchParams.get("redirect_to")), next);
+  assert.equal(signupConfirmationReturnPath(authCallbackUrl("https://ascent.example", "//example.com")), "");
+  assert.equal(signupConfirmationReturnPath("https://ascent.example/other?next=/staff"), "");
+});
+
+test("signup token signs in a customer without a browser verifier and preserves a booking return", async () => {
+  const { calls, client } = fixture();
+  const next = "/book?court=2&review=1";
+  const confirmation = {
+    ...client,
+    auth: {
+      verifyOtp: async (input: { type: "email"; token_hash: string }) => {
+        assert.deepEqual(input, { type: "email", token_hash: "fresh-email-token" });
+        assert.equal(calls.roleChecks, 0);
+        return { data: { session: {} }, error: null };
+      },
+    },
+  };
+  assert.equal(await signupConfirmationDestination("fresh-email-token", next, confirmation), next);
+  assert.equal(calls.roleChecks, 1);
+  assert.equal(calls.code, undefined);
+  calls.roleChecks = 0;
+  assert.equal(await signupConfirmationDestination("fresh-email-token", "//example.com", confirmation), "/my-bookings");
+});
+
+test("invalid signup tokens keep a safe login return and never look up staff access", async () => {
+  const { calls, client } = fixture();
+  const confirmation = {
+    ...client,
+    auth: {
+      verifyOtp: async () => ({ data: { session: null }, error: new Error("Expired token") }),
+    },
+  };
+  const next = "/book?play=open";
+  const destination = new URL(
+    await signupConfirmationDestination("expired", next, confirmation),
+    "https://ascent.example",
+  );
+  assert.equal(destination.pathname, "/login");
+  assert.equal(destination.searchParams.get("error"), "confirmation");
+  assert.equal(destination.searchParams.get("next"), next);
+  assert.equal(await signupConfirmationDestination(null, "//example.com", confirmation), "/login?error=confirmation");
+  assert.equal(calls.roleChecks, 0);
 });
